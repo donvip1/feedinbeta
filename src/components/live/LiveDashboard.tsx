@@ -548,70 +548,6 @@ export const LiveDashboard = ({
           </div>
         )}
 
-        {/* Recorded Spaces Section */}
-        {recordedSpaces && recordedSpaces.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Headphones className="w-5 h-5 text-purple-500" />
-                <span className="font-bold">Recorded Spaces</span>
-              </div>
-              <button className="text-sm text-white/60 flex items-center gap-1 hover:text-white transition-colors">
-                View All <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {recordedSpaces.slice(0, 6).map((space: any) => {
-                const duration = space.started_at && space.ended_at
-                  ? Math.floor((new Date(space.ended_at).getTime() - new Date(space.started_at).getTime()) / 60000)
-                  : 0;
-
-                return (
-                  <div
-                    key={space.id}
-                    onClick={() => navigate(`/live/space/${space.id}`)}
-                    className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/50 border border-white/5 hover:bg-slate-800/80 transition-colors cursor-pointer"
-                  >
-                    {space.cover_image_url ? (
-                      <img src={space.cover_image_url} alt={space.title} className="w-14 h-14 rounded-xl object-cover" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                        <Headphones className="w-6 h-6 text-purple-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full uppercase">Replay</span>
-                      </div>
-                      <p className="font-semibold text-sm truncate">{space.title}</p>
-                      <p className="text-xs text-white/50">
-                        {(space.profiles as any)?.display_name || 'Creator'}
-                        {duration > 0 ? ` • ${duration}m` : ''}
-                        {space.peak_viewers ? ` • ${space.peak_viewers} listeners` : ''}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const url = `${window.location.origin}/live/space/${space.share_link || space.id}`;
-                        if (navigator.share) {
-                          navigator.share({ title: space.title, url });
-                        } else {
-                          navigator.clipboard.writeText(url);
-                        }
-                      }}
-                      className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
-                    >
-                      <Share2 className="w-4 h-4 text-white/60" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Recommended For You / Empty State - Real Data */}
         <div>
           <p className="font-bold mb-4">Recommended For You</p>
@@ -672,6 +608,8 @@ export const LiveDashboard = ({
             </div>
           )}
         </div>
+        </>
+        )}
         </div>
       </div>
 
