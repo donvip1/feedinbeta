@@ -12,6 +12,30 @@ import { Mic, Lock, Loader2, Users, Play, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { useQuery } from '@tanstack/react-query';
+
+const ListenerCount = ({ spaceId, fallback }: { spaceId: string; fallback: number }) => {
+  const { data: count } = useQuery({
+    queryKey: ['space-listener-count', spaceId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('live_space_speakers')
+        .select('*', { count: 'exact', head: true })
+        .eq('space_id', spaceId)
+        .is('left_at', null);
+      return count || 0;
+    },
+    enabled: !!spaceId,
+    refetchInterval: 5000,
+  });
+
+  return (
+    <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+      <Users className="w-4 h-4" />
+      <span>{count ?? fallback} listening</span>
+    </div>
+  );
+};
 
 const SpaceDetail = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -293,10 +317,7 @@ const SpaceDetail = () => {
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 <span className="text-red-500 font-medium">Live Now</span>
               </div>
-              <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
-                <Users className="w-4 h-4" />
-                <span>{space?.viewer_count || 0} listening</span>
-              </div>
+              <ListenerCount spaceId={space?.id} fallback={space?.viewer_count || 0} />
             </>
           ) : space?.status === 'scheduled' ? (
             <div className="space-y-1">
