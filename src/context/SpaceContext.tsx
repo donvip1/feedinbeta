@@ -56,6 +56,11 @@ interface SpaceContextType {
   disconnectAudio: () => void;
   startListenerBroadcast: () => Promise<boolean | undefined>;
   localStream: MediaStream | null;
+  room: Room | null;
+  screenShareStream: MediaStream | null;
+  isRemoteScreenSharing: boolean;
+  publishScreenShare: (stream: MediaStream) => Promise<void>;
+  unpublishScreenShare: () => Promise<void>;
 }
 
 const defaultState: SpaceState = {
@@ -87,6 +92,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const user = authContext?.user ?? null;
   const [spaceState, setSpaceState] = useState<SpaceState>(defaultState);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
+  const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false);
   
   // Refs for state management
   const roomRef = useRef<Room | null>(null);
@@ -270,12 +277,18 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       });
 
-      // Handle incoming audio tracks - CRITICAL for receiving audio
+      // Handle incoming tracks - audio AND video (screen share)
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         console.log(`[SpaceContext-LK] 🎧 Track subscribed from ${participant.identity}:`, track.kind);
         
         if (track.kind === Track.Kind.Audio) {
           playRemoteAudio(track, participant.identity);
+        } else if (track.kind === Track.Kind.Video) {
+          // Remote screen share received
+          console.log(`[SpaceContext-LK] 🖥️ Video track (screen share) from ${participant.identity}`);
+          const mediaStream = new MediaStream([track.mediaStreamTrack]);
+          setScreenShareStream(mediaStream);
+          setIsRemoteScreenSharing(true);
         }
       });
 
@@ -283,6 +296,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log(`[SpaceContext-LK] Track unsubscribed from ${participant.identity}`);
         if (track.kind === Track.Kind.Audio) {
           removeRemoteAudio(participant.identity);
+        } else if (track.kind === Track.Kind.Video) {
+          console.log(`[SpaceContext-LK] 🖥️ Screen share ended from ${participant.identity}`);
+          setScreenShareStream(null);
+          setIsRemoteScreenSharing(false);
         }
       });
 
@@ -741,6 +758,51 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
 
+  // Publish screen share to LiveKit room
+  const publishScreenShare = useCallback(async (stream: MediaStream) => {
+    const room = roomRef.current;
+    if (!room || room.state !== ConnectionState.Connected) {
+      console.error('[SpaceContext-LK] Cannot publish screen share - not connected');
+      return;
+    }
+
+    try {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error('No video track in screen share stream');
+
+      console.log('[SpaceContext-LK] 🖥️ Publishing screen share track...');
+      await room.localParticipant.publishTrack(videoTrack, {
+        name: 'screen-share',
+        source: Track.Source.ScreenShare,
+      });
+      console.log('[SpaceContext-LK] ✅ Screen share published');
+    } catch (error) {
+      console.error('[SpaceContext-LK] Failed to publish screen share:', error);
+      throw error;
+    }
+  }, []);
+
+  // Unpublish screen share from LiveKit room
+  const unpublishScreenShare = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+
+    try {
+      // Find and unpublish screen share tracks
+      const publications = room.localParticipant.trackPublications;
+      publications.forEach((pub) => {
+        if (pub.source === Track.Source.ScreenShare || pub.trackName === 'screen-share') {
+          room.localParticipant.unpublishTrack(pub.track!);
+          console.log('[SpaceContext-LK] 🖥️ Screen share unpublished');
+        }
+      });
+      setScreenShareStream(null);
+      setIsRemoteScreenSharing(false);
+    } catch (error) {
+      console.error('[SpaceContext-LK] Failed to unpublish screen share:', error);
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -763,6 +825,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         disconnectAudio,
         startListenerBroadcast,
         localStream,
+        room: roomRef.current,
+        screenShareStream,
+        isRemoteScreenSharing,
+        publishScreenShare,
+        unpublishScreenShare,
       }}
     >
       {children}
