@@ -28,6 +28,7 @@ const STREAM_CATEGORIES = [
 const REQUIRE_PREMIUM_FOR_STREAMING = false;
 
 type RoomType = 'video_broadcast' | 'pk_battle';
+type StreamMode = 'solo' | 'pk-2' | 'pk-4';
 
 interface CreateLiveStreamModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [scheduledTime, setScheduledTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [roomType, setRoomType] = useState<RoomType>('video_broadcast');
+  const [streamMode, setStreamMode] = useState<StreamMode>('solo');
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
@@ -121,6 +123,9 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
         scheduledStart = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
       }
 
+      const effectiveRoomType: RoomType = streamMode === 'solo' ? 'video_broadcast' : 'pk_battle';
+      const pkMaxSlots = streamMode === 'pk-4' ? 4 : 2;
+
       const { data, error } = await supabase
         .from("live_streams")
         .insert({
@@ -135,11 +140,12 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           scheduled_start: scheduledStart,
           started_at: isScheduled ? null : new Date().toISOString(),
           connection_state: 'idle',
-          room_type: roomType,
+          room_type: effectiveRoomType,
+          pk_max_slots: pkMaxSlots,
           cover_image_url: coverImageUrl,
           is_private: isPrivate,
           share_link: Math.floor(100000 + Math.random() * 900000).toString(),
-        })
+        } as any)
         .select()
         .single();
 
@@ -159,6 +165,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setScheduledDate("");
       setScheduledTime("");
       setRoomType('video_broadcast');
+      setStreamMode('solo');
       setCoverImageUrl(null);
       setIsPrivate(false);
     } catch (error: any) {
@@ -224,34 +231,31 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-5 max-h-[60vh]">
-          {/* Stream Type */}
+          {/* Stream Mode */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stream Type</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRoomType('video_broadcast')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 ${
-                  roomType === 'video_broadcast'
-                    ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
-                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:bg-white/[0.06]'
-                }`}
-              >
-                <Video className="w-6 h-6" />
-                <span className="font-black text-xs uppercase tracking-wider">Video</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRoomType('pk_battle')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 ${
-                  roomType === 'pk_battle'
-                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-400'
-                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:bg-white/[0.06]'
-                }`}
-              >
-                <Swords className="w-6 h-6" />
-                <span className="font-black text-xs uppercase tracking-wider">PK Battle</span>
-              </button>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stream Mode</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: 'solo' as StreamMode, icon: <Video className="w-5 h-5" />, label: 'Solo', color: 'rose' },
+                { id: 'pk-2' as StreamMode, icon: <Swords className="w-5 h-5" />, label: '2-Way PK', color: 'purple' },
+                { id: 'pk-4' as StreamMode, icon: <Radio className="w-5 h-5" />, label: '4-Way PK', color: 'orange' },
+              ]).map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setStreamMode(opt.id)}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all active:scale-95 ${
+                    streamMode === opt.id
+                      ? opt.color === 'rose' ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                        : opt.color === 'purple' ? 'bg-purple-500/15 border-purple-500/40 text-purple-400'
+                        : 'bg-orange-500/15 border-orange-500/40 text-orange-400'
+                      : 'bg-white/[0.03] border-white/5 text-slate-400 hover:bg-white/[0.06]'
+                  }`}
+                >
+                  {opt.icon}
+                  <span className="font-black text-[10px] uppercase tracking-wider">{opt.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -436,14 +440,18 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           <button 
             onClick={handleCreate} 
             disabled={loading || premiumLoading || !title.trim()}
-            className="flex-1 py-3.5 bg-white text-black rounded-2xl text-sm font-black flex items-center justify-center gap-2 hover:bg-rose-50 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-white/10"
+            className={`flex-1 py-3.5 rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-lg ${
+              streamMode !== 'solo'
+                ? 'bg-gradient-to-r from-pink-500 to-violet-600 text-white shadow-pink-500/25'
+                : 'bg-white text-black hover:bg-rose-50 shadow-white/10'
+            }`}
           >
             {loading ? (
               <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                {isScheduled ? 'Schedule Stream' : 'Go Live'}
+                {isScheduled ? 'Schedule' : streamMode !== 'solo' ? 'Start PK Battle' : 'Go Live'}
               </>
             )}
           </button>
