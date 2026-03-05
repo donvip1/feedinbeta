@@ -666,6 +666,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(giftChannel);
       supabase.removeChannel(streamChannel);
+      supabase.removeChannel(viewerChangesChannel);
     };
   }, [streamId, user?.id, stream?.user_id]);
 
