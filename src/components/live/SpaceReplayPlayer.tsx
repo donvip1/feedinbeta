@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Download, Share2, X, Clock } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Download, Share2, X, Clock, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigation } from '@/context/NavigationContext';
+import { SpaceChat } from './SpaceChat';
 
 interface SpaceReplayPlayerProps {
   spaceId: string;
@@ -27,6 +28,7 @@ interface SpaceData {
   peak_viewers: number;
   topic_category: string;
   user_id: string;
+  cover_image_url?: string;
   host?: {
     display_name: string;
     username: string;
@@ -44,11 +46,11 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showChat, setShowChat] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Hide bottom navigation when in replay player
   useEffect(() => {
     setHideBottomNav(true);
     return () => setHideBottomNav(false);
@@ -76,7 +78,6 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
       return;
     }
 
-    // Fetch host profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('display_name, username, avatar_url')
@@ -107,11 +108,7 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
   };
 
   const togglePlayPause = () => {
-    if (isPlaying) {
-      handlePause();
-    } else {
-      handlePlay();
-    }
+    isPlaying ? handlePause() : handlePlay();
   };
 
   const startProgressUpdate = () => {
@@ -181,8 +178,6 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
 
   const handleShare = async () => {
     const shareUrl = shareUrls.liveSpace(spaceId);
-    
-    // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
       try {
         await navigator.share({
@@ -192,39 +187,14 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
         });
         return;
       } catch (error: any) {
-        // If user cancelled, don't fall through to clipboard
         if (error?.name === 'AbortError') return;
       }
     }
-    
-    // Fallback to clipboard with multiple methods
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success('Link copied to clipboard!');
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        textArea.style.top = '-9999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        if (successful) {
-          toast.success('Link copied to clipboard!');
-        } else {
-          toast.error('Could not copy link. Please copy manually: ' + shareUrl);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to copy:', error);
-      toast.error('Could not copy link. Please copy manually: ' + shareUrl);
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Link copied!');
+    } catch {
+      toast.error('Could not copy link');
     }
   };
 
@@ -233,7 +203,6 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
       toast.error('No recording available');
       return;
     }
-
     try {
       const response = await fetch(space.recording_url);
       const blob = await response.blob();
@@ -246,38 +215,54 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success('Download started!');
-    } catch (error) {
-      toast.error('Failed to download recording');
+    } catch {
+      toast.error('Failed to download');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading replay...</div>
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+        <div className="animate-pulse text-zinc-400 text-sm">Loading replay...</div>
       </div>
     );
   }
 
   if (!space || !space.recording_url) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center">
-        <p className="text-muted-foreground mb-4">Recording not available</p>
-        <Button onClick={onClose}>Close</Button>
+      <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-zinc-400 text-sm">Recording not available</p>
+        <Button onClick={onClose} variant="outline" size="sm">Close</Button>
       </div>
     );
   }
 
+  // Chat overlay
+  if (showChat) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <SpaceChat
+          spaceId={spaceId}
+          onClose={() => setShowChat(false)}
+          spaceTitle={space.title}
+          coverImageUrl={space.cover_image_url}
+        />
+      </div>
+    );
+  }
+
+  const durationMins = space.started_at && space.ended_at
+    ? Math.floor((new Date(space.ended_at).getTime() - new Date(space.started_at).getTime()) / 60000)
+    : 0;
+
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
       {/* Audio element */}
       <audio
         ref={audioRef}
         src={space.recording_url}
         onLoadedMetadata={() => {
-          if (audioRef.current) {
-            setDuration(audioRef.current.duration);
-          }
+          if (audioRef.current) setDuration(audioRef.current.duration);
         }}
         onEnded={() => {
           setIsPlaying(false);
@@ -285,77 +270,100 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
         }}
       />
 
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between">
+      {/* Header - compact */}
+      <div className="flex items-center gap-2 px-3 py-2 pt-safe border-b border-white/5 shrink-0">
+        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-8 h-8 text-zinc-400 hover:text-white">
+          <X className="w-5 h-5" />
+        </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="secondary" className="bg-muted">
-              <Clock className="w-3 h-3 mr-1" />
-              Replay
-            </Badge>
+          <h1 className="text-sm font-bold text-white truncate">{space.title}</h1>
+          <p className="text-[10px] text-zinc-500 truncate">
+            {space.host?.display_name} · Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Badge variant="secondary" className="bg-zinc-800/80 text-zinc-400 text-[10px] px-2 py-0.5 border-0">
+            <Clock className="w-3 h-3 mr-1" />
+            Replay
+          </Badge>
+        </div>
+      </div>
+
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Host card + visualization */}
+        <div className="flex flex-col items-center justify-center px-4 py-6 gap-5">
+          {/* Animated avatar visualization */}
+          <div className="relative">
+            <div className={cn(
+              "w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-gradient-to-br from-purple-500/20 to-purple-500/5 flex items-center justify-center transition-all",
+              isPlaying && "animate-pulse"
+            )}>
+              <div className={cn(
+                "w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-gradient-to-br from-purple-500/30 to-purple-500/10 flex items-center justify-center",
+                isPlaying && "animate-pulse"
+              )}>
+                <Avatar className="w-20 h-20 sm:w-28 sm:h-28 ring-4 ring-purple-500/20">
+                  <AvatarImage src={space.host?.avatar_url || ''} />
+                  <AvatarFallback className="text-xl bg-zinc-800 text-zinc-300">{space.host?.display_name?.[0] || 'H'}</AvatarFallback>
+                </Avatar>
+              </div>
+            </div>
+          </div>
+
+          {/* Host info */}
+          <div className="text-center space-y-1 w-full max-w-xs">
+            <p className="font-bold text-white text-base">{space.host?.display_name || 'Unknown Host'}</p>
+            <p className="text-xs text-zinc-500">@{space.host?.username || 'unknown'}</p>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-4 flex-wrap justify-center">
             {space.topic_category && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-[10px] border-zinc-700 text-zinc-400">
                 {space.topic_category}
               </Badge>
             )}
+            <span className="text-[10px] text-zinc-500">{space.peak_viewers || space.viewer_count || 0} listeners</span>
+            {durationMins > 0 && <span className="text-[10px] text-zinc-500">{durationMins} min</span>}
           </div>
-          <h1 className="text-lg font-bold truncate">{space.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}
-          </p>
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="w-5 h-5" />
-        </Button>
-      </div>
 
-      {/* Host info */}
-      <div className="p-4 flex items-center gap-3 border-b">
-        <Avatar className="w-12 h-12">
-          <AvatarImage src={space.host?.avatar_url || ''} />
-          <AvatarFallback>{space.host?.display_name?.[0] || 'H'}</AvatarFallback>
-        </Avatar>
-        <div>
-          <p className="font-medium">{space.host?.display_name || 'Unknown Host'}</p>
-          <p className="text-sm text-muted-foreground">@{space.host?.username || 'unknown'}</p>
-        </div>
-        <div className="ml-auto text-right text-sm text-muted-foreground">
-          <p>{space.peak_viewers || space.viewer_count} peak listeners</p>
-        </div>
-      </div>
+          {/* Description */}
+          {space.description && (
+            <p className="text-xs text-zinc-400 text-center max-w-sm leading-relaxed px-2">{space.description}</p>
+          )}
 
-      {/* Description */}
-      {space.description && (
-        <div className="p-4 border-b">
-          <p className="text-sm text-muted-foreground">{space.description}</p>
-        </div>
-      )}
-
-      {/* Visualization area */}
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-background to-muted/20">
-        <div className="relative">
-          {/* Audio visualization placeholder */}
-          <div className={cn(
-            "w-40 h-40 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center",
-            isPlaying && "animate-pulse"
-          )}>
-            <div className={cn(
-              "w-32 h-32 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center",
-              isPlaying && "animate-pulse"
-            )}>
-              <Avatar className="w-24 h-24 ring-4 ring-primary/20">
-                <AvatarImage src={space.host?.avatar_url || ''} />
-                <AvatarFallback className="text-2xl">{space.host?.display_name?.[0] || 'H'}</AvatarFallback>
-              </Avatar>
-            </div>
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 flex-wrap justify-center">
+            <button
+              onClick={() => setShowChat(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-300 hover:bg-zinc-700/80 text-xs font-medium transition-all active:scale-95"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chat
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-300 hover:bg-zinc-700/80 text-xs font-medium transition-all active:scale-95"
+            >
+              <Share2 className="w-4 h-4" />
+              Share
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-300 hover:bg-zinc-700/80 text-xs font-medium transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Player controls */}
-      <div className="p-4 border-t bg-background/95 backdrop-blur-sm">
+      {/* Player controls - fixed bottom */}
+      <div className="shrink-0 border-t border-white/5 bg-zinc-950/95 backdrop-blur-sm px-4 pt-3 pb-safe">
         {/* Progress bar */}
-        <div className="mb-4">
+        <div className="mb-3">
           <Slider
             value={[currentTime]}
             max={duration || 100}
@@ -363,68 +371,45 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
             onValueChange={handleSeek}
             className="w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+          <div className="flex justify-between text-[10px] text-zinc-500 mt-1 px-0.5">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center justify-between">
-          {/* Left controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
+        {/* Controls row - responsive */}
+        <div className="flex items-center justify-between gap-1">
+          {/* Left: Speed + Volume */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
               onClick={handleSpeedChange}
-              className="text-xs"
+              className="px-2 py-1.5 rounded-lg bg-zinc-800/60 text-[10px] font-bold text-zinc-400 hover:text-white transition-colors min-w-[36px]"
             >
               {playbackSpeed}x
-            </Button>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={toggleMute}>
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </Button>
-              <Slider
-                value={[isMuted ? 0 : volume]}
-                max={1}
-                step={0.01}
-                onValueChange={handleVolumeChange}
-                className="w-20"
-              />
-            </div>
+            </button>
+            <button onClick={toggleMute} className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
           </div>
 
-          {/* Center controls */}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => skip(-15)}>
+          {/* Center: Playback controls */}
+          <div className="flex items-center gap-1">
+            <button onClick={() => skip(-15)} className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors active:scale-90">
               <SkipBack className="w-5 h-5" />
-            </Button>
-            <Button
-              size="icon"
-              className="w-12 h-12 rounded-full"
+            </button>
+            <button
               onClick={togglePlayPause}
+              className="w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center text-white transition-all active:scale-90 shadow-lg shadow-purple-500/20"
             >
-              {isPlaying ? (
-                <Pause className="w-6 h-6" />
-              ) : (
-                <Play className="w-6 h-6 ml-0.5" />
-              )}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => skip(15)}>
+              {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+            </button>
+            <button onClick={() => skip(15)} className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors active:scale-90">
               <SkipForward className="w-5 h-5" />
-            </Button>
+            </button>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleShare}>
-              <Share2 className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleDownload}>
-              <Download className="w-4 h-4" />
-            </Button>
-          </div>
+          {/* Right: spacer for balance */}
+          <div className="w-[76px] shrink-0" />
         </div>
       </div>
     </div>
