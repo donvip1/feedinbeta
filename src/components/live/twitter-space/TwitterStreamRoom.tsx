@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -1298,9 +1298,24 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]">
+    <div
+      className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]"
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+        contain: 'layout style paint',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      }}
+    >
       {/* VIDEO ENGINE */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
         {isPKMode && battleParticipants.length > 0 ? (
           // PK MODE: Grid or Focus layout
           focusedParticipantId === null ? (
