@@ -230,10 +230,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const isPKMode = stream?.room_type === 'pk_battle';
   const pkMaxSlots = (stream as any)?.pk_max_slots || 2;
 
-  // Hide bottom nav
+  // Hide bottom nav + prevent overscroll for native feel
   useEffect(() => {
     setHideBottomNav(true);
-    return () => setHideBottomNav(false);
+    
+    // Prevent overscroll/bounce on iOS
+    const preventOverscroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest('[data-scrollable="true"]') || target.closest('.scrollbar-hide');
+      if (!scrollable) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('touchmove', preventOverscroll, { passive: false });
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
+    return () => {
+      setHideBottomNav(false);
+      document.removeEventListener('touchmove', preventOverscroll);
+      document.body.style.overscrollBehavior = '';
+      document.documentElement.style.overscrollBehavior = '';
+    };
   }, [setHideBottomNav]);
 
   // Fetch user credits
