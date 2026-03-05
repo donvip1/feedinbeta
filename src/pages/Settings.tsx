@@ -50,50 +50,109 @@ import {
 import feedinLogo from '@/assets/feedin-logo.png';
 
 const CheckForUpdatesButton = () => {
-  const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date'>('idle');
+  const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date' | 'installing'>('idle');
 
   const checkForUpdates = useCallback(async () => {
     setStatus('checking');
     try {
       if (!('serviceWorker' in navigator)) {
         setStatus('up-to-date');
+        setTimeout(() => setStatus('idle'), 4000);
         return;
       }
       const reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) { setStatus('up-to-date'); return; }
-      await reg.update();
-      if (reg.waiting || reg.installing) {
+      if (!reg) { 
+        setStatus('up-to-date'); 
+        setTimeout(() => setStatus('idle'), 4000);
+        return; 
+      }
+
+      // If there's already a waiting worker, update is available
+      if (reg.waiting) {
+        setStatus('available');
+        return;
+      }
+
+      // Listen for new worker found during this update check
+      const updatePromise = new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 10000); // 10s timeout
+
+        const onUpdateFound = () => {
+          const newWorker = reg.installing;
+          if (!newWorker) { clearTimeout(timeout); resolve(true); return; }
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed') {
+              clearTimeout(timeout);
+              resolve(true);
+            }
+          });
+        };
+
+        reg.addEventListener('updatefound', onUpdateFound, { once: true });
+
+        // Trigger the actual update check
+        reg.update().then(() => {
+          // After update() resolves, check if waiting appeared
+          if (reg.waiting) {
+            clearTimeout(timeout);
+            resolve(true);
+          }
+          // Otherwise wait for updatefound event or timeout
+        }).catch(() => {
+          clearTimeout(timeout);
+          resolve(false);
+        });
+      });
+
+      const hasUpdate = await updatePromise;
+      
+      if (hasUpdate || reg.waiting) {
         setStatus('available');
       } else {
         setStatus('up-to-date');
-        setTimeout(() => setStatus('idle'), 3000);
+        setTimeout(() => setStatus('idle'), 4000);
       }
     } catch {
       setStatus('up-to-date');
-      setTimeout(() => setStatus('idle'), 3000);
+      setTimeout(() => setStatus('idle'), 4000);
     }
   }, []);
 
-  const applyUpdate = useCallback(() => {
-    navigator.serviceWorker.getRegistration().then(reg => {
+  const applyUpdate = useCallback(async () => {
+    setStatus('installing');
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
       if (reg?.waiting) {
+        // Listen for the new controller to activate, then reload
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        }, { once: true });
         reg.waiting.postMessage({ action: 'skipWaiting' });
-        window.location.reload();
+        // Fallback reload after 3s if controllerchange doesn't fire
+        setTimeout(() => window.location.reload(), 3000);
       } else {
+        // No waiting worker — force clear caches and reload
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
         window.location.reload();
       }
-    });
+    } catch {
+      window.location.reload();
+    }
   }, []);
 
   return (
     <div className="mb-3 space-y-2">
       <button
-        onClick={status === 'available' ? applyUpdate : checkForUpdates}
-        disabled={status === 'checking'}
+        onClick={status === 'available' ? applyUpdate : status === 'installing' ? undefined : checkForUpdates}
+        disabled={status === 'checking' || status === 'installing'}
         className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all duration-200 disabled:opacity-60"
       >
         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-          {status === 'checking' ? (
+          {status === 'checking' || status === 'installing' ? (
             <Loader2 className="w-5 h-5 text-primary animate-spin" />
           ) : status === 'available' ? (
             <Download className="w-5 h-5 text-green-500" />
@@ -106,17 +165,20 @@ const CheckForUpdatesButton = () => {
         <div className="flex-1 text-left">
           <p className="text-sm font-semibold text-foreground">
             {status === 'checking' ? 'Checking for updates...' :
+             status === 'installing' ? 'Installing update...' :
              status === 'available' ? 'Update Available — Tap to Install' :
              status === 'up-to-date' ? 'You\'re up to date!' :
              'Check for Updates'}
           </p>
           <p className="text-xs text-muted-foreground">
-            {status === 'available' ? 'A new version is ready to install' :
+            {status === 'checking' ? 'Please wait...' :
+             status === 'installing' ? 'App will restart shortly' :
+             status === 'available' ? 'A new version is ready to install' :
              status === 'up-to-date' ? 'Running the latest version' :
              'See if a newer version is available'}
           </p>
         </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        {status !== 'installing' && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       </button>
     </div>
   );
