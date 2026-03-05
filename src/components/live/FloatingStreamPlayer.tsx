@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOptionalLiveStreamContext } from '@/context/LiveStreamContext';
-import { X, Maximize2, Play } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const FloatingStreamPlayer: React.FC = () => {
