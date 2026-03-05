@@ -19,20 +19,7 @@ import {
   Trash2,
   Tv,
 } from "lucide-react";
-  Bell,
-  Plus,
-  Flame,
-  ChevronRight,
-  Play,
-  Radio,
-  Users,
-  Mic,
-  Video,
-  Calendar,
-  Sparkles,
-  Headphones,
-  Share2,
-  Trash2,
+  Tv,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
