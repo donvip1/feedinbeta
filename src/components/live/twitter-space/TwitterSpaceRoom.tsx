@@ -1196,6 +1196,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
             <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
           </div>
+          {/* Settings button - moved to header */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
+          >
+            <MoreHorizontal className="w-5 h-5 text-white" />
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {isHost && raisedHandsCount > 0 && (
@@ -1485,21 +1492,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-[#0F1119]">!</span>
               )}
             </button>
-            <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">
-              {canSpeak ? (isMicOn ? 'On Air' : 'Muted') : hasRaisedHand ? 'Pending' : 'Request'}
-            </span>
           </div>
 
           {/* React button - available to ALL participants */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={() => setShowReactions(true)}
-              className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
-            >
-              <Heart className="w-6 h-6 text-slate-400" />
-            </button>
-            <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">React</span>
-          </div>
+          <button
+            onClick={() => setShowReactions(true)}
+            className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
+          >
+            <Heart className="w-6 h-6 text-slate-400" />
+          </button>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
@@ -1522,14 +1523,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {unreadMessages}
               </span>
             )}
-          </button>
-
-          {/* More / Settings */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
-          >
-            <MoreHorizontal className="w-6 h-6 text-white" />
           </button>
 
           {/* Volume */}
