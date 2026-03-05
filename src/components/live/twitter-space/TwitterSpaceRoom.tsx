@@ -1718,13 +1718,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
           {/* Listeners Section */}
           {sortedSpeakers.filter(s => s.role === 'listener').length > 0 && (
-            <div className="border-t border-white/5 pt-8">
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+            <div className="border-t border-white/5 pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
                   Listeners ({sortedSpeakers.filter(s => s.role === 'listener').length})
                 </h4>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-6 opacity-80">
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 opacity-80">
                 {sortedSpeakers
                   .filter(s => s.role === 'listener')
                   .slice(0, 18)
@@ -1733,7 +1733,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                       key={speaker.id}
                       className="flex flex-col items-center gap-2"
                     >
-                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5 cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/5 cursor-pointer active:scale-95 transition-transform duration-75" onClick={() => navigateToProfile(speaker.user_id)}>
                         {speaker.profile?.avatar_url ? (
                           <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
                         ) : (
