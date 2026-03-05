@@ -38,6 +38,8 @@ import {
   Speaker,
   Monitor,
   MonitorOff,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { shareUrls } from '@/lib/url-utils';
@@ -186,8 +188,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [volumeLevel, setVolumeLevel] = useState(100);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [isScreenFullscreen, setIsScreenFullscreen] = useState(false);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const remoteScreenVideoRef = useRef<HTMLVideoElement>(null);
+  const screenContainerRef = useRef<HTMLDivElement>(null);
   
   // Speaker management states
   const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
@@ -873,6 +877,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
   // Get remote screen share from SpaceContext
   const remoteScreenSharing = (spaceContext?.isRemoteScreenSharing && !spaceContext?.screenShareDismissed) ?? false;
+  const remoteScreenDismissedButActive = (spaceContext?.isRemoteScreenSharing && spaceContext?.screenShareDismissed) ?? false;
   const remoteScreenStream = spaceContext?.screenShareStream ?? null;
 
   // Attach remote screen stream to video element
@@ -888,6 +893,41 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       screenVideoRef.current.srcObject = screenStream;
     }
   }, [screenStream]);
+
+  // Fullscreen toggle for screen share
+  const toggleScreenFullscreen = async () => {
+    if (!screenContainerRef.current) return;
+    try {
+      if (!document.fullscreenElement) {
+        await screenContainerRef.current.requestFullscreen();
+        setIsScreenFullscreen(true);
+        // Lock to landscape on mobile if supported
+        try {
+          await (screen.orientation as any)?.lock?.('landscape');
+        } catch {}
+      } else {
+        await document.exitFullscreen();
+        setIsScreenFullscreen(false);
+        try {
+          screen.orientation?.unlock?.();
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Fullscreen not supported:', e);
+    }
+  };
+
+  // Listen for fullscreen exit
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) {
+        setIsScreenFullscreen(false);
+        try { screen.orientation?.unlock?.(); } catch {}
+      }
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const handleLeave = async () => {
     // Stop screen share if active
@@ -1413,15 +1453,35 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </div>
       </div>
 
+      {/* Screen Share Recall Button - shown when dismissed but still active */}
+      {remoteScreenDismissedButActive && (
+        <button
+          onClick={() => spaceContext?.undismissScreenShare()}
+          className="mx-4 mt-2 flex items-center gap-2 bg-purple-600/20 border border-purple-500/30 text-purple-400 px-4 py-2 rounded-xl text-xs font-bold hover:bg-purple-600/30 transition-colors"
+        >
+          <Monitor className="w-4 h-4" />
+          Show Shared Screen
+        </button>
+      )}
+
       {/* Screen Share Overlay */}
       {(isScreenSharing || remoteScreenSharing) && (
-        <div className="relative bg-black border-b border-white/10">
+        <div 
+          ref={screenContainerRef}
+          className={cn(
+            "relative bg-black border-b border-white/10",
+            isScreenFullscreen && "fixed inset-0 z-[100] border-none"
+          )}
+        >
           <video
             ref={isScreenSharing ? screenVideoRef : remoteScreenVideoRef}
             autoPlay
             playsInline
             muted={isScreenSharing}
-            className="w-full max-h-[40vh] object-contain bg-black"
+            className={cn(
+              "w-full object-contain bg-black",
+              isScreenFullscreen ? "h-full" : "max-h-[40vh]"
+            )}
           />
           <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/60 px-3 py-1 rounded-full">
             <Monitor className="w-3 h-3 text-green-400" />
@@ -1429,23 +1489,35 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               {isScreenSharing ? 'You are sharing' : 'Screen shared'}
             </span>
           </div>
-          {isScreenSharing && (
+          
+          {/* Right side controls */}
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            {/* Fullscreen toggle */}
             <button
-              onClick={stopScreenShare}
-              className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-red-600 transition-colors"
+              onClick={toggleScreenFullscreen}
+              className="bg-zinc-700/80 text-white p-1.5 rounded-full hover:bg-zinc-600 transition-colors"
             >
-              Stop Sharing
+              {isScreenFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
-          )}
-          {!isScreenSharing && remoteScreenSharing && (
-            <button
-              onClick={() => spaceContext?.dismissScreenShare()}
-              className="absolute top-2 right-2 bg-zinc-700/80 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-zinc-600 transition-colors"
-            >
-              <X className="w-3 h-3 inline mr-1" />
-              Hide
-            </button>
-          )}
+            
+            {isScreenSharing && (
+              <button
+                onClick={stopScreenShare}
+                className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-red-600 transition-colors"
+              >
+                Stop Sharing
+              </button>
+            )}
+            {!isScreenSharing && remoteScreenSharing && (
+              <button
+                onClick={() => spaceContext?.dismissScreenShare()}
+                className="bg-zinc-700/80 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-zinc-600 transition-colors"
+              >
+                <X className="w-3 h-3 inline mr-1" />
+                Hide
+              </button>
+            )}
+          </div>
         </div>
       )}
 

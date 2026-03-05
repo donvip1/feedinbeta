@@ -63,6 +63,7 @@ interface SpaceContextType {
   publishScreenShare: (stream: MediaStream) => Promise<void>;
   unpublishScreenShare: () => Promise<void>;
   dismissScreenShare: () => void;
+  undismissScreenShare: () => void;
   screenSharerIdentity: string | null;
 }
 
@@ -829,6 +830,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setScreenShareDismissed(true);
   }, []);
 
+  // Undismiss - show screen share again
+  const undismissScreenShare = useCallback(() => {
+    setScreenShareDismissed(false);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -858,6 +864,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         publishScreenShare,
         unpublishScreenShare,
         dismissScreenShare,
+        undismissScreenShare,
         screenSharerIdentity,
       }}
     >
