@@ -1946,55 +1946,126 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-black text-lg flex items-center gap-2">
-                  <Swords className="w-5 h-5 text-purple-400" /> Invite Creators
+                  <UserPlus className="w-5 h-5 text-purple-400" /> Invite to Stream
                 </h3>
                 <button onClick={() => setShowInviteModal(false)} className="p-2 bg-white/5 rounded-full">
                   <X className="w-4 h-4 text-white/60" />
                 </button>
               </div>
 
+              {/* Username search */}
               <div className="flex items-center bg-white/5 rounded-2xl px-4 py-3 border border-white/5 mb-4">
                 <Search className="w-4 h-4 text-white/30" />
                 <input
                   type="text"
-                  placeholder="Search creators..."
+                  value={inviteUsername}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setInviteUsername(val);
+                    if (val.length >= 2) {
+                      setInviteSearching(true);
+                      const { data } = await supabase
+                        .from('profiles')
+                        .select('id, display_name, username, avatar_url')
+                        .or(`username.ilike.%${val}%,display_name.ilike.%${val}%`)
+                        .neq('id', user?.id || '')
+                        .limit(10);
+                      setInviteSearchResults(data || []);
+                      setInviteSearching(false);
+                    } else {
+                      setInviteSearchResults([]);
+                    }
+                  }}
+                  placeholder="Search by username..."
                   className="flex-1 bg-transparent text-white placeholder-white/30 outline-none ml-3 text-sm"
                 />
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-                {viewers.filter(v => v.user_id !== host?.id).map(viewer => {
-                  const isJoined = battleParticipants.some(p => p.id === viewer.user_id);
-                  return (
-                    <div key={viewer.user_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={viewer.profile?.avatar_url || ''}
-                          alt={viewer.profile?.display_name}
-                          className="w-10 h-10 rounded-full"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-white font-bold text-sm truncate">{viewer.profile?.display_name}</p>
-                          <p className="text-white/40 text-xs">@{viewer.profile?.username}</p>
+                {/* Search results */}
+                {inviteUsername.length >= 2 && (
+                  <>
+                    {inviteSearching && <p className="text-center text-white/30 text-sm py-4">Searching...</p>}
+                    {!inviteSearching && inviteSearchResults.map((profile: any) => {
+                      const isJoined = battleParticipants.some(p => p.id === profile.id);
+                      const isInStream = viewers.some(v => v.user_id === profile.id) || profile.id === host?.id;
+                      return (
+                        <div key={profile.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img src={profile.avatar_url || ''} alt={profile.display_name} className="w-10 h-10 rounded-full" />
+                            <div className="min-w-0">
+                              <p className="text-white font-bold text-sm truncate">{profile.display_name}</p>
+                              <p className="text-white/40 text-xs">@{profile.username}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (isPKMode) {
+                                handleInviteCreator(profile.id);
+                              } else {
+                                // Send invite notification
+                                supabase.channel(`stream-events-${streamId}`).send({
+                                  type: 'broadcast',
+                                  event: 'invite_user',
+                                  payload: { user_id: profile.id, display_name: profile.display_name },
+                                });
+                                toast.success(`Invited @${profile.username}`);
+                              }
+                              setInviteUsername('');
+                              setInviteSearchResults([]);
+                            }}
+                            disabled={isJoined}
+                            className={cn(
+                              "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                              isJoined ? 'bg-gray-800 text-gray-500'
+                                : isInStream ? 'bg-blue-600 text-white'
+                                : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                            )}
+                          >
+                            {isJoined ? 'On Stage' : isInStream ? 'In Stream' : 'Invite'}
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => handleInviteCreator(viewer.user_id)}
-                        disabled={isJoined || battleParticipants.length >= pkMaxSlots}
-                        className={cn(
-                          "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
-                          isJoined
-                            ? 'bg-gray-800 text-gray-500'
-                            : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
-                        )}
-                      >
-                        {isJoined ? 'On Stage' : 'Invite'}
-                      </button>
-                    </div>
-                  );
-                })}
-                {viewers.filter(v => v.user_id !== host?.id).length === 0 && (
-                  <p className="text-center text-white/30 text-sm py-8">No viewers to invite yet</p>
+                      );
+                    })}
+                    {!inviteSearching && inviteSearchResults.length === 0 && inviteUsername.length >= 2 && (
+                      <p className="text-center text-white/30 text-sm py-4">No users found</p>
+                    )}
+                  </>
+                )}
+
+                {/* Current viewers (when not searching) */}
+                {inviteUsername.length < 2 && (
+                  <>
+                    <p className="text-white/30 text-xs font-bold uppercase tracking-wider mb-2">Current Viewers</p>
+                    {viewers.filter(v => v.user_id !== host?.id).map(viewer => {
+                      const isJoined = battleParticipants.some(p => p.id === viewer.user_id);
+                      return (
+                        <div key={viewer.user_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img src={viewer.profile?.avatar_url || ''} alt={viewer.profile?.display_name} className="w-10 h-10 rounded-full" />
+                            <div className="min-w-0">
+                              <p className="text-white font-bold text-sm truncate">{viewer.profile?.display_name}</p>
+                              <p className="text-white/40 text-xs">@{viewer.profile?.username}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleInviteCreator(viewer.user_id)}
+                            disabled={isJoined || (isPKMode && battleParticipants.length >= pkMaxSlots)}
+                            className={cn(
+                              "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                              isJoined ? 'bg-gray-800 text-gray-500'
+                                : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                            )}
+                          >
+                            {isJoined ? 'On Stage' : 'Invite'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {viewers.filter(v => v.user_id !== host?.id).length === 0 && (
+                      <p className="text-center text-white/30 text-sm py-8">No viewers yet</p>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
