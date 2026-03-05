@@ -9,6 +9,7 @@ interface Transaction {
   type: string;
   description: string | null;
   stripe_payment_intent_id?: string | null;
+  payment_reference?: string | null;
   created_at: string;
 }
 
@@ -91,9 +92,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions }
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(tx.created_at), 'MMM d, yyyy · h:mm a')}
                   </p>
-                  {isPurchase(tx) && tx.stripe_payment_intent_id && (
+                  {isPurchase(tx) && (tx.payment_reference || tx.stripe_payment_intent_id) && (
                     <p className="text-[10px] text-muted-foreground/70 font-mono truncate">
-                      Ref: {tx.stripe_payment_intent_id}
+                      Ref: {tx.payment_reference || tx.stripe_payment_intent_id}
                     </p>
                   )}
                 </div>
