@@ -1268,21 +1268,48 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         </button>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Host: Gift appreciation to viewers */}
+          {isHost && (
+            <button
+              onClick={() => setShowStreamGiftModal(true)}
+              className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
+              title="Gift viewers"
+            >
+              <Gift className="w-4 h-4 text-amber-400" />
+            </button>
+          )}
+
+          {/* Share */}
+          <button
+            onClick={() => setShowShare(true)}
+            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+          >
+            <Share2 className="w-4 h-4 text-white" />
+          </button>
+
           {/* Settings */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-5 h-5 text-white" />
+            <MoreHorizontal className="w-4 h-4 text-white" />
           </button>
 
           {/* Minimize / PiP */}
           <button
             onClick={handleMinimize}
-            className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
           >
-            <Minimize2 className="w-5 h-5 text-white" />
+            <Minimize2 className="w-4 h-4 text-white" />
+          </button>
+
+          {/* End / Leave */}
+          <button
+            onClick={isHost ? handleEndStream : handleViewerLeave}
+            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white text-xs font-bold active:scale-90 transition-all"
+          >
+            {isHost ? 'End' : 'Leave'}
           </button>
         </div>
       </div>
