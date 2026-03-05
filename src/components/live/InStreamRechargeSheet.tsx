@@ -45,19 +45,18 @@ export const InStreamRechargeSheet: React.FC<InStreamRechargeSheetProps> = ({
     if (!isOpen) return;
     const fetchData = async () => {
       setLoadingPackages(true);
-      const [{ data: pkgs }, { data: rates }] = await Promise.all([
-        supabase
-          .from('credit_packages')
-          .select('*')
-          .eq('is_active', true)
-          .gte('credits', 50)
-          .order('price', { ascending: true }),
-        supabase
-          .from('exchange_rates')
-          .select('*')
-          .eq('is_active', true)
-          .single(),
-      ]);
+      const { data: pkgs } = await supabase
+        .from('credit_packages')
+        .select('*')
+        .eq('is_active', true)
+        .gte('credits', 50)
+        .order('price', { ascending: true });
+
+      const { data: rates } = await supabase
+        .from('exchange_rates' as any)
+        .select('*')
+        .eq('is_active', true)
+        .single();
 
       if (pkgs) {
         setPackages(pkgs as CreditPackage[]);
