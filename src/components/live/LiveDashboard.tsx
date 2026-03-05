@@ -19,8 +19,6 @@ import {
   Trash2,
   Tv,
 } from "lucide-react";
-  Tv,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LiveDiscoverCard } from "./LiveDiscoverCard";
