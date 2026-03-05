@@ -2112,9 +2112,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       {/* CHAT SIDEBAR */}
       {showChat && (
         <motion.div
-          initial={{ opacity: 0, x: 300 }}
+          initial={{ opacity: 0, x: 200 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 300 }}
+          exit={{ opacity: 0, x: 200 }}
+          transition={{ type: 'tween', duration: 0.15 }}
           className="fixed inset-0 z-50 bg-black/60 flex justify-end"
           onClick={() => setShowChat(false)}
         >
@@ -2123,10 +2124,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             onClick={e => e.stopPropagation()}
           >
             {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-              <h2 className="text-white font-bold">Space</h2>
-              <button onClick={() => setShowChat(false)} className="p-2">
-                <X className="w-5 h-5 text-white" />
+            <div className="px-3 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-white font-bold text-sm">Space</h2>
+              <button onClick={() => setShowChat(false)} className="p-1.5 active:scale-90 transition-transform duration-75">
+                <X className="w-4 h-4 text-white" />
               </button>
             </div>
 
