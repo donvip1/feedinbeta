@@ -79,7 +79,7 @@ const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(false); // Start with false - show cached data immediately
+  const [loading, setLoading] = useState(true); // Start true to prevent "not found" flash
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
@@ -734,10 +734,18 @@ const Profile = () => {
     );
   }
 
-  if (!profile) {
+  if (!loading && !profile && (resolvedUserId || identifier)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <p className="text-muted-foreground">Profile not found</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
