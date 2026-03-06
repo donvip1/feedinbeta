@@ -399,7 +399,7 @@ const AdminWallet = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('platform_transactions')
-        .select('*')
+        .select('id, type, amount, to_user_id, description, performed_by, created_at')
         .eq('type', 'transfer')
         .order('created_at', { ascending: false })
         .limit(10);
