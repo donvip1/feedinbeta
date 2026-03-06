@@ -437,11 +437,11 @@ const AdminWallet = () => {
       // If input is not a UUID, look up user by username or email
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(resolvedUserId)) {
-        const identifier = resolvedUserId.replace(/^@/, '');
+        const identifier = resolvedUserId.replace(/^@/, '').toLowerCase();
         const { data: profile, error: lookupError } = await supabase
           .from('profiles')
           .select('id')
-          .or(`username.eq.${identifier},email.eq.${identifier}`)
+          .ilike('username', identifier)
           .maybeSingle();
         
         if (lookupError || !profile) {
