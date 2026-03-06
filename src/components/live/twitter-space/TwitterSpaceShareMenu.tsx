@@ -62,7 +62,7 @@ export const TwitterSpaceShareMenu = ({
         </div>
       ),
       onClick: () => {
-        window.location.href = `/compose?content=${encodeURIComponent(`Join me in this live space! ${shareUrl}`)}`;
+        window.location.href = `/compose?content=${encodeURIComponent(`🎙️ Join me in this live space: "${spaceTitle}" on FeedIn!\n\n${shareUrl}`)}`;
       },
     },
     {
