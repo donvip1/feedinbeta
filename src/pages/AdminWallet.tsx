@@ -397,8 +397,8 @@ const AdminWallet = () => {
   const { data: recentTransfers } = useQuery({
     queryKey: ["recent-admin-transfers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('platform_transactions')
+      const { data, error } = await (supabase
+        .from('platform_transactions') as any)
         .select('id, type, amount, to_user_id, description, performed_by, created_at')
         .eq('type', 'transfer')
         .order('created_at', { ascending: false })
