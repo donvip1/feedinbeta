@@ -1,67 +1,48 @@
 
 
-## Video Stream Room Overhaul Plan
+# Plan: Fix 5 Issues in Live Space Room and Admin Wallet
 
-### Problems Identified
+## Issues Identified
 
-1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
-2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
-3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
-4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
-5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
-6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
-7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
-8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
+1. **Transfer "Review Transfer" button not working** -- The button at line 1656 has proper `disabled` logic (`!selectedUser || !transferAmount || parseInt(transferAmount) <= 0`), but `selectedUser` is typed as `any` and may not be persisting correctly. The `onClick={() => setShowConfirmation(true)}` should work. Need to verify the button is not covered by another element or if `canManageCredits` gate is blocking the tab content.
 
-### Changes to `TwitterStreamRoom.tsx`
+2. **Settings icon: change 3-dot (MoreHorizontal) to Settings icon and move away from HD Audio** -- At line 1475-1480, the settings button uses `MoreHorizontal` and is positioned right next to the "HD Audio" badge. Change to `Settings` icon and move it to the right side header group.
 
-**Remove entirely:**
-- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
-- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
-- Screen share button from bottom bar
-- Recording button/indicator from bottom bar
-- Monitor import from lucide
+3. **Screen sharing not working** -- The `publishScreenShare` in SpaceContext uses LiveKit track publishing. The function exists and the flow looks correct. The issue is likely that the room connection state check at line 884 (`spaceContext?.room?.state !== 'connected'`) is failing because the room object may not be exposed. Need to verify SpaceContext exposes `room`.
 
-**Fix reactions — switch to broadcast channel (matching space pattern):**
-- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
-- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
-- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
+4. **Gift animations only showing for sender** -- The gift channel at line 368-455 listens to `postgres_changes` on `live_space_gifts` table. This is database-driven, so it should work for all participants. However, the INSERT event from the `send_space_gift` RPC might not trigger realtime because the `live_space_gifts` table may not be added to `supabase_realtime` publication. Additionally, there's no broadcast mechanism -- gifts rely purely on postgres_changes which can have latency. Need to add a broadcast channel for instant gift display.
 
-**Fix chat — add optimistic updates:**
-- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
-- This matches what the space does
+5. **Remove duplicate gift count under "Hosted by"** -- At lines 1620-1625, there's a gift count badge under the host name. Remove it since the SpaceWalletBoard at line 1592 already shows gift counts.
 
-**Add host gift counter:**
-- Add `hostGiftTotal` state (copy from space)
-- Fetch initial total from `live_stream_gifts` on mount
-- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
-- Display as a badge below host tag: "Gifts: {count}"
+## Technical Plan
 
-**Fix camera flip:**
-- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
+### Task 1: Fix Transfer Review Button
+- Investigate whether `selectedUser` is `null` when the button is clicked. The `disabled` prop checks `!selectedUser` -- the issue may be that `selectedUser` loses its value. Check if `canManageCredits` is properly returning `true` for the logged-in role.
+- The button code at line 1655-1662 looks correct syntactically. The most likely issue is the `canManageCredits` permission check not returning `true` for the user, meaning the Transfer tab content isn't rendering at all or is read-only. Will verify the `can_manage_credits` RPC includes `developer` role.
 
-**Improve PK Battle:**
-- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
-- Import and use the `usePKBattle` hook
+### Task 2: Change Settings Icon and Reposition
+- In `TwitterSpaceRoom.tsx` line 1475-1480: Change `MoreHorizontal` to `Settings` icon
+- Move the settings button from the left header group (next to HD Audio) to the right header group (before the End/Leave button)
 
-**UI/UX improvements:**
-- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
-- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
-- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
-- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
-- Add proper `min-h-[100dvh]` for mobile viewport
+### Task 3: Fix Screen Sharing
+- Check if `live_space_speakers` RLS allows updates for screen share state
+- Verify `SpaceContext.publishScreenShare` works with current LiveKit room state
+- The screen share function at line 875-913 checks `spaceContext?.room` which should be available. May need to add a database migration to ensure RLS on any screen-share-related tables permits the operation, or check if the LiveKit token has screen share permissions.
 
-### Files to Modify
+### Task 4: Fix Gift Realtime for All Participants
+- Add `live_space_gifts` to `supabase_realtime` publication so postgres_changes work for all
+- Add a Supabase broadcast event in `LiveGiftModal.tsx` after successful gift send, so gifts appear instantly for all participants without waiting for database propagation
+- In `TwitterSpaceRoom.tsx`, add a broadcast listener on the gift channel for immediate display
 
-1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
-2. No other files need modification
+### Task 5: Remove Duplicate Gift Count
+- Remove lines 1620-1626 in `TwitterSpaceRoom.tsx` (the `hostGiftTotal` badge under "Hosted by")
 
-### What stays the same
-- LiveKit initialization logic
-- All Supabase table structures
-- LiveGiftModal (still available for full gift UI)
-- Guest list view
-- Share menu
-- All modals (Report, Rules, Feedback, Audio Settings)
-- FloatingReactions component
+## Files to Modify
+
+1. **`src/pages/AdminWallet.tsx`** -- Debug/fix the Review Transfer button disabled state
+2. **`src/components/live/twitter-space/TwitterSpaceRoom.tsx`** -- Move settings icon, fix gift broadcast, remove duplicate gift count
+3. **`src/components/live/LiveGiftModal.tsx`** -- Add broadcast event after gift send
+4. **`src/components/live/shared/QuickGiftBar.tsx`** -- Add broadcast event after gift send
+5. **`src/components/live/shared/HostGiftPanel.tsx`** -- Add broadcast event after gift send
+6. **Database migration** -- Add `live_space_gifts` to realtime publication; verify `can_manage_credits` RPC includes `developer` role
 
