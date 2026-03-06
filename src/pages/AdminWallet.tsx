@@ -1414,33 +1414,291 @@ const AdminWallet = () => {
 
           {canManageCredits && (
             <TabsContent value="transfer" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Transfer to User</CardTitle>
-                  <CardDescription>Transfer credits from FeedIn Wallet to a user</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-user">Username or User ID</Label>
-                    <Input id="transfer-user" placeholder="Enter username or UUID (e.g. tester1)"
-                      value={transferUserId} onChange={(e) => setTransferUserId(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-amount">Amount</Label>
-                    <Input id="transfer-amount" type="number" placeholder="Enter amount"
-                      value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-reason">Reason (optional)</Label>
-                    <Input id="transfer-reason" placeholder="Enter reason for transfer"
-                      value={transferReason} onChange={(e) => setTransferReason(e.target.value)} />
-                  </div>
-                  <Button onClick={() => transferMutation.mutate({ userId: transferUserId, amount: parseInt(transferAmount), reason: transferReason })}
-                    disabled={!transferAmount || !transferUserId || transferMutation.isPending} className="w-full">
-                    {transferMutation.isPending ? "Transferring..." : "Transfer Credits"}
-                  </Button>
-                </CardContent>
-              </Card>
+              <AnimatePresence mode="wait">
+                {showConfirmation ? (
+                  <motion.div
+                    key="confirm"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-accent/5 overflow-hidden">
+                      {transferSuccess ? (
+                        <CardContent className="py-12 text-center">
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                          >
+                            <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                          </motion.div>
+                          <h3 className="text-xl font-bold text-foreground mb-1">Transfer Successful!</h3>
+                          <p className="text-muted-foreground">
+                            {parseInt(transferAmount).toLocaleString()} credits sent to @{selectedUser?.username}
+                          </p>
+                        </CardContent>
+                      ) : (
+                        <>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2">
+                              <AlertTriangle className="w-5 h-5 text-amber-500" />
+                              Confirm Transfer
+                            </CardTitle>
+                            <CardDescription>Review the details below before confirming</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12 border-2 border-primary/30">
+                                  <AvatarImage src={selectedUser?.avatar_url} />
+                                  <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                    {selectedUser?.username?.[0]?.toUpperCase() || '?'}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-semibold text-foreground">{selectedUser?.full_name || selectedUser?.username}</p>
+                                  <p className="text-sm text-muted-foreground">@{selectedUser?.username}</p>
+                                </div>
+                              </div>
+                              <div className="h-px bg-border" />
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Amount</span>
+                                <span className="text-2xl font-bold text-primary">{parseInt(transferAmount).toLocaleString()} <span className="text-sm font-normal">credits</span></span>
+                              </div>
+                              {transferReason && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Reason</span>
+                                  <span className="text-sm text-foreground">{transferReason}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Source</span>
+                                <span className="text-sm text-foreground">FeedIn Wallet</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-3">
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => setShowConfirmation(false)}
+                                disabled={transferMutation.isPending}
+                              >
+                                <X className="w-4 h-4 mr-1" /> Cancel
+                              </Button>
+                              <Button
+                                className="flex-1 bg-gradient-to-r from-primary to-primary/80"
+                                onClick={() => transferMutation.mutate({
+                                  userId: selectedUser.id,
+                                  amount: parseInt(transferAmount),
+                                  reason: transferReason,
+                                })}
+                                disabled={transferMutation.isPending}
+                              >
+                                {transferMutation.isPending ? (
+                                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4 mr-1" />
+                                )}
+                                {transferMutation.isPending ? "Sending..." : "Confirm & Send"}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </>
+                      )}
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4"
+                  >
+                    {/* Role Badge */}
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <Shield className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-muted-foreground">
+                        Only <strong className="text-primary">CEO</strong> and <strong className="text-primary">Developer</strong> roles can transfer credits
+                      </span>
+                    </div>
+
+                    {/* User Search */}
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-primary" />
+                          Select Recipient
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {selectedUser ? (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/30"
+                          >
+                            <Avatar className="h-10 w-10 border-2 border-primary/40">
+                              <AvatarImage src={selectedUser.avatar_url} />
+                              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                {selectedUser.username?.[0]?.toUpperCase() || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-semibold text-sm text-foreground">{selectedUser.full_name || selectedUser.username}</p>
+                              <p className="text-xs text-muted-foreground">@{selectedUser.username}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedUser(null); setSearchQuery(""); }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search by username or name..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-9"
+                            />
+                            {searchLoading && (
+                              <RefreshCw className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Search Results */}
+                        <AnimatePresence>
+                          {!selectedUser && searchResults && searchResults.length > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="space-y-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card p-1"
+                            >
+                              {searchResults.map((user: any) => (
+                                <button
+                                  key={user.id}
+                                  onClick={() => { setSelectedUser(user); setSearchQuery(""); }}
+                                  className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/80 transition-colors text-left"
+                                >
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={user.avatar_url} />
+                                    <AvatarFallback className="bg-muted text-xs font-bold">
+                                      {user.username?.[0]?.toUpperCase() || '?'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground truncate">{user.full_name || user.username}</p>
+                                    <p className="text-xs text-muted-foreground">@{user.username}</p>
+                                  </div>
+                                  <Send className="w-3.5 h-3.5 text-muted-foreground/50" />
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {!selectedUser && searchQuery.length >= 2 && !searchLoading && searchResults?.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-3">No users found for "{searchQuery}"</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Amount & Reason */}
+                    <Card className="border-border/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Coins className="w-4 h-4 text-primary" />
+                          Transfer Details
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm">Amount</Label>
+                          <Input
+                            type="number"
+                            placeholder="Enter amount"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            className="text-lg font-semibold h-12"
+                          />
+                          {/* Quick Amount Presets */}
+                          <div className="flex flex-wrap gap-2">
+                            {[100, 500, 1000, 5000, 10000, 50000].map((amt) => (
+                              <Button
+                                key={amt}
+                                variant="outline"
+                                size="sm"
+                                className={`text-xs h-7 px-3 ${transferAmount === String(amt) ? 'border-primary bg-primary/10 text-primary' : ''}`}
+                                onClick={() => setTransferAmount(String(amt))}
+                              >
+                                {amt >= 1000 ? `${amt / 1000}K` : amt}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Reason (optional)</Label>
+                          <Input
+                            placeholder="e.g. Welcome bonus, Competition prize..."
+                            value={transferReason}
+                            onChange={(e) => setTransferReason(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          onClick={() => setShowConfirmation(true)}
+                          disabled={!selectedUser || !transferAmount || parseInt(transferAmount) <= 0}
+                          className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 gap-2"
+                        >
+                          <Sparkles className="w-5 h-5" />
+                          Review Transfer
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Recent Transfers */}
+                    {recentTransfers && recentTransfers.length > 0 && (
+                      <Card className="border-border/50">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <History className="w-4 h-4 text-muted-foreground" />
+                            Recent Transfers
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {recentTransfers.map((tx: any) => (
+                              <div key={tx.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/50">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-full bg-primary/10">
+                                    <Send className="w-3 h-3 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-medium text-foreground">{tx.description || 'Transfer'}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {tx.created_at ? format(new Date(tx.created_at), 'MMM d, yyyy · HH:mm') : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                                  {(tx.amount ?? 0).toLocaleString()}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </TabsContent>
           )}
 
