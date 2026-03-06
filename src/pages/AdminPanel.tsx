@@ -720,14 +720,20 @@ const AdminPanel = () => {
                     {activeSpaces && activeSpaces.length > 0 ? (
                       <div className="space-y-2">
                         {activeSpaces.map((space: any) => (
-                          <div key={space.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium text-sm">{space.title || 'Untitled Space'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {space.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(space.created_at), { addSuffix: true })}
-                              </p>
+                          <div key={space.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-8 h-8 shrink-0">
+                                <AvatarImage src={space.profiles?.avatar_url} />
+                                <AvatarFallback>{(space.profiles?.display_name || '?')[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{space.title || 'Untitled Space'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  @{space.profiles?.username || 'unknown'} · {space.viewer_count || 0} viewers · {formatDistanceToNow(new Date(space.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
                             </div>
-                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('space', space.id)}>
+                            <Button variant="destructive" size="sm" className="shrink-0 ml-2" onClick={() => handleEndSingle('space', space.id)}>
                               <StopCircle className="w-3 h-3 mr-1" /> End
                             </Button>
                           </div>
@@ -747,14 +753,20 @@ const AdminPanel = () => {
                     {activeStreams && activeStreams.length > 0 ? (
                       <div className="space-y-2">
                         {activeStreams.map((stream: any) => (
-                          <div key={stream.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium text-sm">{stream.title || 'Untitled Stream'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {stream.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(stream.created_at), { addSuffix: true })}
-                              </p>
+                          <div key={stream.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-8 h-8 shrink-0">
+                                <AvatarImage src={stream.profiles?.avatar_url} />
+                                <AvatarFallback>{(stream.profiles?.display_name || '?')[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{stream.title || 'Untitled Stream'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  @{stream.profiles?.username || 'unknown'} · {stream.viewer_count || 0} viewers · {formatDistanceToNow(new Date(stream.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
                             </div>
-                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('stream', stream.id)}>
+                            <Button variant="destructive" size="sm" className="shrink-0 ml-2" onClick={() => handleEndSingle('stream', stream.id)}>
                               <StopCircle className="w-3 h-3 mr-1" /> End
                             </Button>
                           </div>
