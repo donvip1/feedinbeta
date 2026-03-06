@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { getFriendlyError, isTemporaryError } from "@/lib/error-messages";
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { 
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, Radio, 
