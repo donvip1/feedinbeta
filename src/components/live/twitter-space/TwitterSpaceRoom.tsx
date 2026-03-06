@@ -2064,7 +2064,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               )}
               <div className="px-3 py-2">
                 <p className="text-white text-sm font-semibold truncate">{space?.title || 'Live Space'}</p>
-                <p className="text-zinc-500 text-xs truncate">feedinbeta.lovable.app</p>
+                <p className="text-zinc-500 text-xs truncate">feedinn.com</p>
               </div>
             </div>
 

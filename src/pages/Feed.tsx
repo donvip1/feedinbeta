@@ -894,7 +894,8 @@ const Feed = () => {
           <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
-            {/* Live content only appears when user explicitly taps the Live tab */}
+            {/* Spacer to clear the fixed overlay header on all tabs */}
+            {activeTab !== 'videos' && <div className="h-16" />}
 
             {displayPosts.map((post, index) => {
               const uniqueKey = post._cycleKey || post.id;
