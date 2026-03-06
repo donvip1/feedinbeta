@@ -56,14 +56,31 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [isPrivate, setIsPrivate] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
 
-  const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((e.key === ' ' || e.key === 'Enter') && hashtagInput.trim()) {
-      e.preventDefault();
-      const tag = hashtagInput.trim().replace(/^#/, '').toLowerCase();
-      if (tag && !hashtags.includes(tag) && hashtags.length < MAX_HASHTAGS) {
-        setHashtags([...hashtags, tag]);
-        setHashtagInput("");
+  const addHashtag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    if (tag && !hashtags.includes(tag) && hashtags.length < MAX_HASHTAGS) {
+      setHashtags([...hashtags, tag]);
+    }
+  };
+
+  const handleHashtagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.endsWith(' ') || value.endsWith(',')) {
+      const raw = value.slice(0, -1);
+      if (raw.trim()) {
+        addHashtag(raw);
       }
+      setHashtagInput('');
+    } else {
+      setHashtagInput(value);
+    }
+  };
+
+  const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && hashtagInput.trim()) {
+      e.preventDefault();
+      addHashtag(hashtagInput);
+      setHashtagInput('');
     } else if (e.key === 'Backspace' && !hashtagInput && hashtags.length > 0) {
       setHashtags(hashtags.slice(0, -1));
     }
@@ -334,7 +351,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
                 <input
                   type="text"
                   value={hashtagInput}
-                  onChange={(e) => setHashtagInput(e.target.value.replace(/\s/g, ''))}
+                  onChange={handleHashtagChange}
                   onKeyDown={handleHashtagKeyDown}
                   placeholder={hashtags.length === 0 ? "Add hashtags..." : ""}
                   className="flex-1 min-w-[80px] bg-transparent outline-none text-sm text-white placeholder:text-slate-600"
