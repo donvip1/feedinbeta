@@ -141,6 +141,10 @@ const AdminWallet = () => {
   const [withdrawReason, setWithdrawReason] = useState("");
   const [withdrawProfitsAmount, setWithdrawProfitsAmount] = useState("");
   const [withdrawProfitsReason, setWithdrawProfitsReason] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [transferSuccess, setTransferSuccess] = useState(false);
 
   // Server-side permission check - can view admin wallet (admin OR moderator)
   const { data: canViewWallet, isLoading: loadingViewPermission } = useQuery({
