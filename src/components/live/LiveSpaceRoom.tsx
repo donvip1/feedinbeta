@@ -1016,6 +1016,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       return;
     }
 
+    // Check if screen sharing is supported (not available on mobile WebViews)
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },

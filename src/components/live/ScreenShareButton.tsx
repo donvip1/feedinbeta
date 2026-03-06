@@ -31,8 +31,17 @@ export function ScreenShareButton({
   const [isLoading, setIsLoading] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
+  const isScreenShareSupported = useCallback(() => {
+    return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function');
+  }, []);
+
   const startScreenShare = useCallback(async (withAudio: boolean = true) => {
     if (isSharing || disabled) return;
+    
+    if (!isScreenShareSupported()) {
+      toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
+      return;
+    }
     
     setIsLoading(true);
     
