@@ -31,42 +31,60 @@ export function ScreenShareButton({
   const [isLoading, setIsLoading] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  const isScreenShareSupported = useCallback(() => {
-    return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function');
-  }, []);
-
   const startScreenShare = useCallback(async (withAudio: boolean = true) => {
     if (isSharing || disabled) return;
-    
-    if (!isScreenShareSupported()) {
-      toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
-      return;
-    }
     
     setIsLoading(true);
     
     try {
-      const constraints: DisplayMediaStreamOptions = {
-        video: {
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
-          frameRate: { ideal: 30, max: 30 },
-        },
+      // Check if getDisplayMedia is available
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function') {
+        const constraints: DisplayMediaStreamOptions = {
+          video: {
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 30, max: 30 },
+          },
+          audio: withAudio,
+        };
+
+        const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+        
+        screenStreamRef.current = stream;
+        setIsSharing(true);
+
+        stream.getVideoTracks()[0].onended = () => {
+          stopScreenShare();
+        };
+
+        onScreenStream(stream);
+        toast.success('Screen sharing started!');
+        return;
+      }
+
+      // Fallback: try getUserMedia with mediaSource for older/mobile browsers
+      const fallbackConstraints: any = {
+        video: { mediaSource: 'screen' as any },
         audio: withAudio,
       };
 
-      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
-      
-      screenStreamRef.current = stream;
-      setIsSharing(true);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        screenStreamRef.current = stream;
+        setIsSharing(true);
 
-      // Handle user stopping screen share via browser UI
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
+        stream.getVideoTracks()[0].onended = () => {
+          stopScreenShare();
+        };
 
-      onScreenStream(stream);
-      toast.success('Screen sharing started!');
+        onScreenStream(stream);
+        toast.success('Screen sharing started!');
+        return;
+      } catch {
+        // Both methods failed
+        toast.error('Screen sharing is not available on this browser. Try opening in Chrome or your default browser.');
+      }
+
     } catch (error: any) {
       console.error('[ScreenShare] Error:', error);
       
