@@ -344,6 +344,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Connect to the room
       await room.connect(data.url, data.token);
+      roomRef.current = room;
+      setRoomReady(room);
 
       console.log('[SpaceContext-LK] ✅ Connected to room, participants:', room.remoteParticipants.size);
 
@@ -879,7 +881,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         disconnectAudio,
         startListenerBroadcast,
         localStream,
-        room: roomRef.current,
+        room: roomReady,
         screenShareStream,
         isRemoteScreenSharing,
         screenShareDismissed,
