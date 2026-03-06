@@ -454,11 +454,65 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       })
       .subscribe();
 
+    // Broadcast gift channel - for instant gift display (no DB latency)
+    const giftBroadcastChannel = supabase
+      .channel(`space-gift-broadcast-${spaceId}`)
+      .on('broadcast', { event: 'gift_sent' }, (payload: any) => {
+        const giftData = payload.payload;
+        if (!giftData) return;
+        // Skip if this is our own gift (sender already sees toast)
+        if (giftData.sender_id === user?.id) return;
+
+        const emoji = giftData.emoji || '🎁';
+        const senderName = giftData.sender_name || 'Someone';
+        const receiverName = giftData.receiver_name || 'Host';
+        const creditValue = giftData.credit_value || 1;
+        const recipientAmount = Math.floor(creditValue * 0.85);
+
+        // Update host gift counter
+        if (giftData.receiver_id === space?.user_id) {
+          setHostGiftTotal(prev => prev + creditValue);
+        }
+
+        // Toast for receiver
+        if (giftData.receiver_id === user?.id) {
+          toast(`${emoji} ${senderName} sent you a gift! (+${recipientAmount} credits)`, {
+            icon: '🎁',
+            duration: 6000,
+          });
+        }
+
+        // Floating animation
+        const floatingGift: FloatingGiftReaction = {
+          id: `broadcast-${Date.now()}-${Math.random()}`,
+          type: giftData.gift_type,
+          senderName,
+          emoji,
+        };
+        setFloatingGiftReactions(prev => [...prev, floatingGift]);
+
+        // Banner animation
+        const newGiftAnim: GiftAnimation = {
+          id: `broadcast-${Date.now()}-${Math.random()}`,
+          emoji,
+          senderName,
+          receiverName,
+          value: creditValue,
+        };
+        setGiftAnimations(prev => [...prev, newGiftAnim]);
+
+        setTimeout(() => {
+          setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
+        }, 5000);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(controlChannel);
       supabase.removeChannel(giftChannel);
+      supabase.removeChannel(giftBroadcastChannel);
     };
   }, [spaceId, isHost, user?.id]);
 
