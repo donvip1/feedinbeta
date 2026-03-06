@@ -363,16 +363,6 @@ const Settings = () => {
       </header>
 
       <main className="px-4 py-4 max-w-lg mx-auto pb-24 space-y-3">
-        {/* Quick Actions Row */}
-        <div className="flex gap-1 rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm p-1">
-          <QuickAction icon={Wallet} label="Wallet" onClick={() => navigate('/wallet')} color="text-green-500" />
-          <QuickAction icon={Users} label="Friends" onClick={() => navigate('/friends')} color="text-blue-500" />
-          <QuickAction icon={Bookmark} label="Saved" onClick={() => navigate('/saved')} color="text-orange-500" />
-          <QuickAction icon={Gift} label="Invite" onClick={() => {
-            const el = document.getElementById('referral-section');
-            el?.scrollIntoView({ behavior: 'smooth' });
-          }} color="text-pink-500" />
-        </div>
 
         {/* Dark Mode Toggle — inline compact */}
         <div className="rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
