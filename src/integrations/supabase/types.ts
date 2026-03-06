@@ -8542,15 +8542,10 @@ export type Database = {
         Args: { p_amount: number; p_reason?: string }
         Returns: Json
       }
-      admin_transfer_to_user:
-        | {
-            Args: { p_amount: number; p_reason?: string; p_user_id: string }
-            Returns: Json
-          }
-        | {
-            Args: { p_amount: number; p_reason?: string; p_user_id: string }
-            Returns: Json
-          }
+      admin_transfer_to_user: {
+        Args: { p_amount: number; p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
       admin_withdraw_from_profits:
         | { Args: { p_amount: number; p_reason?: string }; Returns: boolean }
         | { Args: { p_amount: number; p_reason?: string }; Returns: Json }
