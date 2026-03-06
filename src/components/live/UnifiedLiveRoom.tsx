@@ -675,7 +675,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
                    <span className="text-white text-sm font-medium">{roomInfo.hostName}</span>
-                   {roomInfo.hostUserId && <VerifiedBadge userId={roomInfo.hostUserId} size="sm" />}
+                   {roomInfo.hostId && <VerifiedBadge userId={roomInfo.hostId} size="sm" />}
                   {isHost && <Crown className="w-3 h-3 text-amber-400" />}
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-white/60">
