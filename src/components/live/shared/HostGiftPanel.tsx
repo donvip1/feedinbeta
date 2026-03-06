@@ -139,6 +139,21 @@ export const HostGiftPanel = ({
       // Refresh actual balance from DB
       await fetchCredits();
 
+      // Broadcast gift for instant display to all participants
+      await supabase.channel(`space-gift-broadcast-${roomId}`).send({
+        type: 'broadcast',
+        event: 'gift_sent',
+        payload: {
+          gift_type: giftType,
+          credit_value: creditValue,
+          emoji,
+          sender_id: user.id,
+          sender_name: user.user_metadata?.display_name || 'Host',
+          receiver_id: selectedViewer.id,
+          receiver_name: selectedViewer.display_name,
+        },
+      });
+
       onGiftSent?.({ type: giftType, value: creditValue, emoji, recipientName: selectedViewer.display_name });
     } catch (error: any) {
       console.error('Gift error:', error);
