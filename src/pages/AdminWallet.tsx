@@ -473,26 +473,8 @@ const AdminWallet = () => {
   // Transfer to user mutation
   const transferMutation = useMutation({
     mutationFn: async ({ userId, amount, reason }: { userId: string; amount: number; reason: string }) => {
-      let resolvedUserId = userId.trim();
-      
-      // If input is not a UUID, look up user by username or email
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(resolvedUserId)) {
-        const identifier = resolvedUserId.replace(/^@/, '').toLowerCase();
-        const { data: profile, error: lookupError } = await supabase
-          .from('profiles')
-          .select('id')
-          .ilike('username', identifier)
-          .maybeSingle();
-        
-        if (lookupError || !profile) {
-          throw new Error(`User "${identifier}" not found. Try entering their UUID or exact username.`);
-        }
-        resolvedUserId = profile.id;
-      }
-      
       const { data, error } = await supabase.rpc("admin_transfer_to_user", {
-        p_user_id: resolvedUserId,
+        p_user_id: userId,
         p_amount: amount,
         p_reason: reason || "Admin transfer",
       });
@@ -500,16 +482,24 @@ const AdminWallet = () => {
       return data;
     },
     onSuccess: () => {
-      toast.success("Credits transferred successfully");
+      setTransferSuccess(true);
       queryClient.invalidateQueries({ queryKey: ["platform-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["credit-statistics"] });
       queryClient.invalidateQueries({ queryKey: ["platform-transactions"] });
-      setTransferAmount("");
-      setTransferUserId("");
-      setTransferReason("");
+      queryClient.invalidateQueries({ queryKey: ["recent-admin-transfers"] });
+      setTimeout(() => {
+        setTransferSuccess(false);
+        setShowConfirmation(false);
+        setTransferAmount("");
+        setTransferUserId("");
+        setTransferReason("");
+        setSelectedUser(null);
+        setSearchQuery("");
+      }, 2500);
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to transfer credits");
+      setShowConfirmation(false);
     },
   });
 
