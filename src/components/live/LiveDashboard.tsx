@@ -18,6 +18,7 @@ import {
   Share2,
   Trash2,
   Tv,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -275,6 +276,12 @@ export const LiveDashboard = ({
         {/* Top row: Logo + Actions */}
         <div className="flex items-center justify-between pt-12 pb-1">
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigate('/feed')}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
             <Tv className="w-5 h-5 text-pink-500 shrink-0" />
             <span className="text-lg font-black whitespace-nowrap">FeedIn Live</span>
           </div>

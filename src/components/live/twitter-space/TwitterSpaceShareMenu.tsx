@@ -23,9 +23,11 @@ export const TwitterSpaceShareMenu = ({
 }: TwitterSpaceShareMenuProps) => {
   const shareUrl = shareUrls.liveSpace(shareLink || spaceId);
 
+  const shareText = `🎙️ Join me in this live space: "${spaceTitle || 'Live Space'}" on FeedIn!\n\n${shareUrl}`;
+
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareText);
       toast.success('Link copied to clipboard');
       onClose();
     } catch (error) {
@@ -37,8 +39,8 @@ export const TwitterSpaceShareMenu = ({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: spaceTitle,
-          text: `Join me in this live space: ${spaceTitle}`,
+          title: `🎙️ ${spaceTitle || 'Live Space'} — FeedIn Live`,
+          text: `Join me in this live space: "${spaceTitle}" on FeedIn!`,
           url: shareUrl,
         });
         onClose();
