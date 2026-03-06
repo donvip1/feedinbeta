@@ -7,6 +7,7 @@ import { useNavigation } from '@/context/NavigationContext';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import { useSpaceRecorder } from '@/hooks/useSpaceRecorder';
 import { toast } from 'sonner';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic,
@@ -940,6 +941,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       console.warn('[ScreenShare] Room not ready, state:', spaceContext?.room?.state);
       return;
     }
+    // Block screen sharing in standalone PWA mode
+    if (isStandalonePWA()) {
+      toast.error(SCREEN_SHARE_PWA_ERROR);
+      return;
+    }
+
     try {
       let stream: MediaStream;
 
@@ -960,6 +967,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           toast.error('Screen sharing is not available in the app. Please open feedinn.com in Chrome to use this feature.');
           return;
         }
+      }
+
+      // Validate stream is not blank (common on Android PWA)
+      if (isStreamBlank(stream)) {
+        stream.getTracks().forEach(t => t.stop());
+        toast.error(SCREEN_SHARE_BLANK_ERROR);
+        return;
       }
 
       stream.getVideoTracks()[0].onended = () => {

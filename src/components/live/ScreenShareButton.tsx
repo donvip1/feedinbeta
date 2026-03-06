@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -33,6 +34,12 @@ export function ScreenShareButton({
 
   const startScreenShare = useCallback(async (withAudio: boolean = true) => {
     if (isSharing || disabled) return;
+
+    // Block screen sharing in standalone PWA mode
+    if (isStandalonePWA()) {
+      toast.error(SCREEN_SHARE_PWA_ERROR);
+      return;
+    }
     
     setIsLoading(true);
     
@@ -50,6 +57,13 @@ export function ScreenShareButton({
 
         const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
         
+        // Validate stream is not blank
+        if (isStreamBlank(stream)) {
+          stream.getTracks().forEach(t => t.stop());
+          toast.error(SCREEN_SHARE_BLANK_ERROR);
+          return;
+        }
+
         screenStreamRef.current = stream;
         setIsSharing(true);
 
