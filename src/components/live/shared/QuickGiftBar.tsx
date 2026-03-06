@@ -129,6 +129,20 @@ export const QuickGiftBar = ({
       // Refresh credits after successful gift
       await fetchCredits();
 
+      // Broadcast gift for instant display to all participants
+      await supabase.channel(`space-gift-broadcast-${roomId}`).send({
+        type: 'broadcast',
+        event: 'gift_sent',
+        payload: {
+          gift_type: gift.type,
+          credit_value: gift.value,
+          emoji: gift.emoji,
+          sender_id: user.id,
+          sender_name: user.user_metadata?.display_name || user.user_metadata?.username || 'Someone',
+          receiver_id: recipientId,
+        },
+      });
+
       onGiftSent?.({ type: gift.type, value: gift.value, emoji: gift.emoji });
       toast.success(`${gift.emoji} ${gift.name} sent!`);
     } catch (error: any) {

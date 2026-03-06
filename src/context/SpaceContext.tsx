@@ -98,6 +98,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false);
+  const [roomReady, setRoomReady] = useState<Room | null>(null);
   const [screenShareDismissed, setScreenShareDismissed] = useState(false);
   const [screenSharerIdentity, setScreenSharerIdentity] = useState<string | null>(null);
   
@@ -343,6 +344,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Connect to the room
       await room.connect(data.url, data.token);
+      roomRef.current = room;
+      setRoomReady(room);
 
       console.log('[SpaceContext-LK] ✅ Connected to room, participants:', room.remoteParticipants.size);
 
@@ -472,6 +475,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
+      setRoomReady(null);
     }
 
     // Remove all audio elements
@@ -878,7 +882,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         disconnectAudio,
         startListenerBroadcast,
         localStream,
-        room: roomRef.current,
+        room: roomReady,
         screenShareStream,
         isRemoteScreenSharing,
         screenShareDismissed,

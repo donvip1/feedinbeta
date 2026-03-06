@@ -19,7 +19,7 @@ import {
   X,
   ChevronDown,
   Search,
-  MoreHorizontal,
+  MoreHorizontal, // kept for potential future use
   Link as LinkIcon,
   Send,
   Flag,
@@ -454,11 +454,65 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       })
       .subscribe();
 
+    // Broadcast gift channel - for instant gift display (no DB latency)
+    const giftBroadcastChannel = supabase
+      .channel(`space-gift-broadcast-${spaceId}`)
+      .on('broadcast', { event: 'gift_sent' }, (payload: any) => {
+        const giftData = payload.payload;
+        if (!giftData) return;
+        // Skip if this is our own gift (sender already sees toast)
+        if (giftData.sender_id === user?.id) return;
+
+        const emoji = giftData.emoji || '🎁';
+        const senderName = giftData.sender_name || 'Someone';
+        const receiverName = giftData.receiver_name || 'Host';
+        const creditValue = giftData.credit_value || 1;
+        const recipientAmount = Math.floor(creditValue * 0.85);
+
+        // Update host gift counter
+        if (giftData.receiver_id === space?.user_id) {
+          setHostGiftTotal(prev => prev + creditValue);
+        }
+
+        // Toast for receiver
+        if (giftData.receiver_id === user?.id) {
+          toast(`${emoji} ${senderName} sent you a gift! (+${recipientAmount} credits)`, {
+            icon: '🎁',
+            duration: 6000,
+          });
+        }
+
+        // Floating animation
+        const floatingGift: FloatingGiftReaction = {
+          id: `broadcast-${Date.now()}-${Math.random()}`,
+          type: giftData.gift_type,
+          senderName,
+          emoji,
+        };
+        setFloatingGiftReactions(prev => [...prev, floatingGift]);
+
+        // Banner animation
+        const newGiftAnim: GiftAnimation = {
+          id: `broadcast-${Date.now()}-${Math.random()}`,
+          emoji,
+          senderName,
+          receiverName,
+          value: creditValue,
+        };
+        setGiftAnimations(prev => [...prev, newGiftAnim]);
+
+        setTimeout(() => {
+          setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
+        }, 5000);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(controlChannel);
       supabase.removeChannel(giftChannel);
+      supabase.removeChannel(giftBroadcastChannel);
     };
   }, [spaceId, isHost, user?.id]);
 
@@ -1472,14 +1526,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
             <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
           </div>
+        </div>
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowSettings(true)}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-4 h-4 text-white" />
+            <Settings className="w-4 h-4 text-white" />
           </button>
-        </div>
-        <div className="flex items-center gap-1.5">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
@@ -1617,13 +1671,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <p className="text-sm text-slate-400 mb-1">
             Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
           </p>
-          {hostGiftTotal > 0 && (
-            <div className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full mb-2">
-              <Gift className="w-3 h-3 text-amber-400" />
-              <span className="text-[10px] font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
-            </div>
-          )}
-          {hostGiftTotal === 0 && <div className="mb-2" />}
+          <div className="mb-2" />
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => setView('guests')}

@@ -159,6 +159,21 @@ export const LiveGiftModal = ({
         related_type: isSpace ? 'space' : 'live_stream'
       });
 
+      // Broadcast gift event for instant display to all participants
+      const giftEmoji2 = GIFTS.find(g => g.type === giftType)?.emoji || '🎁';
+      await supabase.channel(`space-gift-broadcast-${streamId}`).send({
+        type: 'broadcast',
+        event: 'gift_sent',
+        payload: {
+          gift_type: giftType,
+          credit_value: creditValue,
+          emoji: giftEmoji2,
+          sender_id: user.id,
+          sender_name: senderName,
+          receiver_id: recipientId,
+        },
+      });
+
       toast.success(`${giftType} sent!`);
       await fetchUserCredits();
 
