@@ -323,7 +323,7 @@ export const FlyingChat = ({
                     {/* Text Content */}
                     <p className="text-sm font-semibold whitespace-nowrap">
                       <span className="text-white/90">{displayName === 'Anonymous' ? 'Me' : displayName}</span>
-                      <span className="text-yellow-300 ml-1 font-bold">{message.content}</span>
+                      {message.user_id && <VerifiedBadge userId={message.user_id} size="sm" />}
                     </p>
                   </motion.div>
                 ) : (
@@ -341,6 +341,7 @@ export const FlyingChat = ({
                     >
                       {isHostUser && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
                       {displayName}
+                      {message.user_id && <VerifiedBadge userId={message.user_id} size="sm" />}
                     </span>
                     {/* Message content - bold with shadow */}
                     <span className="text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
