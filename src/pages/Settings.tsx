@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { useTheme } from 'next-themes';
-import { ReferralSection } from '@/components/settings/ReferralSection';
+
 import { 
   ArrowLeft, User, Shield, Bell, Lock, Trash2, ChevronRight, LogOut,
   TrendingUp, UsersRound, Wallet, Coins, Crown, Bookmark, HardDrive,
@@ -399,14 +399,7 @@ const Settings = () => {
           />
         )}
 
-        {/* Referral Section */}
-        <div id="referral-section" className="rounded-2xl border border-primary/30 bg-primary/5 backdrop-blur-sm p-4">
-          <h3 className="text-sm font-bold mb-3 text-foreground flex items-center gap-2">
-            <Gift className="w-4 h-4 text-primary" />
-            Invite Friends & Earn
-          </h3>
-          <ReferralSection />
-        </div>
+        {/* Invite Friends & Earn — moved above groups is handled by DOM order */}
 
         {/* Check for Updates + About */}
         <div className="rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm p-3 space-y-2">
