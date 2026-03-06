@@ -10,6 +10,8 @@ class BackgroundAudioManager {
   private wakeLock: WakeLockSentinel | null = null;
   private isActive: boolean = false;
   private audioElements: Map<string, HTMLAudioElement> = new Map();
+  private mediaStreams: Map<string, MediaStreamAudioSourceNode> = new Map();
+  private intentionallyMuted: Set<string> = new Set();
   private silentOscillator: OscillatorNode | null = null;
 
   async initialize(): Promise<void> {
@@ -59,10 +61,10 @@ class BackgroundAudioManager {
   }
 
   private startKeepAlive(): void {
-    // Keep audio context alive with periodic activity
+    // Keep audio context alive with periodic activity - more frequent for background reliability
     this.keepAliveInterval = setInterval(() => {
       this.pingAudioContext();
-    }, 5000); // Every 5 seconds
+    }, 3000); // Every 3 seconds for better background persistence
   }
 
   private pingAudioContext(): void {
@@ -120,6 +122,23 @@ class BackgroundAudioManager {
         element.play().catch(err => {
           console.warn(`[BackgroundAudio] Failed to resume audio ${id}:`, err);
         });
+      }
+    });
+
+    // Re-enable any muted media stream tracks that should be active
+    this.mediaStreams.forEach((source, id) => {
+      try {
+        const stream = source.mediaStream;
+        if (stream) {
+          stream.getAudioTracks().forEach(track => {
+            if (!track.enabled && !this.intentionallyMuted.has(id)) {
+              track.enabled = true;
+              console.log(`[BackgroundAudio] Re-enabled audio track for ${id}`);
+            }
+          });
+        }
+      } catch (err) {
+        // Silent fail
       }
     });
 
@@ -183,16 +202,43 @@ class BackgroundAudioManager {
   /**
    * Connect a MediaStream to the audio context for background playback
    */
-  connectMediaStream(stream: MediaStream): MediaStreamAudioSourceNode | null {
+  connectMediaStream(stream: MediaStream, id?: string): MediaStreamAudioSourceNode | null {
     if (!this.audioContext) return null;
 
     try {
       const source = this.audioContext.createMediaStreamSource(stream);
       source.connect(this.audioContext.destination);
+      const streamId = id || `stream-${Date.now()}`;
+      this.mediaStreams.set(streamId, source);
+      console.log(`[BackgroundAudio] Connected MediaStream: ${streamId}`);
       return source;
     } catch (error) {
       console.error('[BackgroundAudio] Failed to connect MediaStream:', error);
       return null;
+    }
+  }
+
+  /**
+   * Mark a stream as intentionally muted (user chose to mute)
+   */
+  setStreamMuted(id: string, muted: boolean): void {
+    if (muted) {
+      this.intentionallyMuted.add(id);
+    } else {
+      this.intentionallyMuted.delete(id);
+    }
+  }
+
+  /**
+   * Disconnect a media stream
+   */
+  disconnectMediaStream(id: string): void {
+    const source = this.mediaStreams.get(id);
+    if (source) {
+      try { source.disconnect(); } catch {}
+      this.mediaStreams.delete(id);
+      this.intentionallyMuted.delete(id);
+      console.log(`[BackgroundAudio] Disconnected MediaStream: ${id}`);
     }
   }
 

@@ -395,6 +395,9 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const stream = new MediaStream([localTrack.mediaStreamTrack]);
           setLocalStream(stream);
 
+          // Connect mic stream to background audio manager for persistent playback when minimized
+          backgroundAudioManager.connectMediaStream(stream);
+
         } catch (micError: any) {
           console.error('[SpaceContext-LK] Failed to get microphone:', micError);
           const friendly = getFriendlyError(micError.message || micError.name || 'microphone');
