@@ -941,10 +941,26 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
-        audio: true,
-      });
+      let stream: MediaStream;
+
+      // Check if getDisplayMedia is available (not available in PWA/WebView on Android)
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function') {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+          audio: true,
+        });
+      } else {
+        // Fallback: try getUserMedia with mediaSource for older/mobile browsers
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { mediaSource: 'screen' } as any,
+            audio: true,
+          });
+        } catch {
+          toast.error('Screen sharing is not available in the app. Please open feedinn.com in Chrome to use this feature.');
+          return;
+        }
+      }
 
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
