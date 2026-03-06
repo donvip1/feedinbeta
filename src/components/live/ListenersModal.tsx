@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import {
   Sheet,
   SheetContent,
@@ -85,8 +86,9 @@ export const ListenersModal = ({ listeners, totalCount, isHost, onPromote }: Lis
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-sm">
+                    <p className="font-medium text-sm flex items-center gap-1">
                       {listener.profile?.display_name || 'User'}
+                      <VerifiedBadge userId={listener.user_id} size="sm" />
                     </p>
                     <p className="text-xs text-muted-foreground">
                       @{listener.profile?.username || 'user'}
