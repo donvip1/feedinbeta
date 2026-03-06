@@ -363,7 +363,7 @@ const AdminWallet = () => {
     enabled: canViewWallet === true,
   });
 
-  // Fetch subscription statistics
+   // Fetch subscription statistics
   const { data: subscriptionStats } = useQuery({
     queryKey: ["subscription-statistics"],
     queryFn: async () => {
@@ -373,6 +373,40 @@ const AdminWallet = () => {
     },
     enabled: canViewWallet === true,
     refetchInterval: 30000,
+  });
+
+  // User search for transfer
+  const { data: searchResults, isLoading: searchLoading } = useQuery({
+    queryKey: ["user-search-transfer", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery || searchQuery.length < 2) return [];
+      const cleanQuery = searchQuery.replace(/^@/, '').toLowerCase();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .or(`username.ilike.%${cleanQuery}%,full_name.ilike.%${cleanQuery}%`)
+        .limit(6);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: searchQuery.length >= 2 && !selectedUser,
+    staleTime: 10000,
+  });
+
+  // Recent transfers for history
+  const { data: recentTransfers } = useQuery({
+    queryKey: ["recent-admin-transfers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('platform_transactions')
+        .select('*')
+        .eq('type', 'transfer')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+    enabled: canManageCredits === true,
   });
 
   // Withdraw from profits wallet mutation
