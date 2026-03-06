@@ -1,0 +1,2 @@
+ALTER TABLE public.gift_analytics DROP CONSTRAINT gift_analytics_source_type_check;
+ALTER TABLE public.gift_analytics ADD CONSTRAINT gift_analytics_source_type_check CHECK (source_type = ANY (ARRAY['post'::text, 'live_stream'::text, 'live_space'::text, 'story'::text, 'profile'::text, 'chat'::text]));
