@@ -1472,14 +1472,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
             <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
           </div>
+        </div>
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowSettings(true)}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-4 h-4 text-white" />
+            <Settings className="w-4 h-4 text-white" />
           </button>
-        </div>
-        <div className="flex items-center gap-1.5">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
@@ -1617,13 +1617,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <p className="text-sm text-slate-400 mb-1">
             Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
           </p>
-          {hostGiftTotal > 0 && (
-            <div className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full mb-2">
-              <Gift className="w-3 h-3 text-amber-400" />
-              <span className="text-[10px] font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
-            </div>
-          )}
-          {hostGiftTotal === 0 && <div className="mb-2" />}
+          <div className="mb-2" />
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => setView('guests')}

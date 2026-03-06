@@ -98,6 +98,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false);
+  const [roomReady, setRoomReady] = useState<Room | null>(null);
   const [screenShareDismissed, setScreenShareDismissed] = useState(false);
   const [screenSharerIdentity, setScreenSharerIdentity] = useState<string | null>(null);
   
