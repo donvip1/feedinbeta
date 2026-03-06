@@ -85,18 +85,6 @@ export function ScreenShareButton({
         toast.error('Screen sharing is not available on this browser. Try opening in Chrome or your default browser.');
       }
 
-      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
-      
-      screenStreamRef.current = stream;
-      setIsSharing(true);
-
-      // Handle user stopping screen share via browser UI
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
-
-      onScreenStream(stream);
-      toast.success('Screen sharing started!');
     } catch (error: any) {
       console.error('[ScreenShare] Error:', error);
       
