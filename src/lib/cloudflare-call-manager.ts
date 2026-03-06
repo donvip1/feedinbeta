@@ -842,6 +842,10 @@ export class CloudflareCallManager {
    */
   async startScreenShare(): Promise<MediaStream | null> {
     try {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+        console.error('[CloudflareCall] getDisplayMedia not supported on this device');
+        return null;
+      }
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,

@@ -335,6 +335,11 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         setIsScreenSharing(false);
         toast.success("Screen share stopped");
       } else {
+        // Check if screen sharing is supported
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+          toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
+          return;
+        }
         // Start screen share
         const tracks = await createLocalScreenTracks({ audio: true });
         const screenTrack = tracks.find(t => t.kind === Track.Kind.Video) as LocalVideoTrack;

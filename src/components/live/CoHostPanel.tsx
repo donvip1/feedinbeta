@@ -206,6 +206,12 @@ export function CoHostPanel({
 
   // Start screen sharing
   const startScreenShare = useCallback(async () => {
+    // Check if screen sharing is supported (not available on mobile WebViews)
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
+      return;
+    }
+
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { 
