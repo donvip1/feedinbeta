@@ -24,6 +24,7 @@ import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
 import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { shareUrls } from '@/lib/url-utils';
 import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';

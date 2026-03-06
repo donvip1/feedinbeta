@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
 import { Coins, Crown, Gift, Megaphone } from 'lucide-react';
 import { FullScreenGiftEffect } from './FullScreenGiftEffect';
