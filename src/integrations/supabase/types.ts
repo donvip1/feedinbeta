@@ -8530,6 +8530,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_end_live_sessions: {
+        Args: { p_target_id?: string; p_target_type?: string }
+        Returns: Json
+      }
       admin_grant_credits: {
         Args: { credit_amount: number; reason?: string; target_user_id: string }
         Returns: Json

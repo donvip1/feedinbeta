@@ -35,14 +35,15 @@ const AdminPanel = () => {
   const [endingLive, setEndingLive] = useState(false);
   const [demoting, setDemoting] = useState<string | null>(null);
 
-  // Fetch active live spaces and streams
+  // Fetch active live spaces and streams with host profiles
   const { data: activeSpaces, refetch: refetchSpaces } = useQuery({
     queryKey: ['admin-active-spaces'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('live_spaces')
-        .select('id, title, host_id, status, created_at, viewer_count')
-        .eq('status', 'live');
+        .select('id, title, host_id, status, created_at, viewer_count, profiles:host_id(username, display_name, avatar_url)')
+        .eq('status', 'live')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -54,8 +55,9 @@ const AdminPanel = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('live_streams')
-        .select('id, title, host_id, status, created_at, viewer_count')
-        .eq('status', 'live');
+        .select('id, title, host_id, status, created_at, viewer_count, profiles:host_id(username, display_name, avatar_url)')
+        .eq('status', 'live')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -65,17 +67,16 @@ const AdminPanel = () => {
   const handleEndAllLive = async () => {
     setEndingLive(true);
     try {
-      const [spacesRes, streamsRes] = await Promise.all([
-        supabase.from('live_spaces').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
-        supabase.from('live_streams').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
-      ]);
-      if (spacesRes.error) throw spacesRes.error;
-      if (streamsRes.error) throw streamsRes.error;
-      toast.success('All live streams and spaces ended');
+      const { data, error } = await supabase.rpc('admin_end_live_sessions', {
+        p_target_type: 'all',
+      });
+      if (error) throw error;
+      const result = data as any;
+      toast.success(`Ended ${result.spaces_ended} spaces and ${result.streams_ended} streams`);
       refetchSpaces();
       refetchStreams();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to end all');
+      toast.error(error.message || 'Failed to end all sessions');
     } finally {
       setEndingLive(false);
     }
@@ -83,13 +84,15 @@ const AdminPanel = () => {
 
   const handleEndSingle = async (type: 'space' | 'stream', id: string) => {
     try {
-      const table = type === 'space' ? 'live_spaces' : 'live_streams';
-      const { error } = await supabase.from(table).update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+      const { data, error } = await supabase.rpc('admin_end_live_sessions', {
+        p_target_type: type,
+        p_target_id: id,
+      });
       if (error) throw error;
-      toast.success(`${type === 'space' ? 'Space' : 'Stream'} ended`);
+      toast.success(`${type === 'space' ? 'Space' : 'Stream'} ended successfully`);
       type === 'space' ? refetchSpaces() : refetchStreams();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to end');
+      toast.error(error.message || 'Failed to end session');
     }
   };
 
