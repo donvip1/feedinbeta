@@ -126,6 +126,7 @@ const MyAds = lazy(() => import("./pages/MyAds"));
 const StarredMessages = lazy(() => import("./pages/StarredMessages"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AboutFeedIn = lazy(() => import("./pages/AboutFeedIn"));
+const InviteFriends = lazy(() => import("./pages/InviteFriends"));
 // Lazy load ALL AI tools - reduces memory during build
 const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
 const ImageUpscaler = lazy(() => import("./pages/tools/ImageUpscaler"));
