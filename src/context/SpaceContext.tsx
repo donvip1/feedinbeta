@@ -4,6 +4,7 @@ import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import { backgroundServiceManager } from '@/lib/background-service-manager';
+import { backgroundAudioManager } from '@/lib/background-audio-manager';
 import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 import {
   Room,
