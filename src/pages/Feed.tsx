@@ -849,7 +849,7 @@ const Feed = () => {
         
         {activeTab === 'live' ? (
           // Live content tab
-          <div className="p-4 space-y-4">
+          <div className="p-4 pt-20 space-y-4">
             {liveContent && liveContent.length > 0 ? (
               liveContent.map((item) => (
                 <LiveFeedCard
