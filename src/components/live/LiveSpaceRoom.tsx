@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { SpaceChat } from './SpaceChat';

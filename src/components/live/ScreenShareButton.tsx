@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,

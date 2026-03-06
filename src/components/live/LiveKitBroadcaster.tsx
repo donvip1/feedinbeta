@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { isStandalonePWA, SCREEN_SHARE_PWA_ERROR } from '@/lib/screen-share-utils';
 import { getFriendlyError, isTemporaryError } from "@/lib/error-messages";
 import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { 

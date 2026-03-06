@@ -7,6 +7,7 @@ import { useNavigation } from '@/context/NavigationContext';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import { useSpaceRecorder } from '@/hooks/useSpaceRecorder';
 import { toast } from 'sonner';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic,

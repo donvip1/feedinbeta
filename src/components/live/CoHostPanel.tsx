@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { isStandalonePWA, isStreamBlank, SCREEN_SHARE_PWA_ERROR, SCREEN_SHARE_BLANK_ERROR } from '@/lib/screen-share-utils';
 import { createUnifiedSFUClient, UnifiedSFUClient } from '@/lib/unified-sfu-client';
 
 interface CoHost {
