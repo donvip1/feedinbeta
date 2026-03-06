@@ -515,13 +515,15 @@ const AccountSettings = () => {
 
             <div>
               <Label htmlFor="user-id">User ID</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="user-id"
-                  value={user?.id || ''}
-                  disabled
-                  className="bg-muted cursor-not-allowed font-mono text-xs"
-                />
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 relative">
+                  <Input
+                    id="user-id"
+                    value={user?.id ? `FI-${user.id.substring(0, 4).toUpperCase()}-${user.id.substring(4, 8).toUpperCase()}` : ''}
+                    disabled
+                    className="bg-muted cursor-not-allowed font-mono text-sm tracking-wider"
+                  />
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -530,15 +532,15 @@ const AccountSettings = () => {
                   onClick={() => {
                     if (user?.id) {
                       navigator.clipboard.writeText(user.id);
-                      toast({ title: 'User ID copied to clipboard' });
+                      toast({ title: 'User ID copied', description: 'Full ID copied for wallet transfers' });
                     }
                   }}
                 >
-                  Copy
+                  Copy Full ID
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Your unique identifier. Share this for wallet transfers.
+                Your unique FeedIn ID. Tap "Copy Full ID" for wallet transfers.
               </p>
             </div>
 

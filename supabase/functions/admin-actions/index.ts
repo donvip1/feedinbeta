@@ -410,18 +410,10 @@ serve(async (req) => {
       }
 
       case "assign_role": {
-        // Only super_admin, developers, and admins with can_manage_roles can assign
-        if (!isDeveloper && !isAdmin && !adminRole.can_manage_roles) {
+        // Only super_admin and developers can assign roles
+        if (!isDeveloper) {
           return new Response(
-            JSON.stringify({ error: "No permission to assign roles" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Moderators cannot assign roles
-        if (adminRole.role === "moderator") {
-          return new Response(
-            JSON.stringify({ error: "Moderators cannot assign roles" }),
+            JSON.stringify({ error: "Only Super Admin and Developers can assign roles" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -436,10 +428,10 @@ serve(async (req) => {
           );
         }
 
-        // Only super_admin/developers can assign developer role
-        if (role === "developer" && !isDeveloper) {
+        // Only super_admin can assign developer role
+        if (role === "developer" && adminRole.role !== "super_admin") {
           return new Response(
-            JSON.stringify({ error: "Only super admins can assign developer role" }),
+            JSON.stringify({ error: "Only Super Admin can assign developer role" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -517,18 +509,10 @@ serve(async (req) => {
       }
 
       case "revoke_role": {
-        // Only super_admin, developers, and admins with can_manage_roles can revoke
-        if (!isDeveloper && !isAdmin && !adminRole.can_manage_roles) {
+        // Only super_admin and developers can revoke roles
+        if (!isDeveloper) {
           return new Response(
-            JSON.stringify({ error: "No permission to revoke roles" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Moderators cannot revoke roles
-        if (adminRole.role === "moderator") {
-          return new Response(
-            JSON.stringify({ error: "Moderators cannot revoke roles" }),
+            JSON.stringify({ error: "Only Super Admin and Developers can revoke roles" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
