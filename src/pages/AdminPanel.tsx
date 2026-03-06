@@ -35,14 +35,15 @@ const AdminPanel = () => {
   const [endingLive, setEndingLive] = useState(false);
   const [demoting, setDemoting] = useState<string | null>(null);
 
-  // Fetch active live spaces and streams
+  // Fetch active live spaces and streams with host profiles
   const { data: activeSpaces, refetch: refetchSpaces } = useQuery({
     queryKey: ['admin-active-spaces'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('live_spaces')
-        .select('id, title, host_id, status, created_at, viewer_count')
-        .eq('status', 'live');
+        .select('id, title, host_id, status, created_at, viewer_count, profiles:host_id(username, display_name, avatar_url)')
+        .eq('status', 'live')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -54,8 +55,9 @@ const AdminPanel = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('live_streams')
-        .select('id, title, host_id, status, created_at, viewer_count')
-        .eq('status', 'live');
+        .select('id, title, host_id, status, created_at, viewer_count, profiles:host_id(username, display_name, avatar_url)')
+        .eq('status', 'live')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -65,17 +67,16 @@ const AdminPanel = () => {
   const handleEndAllLive = async () => {
     setEndingLive(true);
     try {
-      const [spacesRes, streamsRes] = await Promise.all([
-        supabase.from('live_spaces').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
-        supabase.from('live_streams').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
-      ]);
-      if (spacesRes.error) throw spacesRes.error;
-      if (streamsRes.error) throw streamsRes.error;
-      toast.success('All live streams and spaces ended');
+      const { data, error } = await supabase.rpc('admin_end_live_sessions', {
+        p_target_type: 'all',
+      });
+      if (error) throw error;
+      const result = data as any;
+      toast.success(`Ended ${result.spaces_ended} spaces and ${result.streams_ended} streams`);
       refetchSpaces();
       refetchStreams();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to end all');
+      toast.error(error.message || 'Failed to end all sessions');
     } finally {
       setEndingLive(false);
     }
@@ -83,13 +84,15 @@ const AdminPanel = () => {
 
   const handleEndSingle = async (type: 'space' | 'stream', id: string) => {
     try {
-      const table = type === 'space' ? 'live_spaces' : 'live_streams';
-      const { error } = await supabase.from(table).update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+      const { data, error } = await supabase.rpc('admin_end_live_sessions', {
+        p_target_type: type,
+        p_target_id: id,
+      });
       if (error) throw error;
-      toast.success(`${type === 'space' ? 'Space' : 'Stream'} ended`);
+      toast.success(`${type === 'space' ? 'Space' : 'Stream'} ended successfully`);
       type === 'space' ? refetchSpaces() : refetchStreams();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to end');
+      toast.error(error.message || 'Failed to end session');
     }
   };
 
@@ -717,14 +720,20 @@ const AdminPanel = () => {
                     {activeSpaces && activeSpaces.length > 0 ? (
                       <div className="space-y-2">
                         {activeSpaces.map((space: any) => (
-                          <div key={space.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium text-sm">{space.title || 'Untitled Space'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {space.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(space.created_at), { addSuffix: true })}
-                              </p>
+                          <div key={space.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-8 h-8 shrink-0">
+                                <AvatarImage src={space.profiles?.avatar_url} />
+                                <AvatarFallback>{(space.profiles?.display_name || '?')[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{space.title || 'Untitled Space'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  @{space.profiles?.username || 'unknown'} · {space.viewer_count || 0} viewers · {formatDistanceToNow(new Date(space.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
                             </div>
-                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('space', space.id)}>
+                            <Button variant="destructive" size="sm" className="shrink-0 ml-2" onClick={() => handleEndSingle('space', space.id)}>
                               <StopCircle className="w-3 h-3 mr-1" /> End
                             </Button>
                           </div>
@@ -744,14 +753,20 @@ const AdminPanel = () => {
                     {activeStreams && activeStreams.length > 0 ? (
                       <div className="space-y-2">
                         {activeStreams.map((stream: any) => (
-                          <div key={stream.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium text-sm">{stream.title || 'Untitled Stream'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {stream.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(stream.created_at), { addSuffix: true })}
-                              </p>
+                          <div key={stream.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-8 h-8 shrink-0">
+                                <AvatarImage src={stream.profiles?.avatar_url} />
+                                <AvatarFallback>{(stream.profiles?.display_name || '?')[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{stream.title || 'Untitled Stream'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  @{stream.profiles?.username || 'unknown'} · {stream.viewer_count || 0} viewers · {formatDistanceToNow(new Date(stream.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
                             </div>
-                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('stream', stream.id)}>
+                            <Button variant="destructive" size="sm" className="shrink-0 ml-2" onClick={() => handleEndSingle('stream', stream.id)}>
                               <StopCircle className="w-3 h-3 mr-1" /> End
                             </Button>
                           </div>
