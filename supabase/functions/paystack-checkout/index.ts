@@ -184,7 +184,7 @@ serve(async (req) => {
         amount: amountInKobo,
         currency: 'NGN',
         metadata,
-        callback_url: `${Deno.env.get('SITE_URL') || req.headers.get('origin') || 'https://feedinbeta.lovable.app'}/wallet/${type === 'credits' ? 'credits' : 'subscription'}`,
+        callback_url: `${Deno.env.get('SITE_URL') || req.headers.get('origin') || 'https://feedinn.com'}/wallet/${type === 'credits' ? 'credits' : 'subscription'}`,
       }),
     });
 
