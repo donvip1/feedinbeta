@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { shareUrls } from '@/lib/url-utils';
 import { cn } from '@/lib/utils';
 
@@ -673,7 +674,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-white text-sm font-medium">{roomInfo.hostName}</span>
+                   <span className="text-white text-sm font-medium">{roomInfo.hostName}</span>
+                   {roomInfo.hostUserId && <VerifiedBadge userId={roomInfo.hostUserId} size="sm" />}
                   {isHost && <Crown className="w-3 h-3 text-amber-400" />}
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-white/60">
@@ -888,8 +890,9 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                           </div>
                         )}
                       </div>
-                      <span className="text-[10px] text-white/60 max-w-[48px] truncate">
+                      <span className="text-[10px] text-white/60 max-w-[48px] truncate flex items-center gap-0.5">
                         {p.profile?.display_name?.split(' ')[0] || 'User'}
+                        <VerifiedBadge userId={p.user_id} size="sm" />
                       </span>
                     </motion.div>
                   ))}
