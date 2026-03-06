@@ -514,6 +514,35 @@ const AccountSettings = () => {
             </div>
 
             <div>
+              <Label htmlFor="user-id">User ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="user-id"
+                  value={user?.id || ''}
+                  disabled
+                  className="bg-muted cursor-not-allowed font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    if (user?.id) {
+                      navigator.clipboard.writeText(user.id);
+                      toast({ title: 'User ID copied to clipboard' });
+                    }
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your unique identifier. Share this for wallet transfers.
+              </p>
+            </div>
+
+            <div>
               <Label htmlFor="display_name" className="flex items-center gap-2">
                 Display Name
                 {displayNameLocked && <Lock className="w-3 h-3 text-muted-foreground" />}
