@@ -432,8 +432,26 @@ const AdminWallet = () => {
   // Transfer to user mutation
   const transferMutation = useMutation({
     mutationFn: async ({ userId, amount, reason }: { userId: string; amount: number; reason: string }) => {
+      let resolvedUserId = userId.trim();
+      
+      // If input is not a UUID, look up user by username or email
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(resolvedUserId)) {
+        const identifier = resolvedUserId.replace(/^@/, '');
+        const { data: profile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id')
+          .or(`username.eq.${identifier},email.eq.${identifier}`)
+          .maybeSingle();
+        
+        if (lookupError || !profile) {
+          throw new Error(`User "${identifier}" not found. Try entering their UUID or exact username.`);
+        }
+        resolvedUserId = profile.id;
+      }
+      
       const { data, error } = await supabase.rpc("admin_transfer_to_user", {
-        p_user_id: userId,
+        p_user_id: resolvedUserId,
         p_amount: amount,
         p_reason: reason || "Admin transfer",
       });
@@ -1372,8 +1390,8 @@ const AdminWallet = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="transfer-user">User ID</Label>
-                    <Input id="transfer-user" placeholder="Enter user UUID"
+                    <Label htmlFor="transfer-user">Username or User ID</Label>
+                    <Input id="transfer-user" placeholder="Enter username or UUID (e.g. tester1)"
                       value={transferUserId} onChange={(e) => setTransferUserId(e.target.value)} />
                   </div>
                   <div className="space-y-2">
