@@ -321,9 +321,10 @@ export const FlyingChat = ({
                       </AvatarFallback>
                     </Avatar>
                     {/* Text Content */}
-                    <p className="text-sm font-semibold whitespace-nowrap">
+                    <p className="text-sm font-semibold whitespace-nowrap flex items-center gap-1">
                       <span className="text-white/90">{displayName === 'Anonymous' ? 'Me' : displayName}</span>
                       {message.user_id && <VerifiedBadge userId={message.user_id} size="sm" />}
+                      <span className="text-yellow-300 ml-1 font-bold">{message.content}</span>
                     </p>
                   </motion.div>
                 ) : (

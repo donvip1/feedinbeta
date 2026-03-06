@@ -713,8 +713,9 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <span className="text-primary text-xs font-medium">
+                  <span className="text-primary text-xs font-medium flex items-center gap-1">
                     {comment.profiles?.display_name || comment.profiles?.username || 'User'}
+                    {comment.user_id && <VerifiedBadge userId={comment.user_id} size="sm" />}
                   </span>
                   <p className="text-white text-sm break-words">{comment.content}</p>
                 </div>

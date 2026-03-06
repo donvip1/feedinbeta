@@ -230,6 +230,7 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false, coverImage
                   onClick={() => navigate(`/profile/${msg.profile?.username || msg.user_id}`, { state: { returnTo: `/live/space/${spaceId}` } })}
                 >
                   {msg.profile?.display_name || 'User'}
+                  <VerifiedBadge userId={msg.user_id} size="sm" />
                 </span>
                 <span className="text-[10px] text-zinc-600">@{msg.profile?.username || 'user'}</span>
                 <span className="text-[10px] text-zinc-700">
