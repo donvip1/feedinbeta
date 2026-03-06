@@ -475,6 +475,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
+      setRoomReady(null);
     }
 
     // Remove all audio elements
