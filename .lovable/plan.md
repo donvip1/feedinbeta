@@ -1,65 +1,67 @@
 
 
-## Problem
+## Video Stream Room Overhaul Plan
 
-When sharing a live space link on WhatsApp/Telegram, the preview shows the generic FeedIn logo and default description instead of the space's cover image and title. This happens because:
+### Problems Identified
 
-1. Shared URLs point to `feedinn.com/live/space/{id}` — a client-side SPA route
-2. Social crawlers fetch `index.html` which has static, generic OG meta tags
-3. The `og-space` and `og-stream` edge functions exist and generate dynamic OG data, but **nothing routes crawlers to them**
+1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
+2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
+3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
+4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
+5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
+6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
+7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
+8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
 
-## Solution
+### Changes to `TwitterStreamRoom.tsx`
 
-Change the shared URLs to point to the edge functions instead of the SPA directly. The edge functions already generate proper OG HTML with `<meta http-equiv="refresh">` that redirects browsers to the SPA after crawlers read the meta tags.
+**Remove entirely:**
+- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
+- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
+- Screen share button from bottom bar
+- Recording button/indicator from bottom bar
+- Monitor import from lucide
 
-### Changes
+**Fix reactions — switch to broadcast channel (matching space pattern):**
+- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
+- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
+- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
 
-**1. `src/lib/url-utils.ts`** — Update `shareUrls.liveSpace` and `shareUrls.liveStream` to point to the OG edge functions:
+**Fix chat — add optimistic updates:**
+- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
+- This matches what the space does
 
-```typescript
-liveSpace: (spaceId: string) => `https://spsguldyimamulhigloc.supabase.co/functions/v1/og-space?id=${spaceId}`,
-liveStream: (streamId: string) => `https://spsguldyimamulhigloc.supabase.co/functions/v1/og-stream?id=${streamId}`,
-```
+**Add host gift counter:**
+- Add `hostGiftTotal` state (copy from space)
+- Fetch initial total from `live_stream_gifts` on mount
+- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
+- Display as a badge below host tag: "Gifts: {count}"
 
-Wait — per the project policy, we must never expose internal backend function URLs. The correct approach is different.
+**Fix camera flip:**
+- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
 
-### Revised Solution
+**Improve PK Battle:**
+- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
+- Import and use the `usePKBattle` hook
 
-Since we can't use edge function URLs as share links, the fix is to make the SPA dynamically inject OG tags before crawlers render the page. But SPAs can't do that — crawlers don't execute JavaScript.
+**UI/UX improvements:**
+- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
+- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
+- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
+- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
+- Add proper `min-h-[100dvh]` for mobile viewport
 
-The proper approach: **Use the edge functions as a proxy/redirect**. Create clean redirect URLs on the `feedinn.com` domain that route through the edge functions. Since we're on a static hosting platform (no server-side rendering), the only viable option is:
+### Files to Modify
 
-**Change share links to use the edge function URLs but wrapped cleanly.** However, per policy we shouldn't expose raw function URLs.
+1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
+2. No other files need modification
 
-**Best approach:** Update the OG edge functions to use the `feedinn.com` share URLs in their output, and update the share link generation to route through the edge functions. We can create a simple wrapper — share via a URL like `feedinn.com/s/{shareCode}` that gets handled client-side to redirect, but crawlers still won't see dynamic OG tags.
-
-**The only working solution for dynamic OG on a static SPA:** Make the share URLs point to the edge functions. The edge function already redirects humans to the real SPA URL. We just need to format the share URL cleanly.
-
-### Final Plan
-
-**1. `src/lib/url-utils.ts`** — Update share URL generators for spaces and streams to route through the OG edge functions. Use the `VITE_SUPABASE_URL` env var (not hardcoded):
-
-```typescript
-liveSpace: (spaceId: string) => {
-  const base = import.meta.env.VITE_SUPABASE_URL;
-  return `${base}/functions/v1/og-space?id=${spaceId}`;
-},
-liveStream: (streamId: string) => {
-  const base = import.meta.env.VITE_SUPABASE_URL;
-  return `${base}/functions/v1/og-stream?id=${streamId}`;
-},
-```
-
-This way:
-- WhatsApp/Telegram crawlers hit the edge function, get the cover image + title in OG tags
-- Human users get instantly redirected to `feedinn.com/live/space/{id}` via the `<meta http-equiv="refresh">` already in the edge function
-- The cover image shows in link previews instead of the generic logo
-
-**2. `supabase/functions/og-space/index.ts`** — No changes needed, already works correctly. It fetches `cover_image_url` from the database and sets it as the OG image.
-
-**3. `supabase/functions/og-stream/index.ts`** — No changes needed, same logic.
-
-### One file change total
-
-Only `src/lib/url-utils.ts` needs to be updated — the `liveSpace` and `liveStream` functions in the `shareUrls` object.
+### What stays the same
+- LiveKit initialization logic
+- All Supabase table structures
+- LiveGiftModal (still available for full gift UI)
+- Guest list view
+- Share menu
+- All modals (Report, Rules, Feedback, Audio Settings)
+- FloatingReactions component
 

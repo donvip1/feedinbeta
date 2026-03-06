@@ -55,6 +55,6 @@ export const shareUrls = {
   profile: (username: string) => createShareableUrl(`/profile/${username}`),
   groupJoin: (inviteCode: string) => createShareableUrl(`/groups/join/${inviteCode}`),
   group: (groupId: string) => createShareableUrl(`/groups/${groupId}`),
-  liveStream: (streamId: string) => createShareableUrl(`/live/stream/${streamId}`),
-  liveSpace: (spaceId: string) => createShareableUrl(`/live/space/${spaceId}`),
+  liveStream: (streamId: string) => `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-stream?id=${streamId}`,
+  liveSpace: (spaceId: string) => `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-space?id=${spaceId}`,
 };
