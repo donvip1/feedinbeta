@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
 import { Coins, Crown, Gift, Megaphone } from 'lucide-react';
 import { FullScreenGiftEffect } from './FullScreenGiftEffect';
@@ -320,8 +321,9 @@ export const FlyingChat = ({
                       </AvatarFallback>
                     </Avatar>
                     {/* Text Content */}
-                    <p className="text-sm font-semibold whitespace-nowrap">
+                    <p className="text-sm font-semibold whitespace-nowrap flex items-center gap-1">
                       <span className="text-white/90">{displayName === 'Anonymous' ? 'Me' : displayName}</span>
+                      {message.user_id && <VerifiedBadge userId={message.user_id} size="sm" />}
                       <span className="text-yellow-300 ml-1 font-bold">{message.content}</span>
                     </p>
                   </motion.div>
@@ -340,6 +342,7 @@ export const FlyingChat = ({
                     >
                       {isHostUser && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
                       {displayName}
+                      {message.user_id && <VerifiedBadge userId={message.user_id} size="sm" />}
                     </span>
                     {/* Message content - bold with shadow */}
                     <span className="text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">

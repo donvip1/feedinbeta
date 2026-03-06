@@ -24,6 +24,7 @@ import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
 import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { shareUrls } from '@/lib/url-utils';
 import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
@@ -1461,7 +1462,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                         <AvatarFallback>{speaker.profile?.display_name?.[0] || 'U'}</AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium">{speaker.profile?.display_name}</span>
+                        <span className="text-sm font-medium flex items-center gap-1">{speaker.profile?.display_name} <VerifiedBadge userId={speaker.user_id} size="sm" /></span>
                         <span className="text-xs text-muted-foreground">wants to speak</span>
                       </div>
                     </div>
@@ -1981,8 +1982,9 @@ const SpeakerAvatar = ({
       </div>
 
       <div className="text-center">
-        <p className="text-xs font-medium truncate max-w-[80px]">
+        <p className="text-xs font-medium truncate max-w-[80px] flex items-center justify-center gap-0.5">
           {speaker.profile?.display_name || 'User'}
+          <VerifiedBadge userId={speaker.user_id} size="sm" />
         </p>
         {speaker.role !== 'listener' && speaker.role !== 'speaker' && (
           <Badge variant="secondary" className="text-[10px] h-4 mt-0.5">

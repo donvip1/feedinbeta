@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -265,8 +266,9 @@ const ParticipantRow = ({
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <p className="font-medium text-sm">
+            <p className="font-medium text-sm flex items-center gap-1">
               {participant.profile?.display_name || 'User'}
+              <VerifiedBadge userId={participant.user_id} size="sm" />
               {isCurrentUser && <span className="text-muted-foreground ml-1">(You)</span>}
             </p>
           </div>
