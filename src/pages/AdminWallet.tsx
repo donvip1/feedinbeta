@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   ArrowLeft, Coins, TrendingUp, Wallet, Send, Plus, History, 
   Shield, Eye, Users, Lock, Gift, Megaphone, DollarSign, 
   Award, Target, RefreshCw, PiggyBank, Radio, Activity, 
-  ArrowUpRight, ArrowDownRight, Clock, Calendar
+  ArrowUpRight, ArrowDownRight, Clock, Calendar, Search,
+  CheckCircle2, AlertTriangle, Zap, UserCheck, X, Sparkles
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BackButton } from '@/components/navigation/BackButton';
 import { format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface CreditStatistics {
   user_credits_total: number;
