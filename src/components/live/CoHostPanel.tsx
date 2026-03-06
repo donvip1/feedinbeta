@@ -206,6 +206,12 @@ export function CoHostPanel({
 
   // Start screen sharing
   const startScreenShare = useCallback(async () => {
+    // Block screen sharing in standalone PWA mode
+    if (isStandalonePWA()) {
+      toast.error(SCREEN_SHARE_PWA_ERROR);
+      return;
+    }
+
     // Check if screen sharing is supported (not available on mobile WebViews)
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
       toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
@@ -221,6 +227,13 @@ export function CoHostPanel({
         },
         audio: true,
       });
+
+      // Validate stream is not blank
+      if (isStreamBlank(screenStream)) {
+        screenStream.getTracks().forEach(t => t.stop());
+        toast.error(SCREEN_SHARE_BLANK_ERROR);
+        return;
+      }
 
       screenStreamRef.current = screenStream;
       setIsScreenSharing(true);

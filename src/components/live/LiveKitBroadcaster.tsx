@@ -336,6 +336,11 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         setIsScreenSharing(false);
         toast.success("Screen share stopped");
       } else {
+        // Block screen sharing in standalone PWA mode
+        if (isStandalonePWA()) {
+          toast.error(SCREEN_SHARE_PWA_ERROR);
+          return;
+        }
         // Check if screen sharing is supported
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
           toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');

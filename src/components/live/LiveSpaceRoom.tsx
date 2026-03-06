@@ -1017,6 +1017,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       return;
     }
 
+    // Block screen sharing in standalone PWA mode
+    if (isStandalonePWA()) {
+      toast.error(SCREEN_SHARE_PWA_ERROR);
+      return;
+    }
+
     // Check if screen sharing is supported (not available on mobile WebViews)
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
       toast.error('Screen sharing is not supported on this device. Please use a desktop browser.');
@@ -1028,6 +1034,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
         audio: true,
       });
+
+      // Validate stream is not blank (common on Android PWA)
+      if (isStreamBlank(stream)) {
+        stream.getTracks().forEach(t => t.stop());
+        toast.error(SCREEN_SHARE_BLANK_ERROR);
+        return;
+      }
 
       // Handle user stopping via browser UI
       stream.getVideoTracks()[0].onended = () => {
