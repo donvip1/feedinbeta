@@ -397,6 +397,7 @@ const App = () => {
             <Route path="/settings/investment-docs" element={<InvestmentDocs />} />
             <Route path="/settings/currency" element={<CurrencySettings />} />
             <Route path="/settings/about" element={<AboutFeedIn />} />
+            <Route path="/settings/invite" element={<InviteFriends />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/deleted-posts" element={<AdminDeletedPosts />} />
             <Route path="/admin/panel" element={<AdminPanel />} />
