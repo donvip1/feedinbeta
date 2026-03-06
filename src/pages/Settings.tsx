@@ -293,7 +293,7 @@ const Settings = () => {
       items: [
         { icon: Users, title: 'Friends', description: 'Friends & requests', route: '/friends', color: 'text-blue-500' },
         { icon: UsersRound, title: 'Groups', description: 'Communities', route: '/groups', color: 'text-indigo-500' },
-        { icon: Bookmark, title: 'Saved Posts', route: '/saved', color: 'text-orange-500' },
+        
         { icon: Radio, title: 'Live Streaming', route: '/live', color: 'text-red-500' },
         { icon: Rocket, title: 'Manage Ads', description: 'Ad campaigns', route: '/ads/my-ads', color: 'text-amber-500' },
         { icon: TrendingUp, title: 'Trending', route: '/feed/trending', color: 'text-orange-500' },
