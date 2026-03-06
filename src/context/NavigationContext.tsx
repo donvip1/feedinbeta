@@ -46,6 +46,7 @@ const ROUTE_FALLBACKS: Record<string, string> = {
   '/settings/blocked': '/settings',
   '/settings/language': '/settings',
   '/settings/cache': '/settings',
+  '/settings/invite': '/settings',
   '/settings/help': '/settings',
   '/settings/investors': '/settings',
   '/settings/investment-docs': '/settings/investors',
