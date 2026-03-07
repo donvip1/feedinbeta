@@ -1845,12 +1845,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           </div>
                         )}
                       </div>
-                      <span 
-                        className="text-[10px] font-bold text-slate-500 truncate w-full text-center cursor-pointer hover:text-purple-400 transition-colors"
+                      <div 
+                        className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-purple-400 transition-colors"
                         onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
                       >
-                        {speaker.profile?.display_name?.split(' ')[0] || 'User'}
-                      </span>
+                        <span className="text-[10px] font-bold text-slate-500 truncate">
+                          {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                        </span>
+                        <VerifiedBadge userId={speaker.user_id} size="sm" />
+                      </div>
                     </div>
                   ))}
               </div>
