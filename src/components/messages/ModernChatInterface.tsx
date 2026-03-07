@@ -1268,86 +1268,82 @@ export const ModernChatInterface = ({
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-gradient-to-b from-background to-background/95 overflow-hidden">
-      {/* Header - Flex shrink 0 to stay at top */}
-      <header className="flex-shrink-0 flex items-center gap-2 px-2 py-2 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[52px]">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="md:hidden shrink-0 h-8 w-8 hover:bg-primary/10"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        
-        <div 
-          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer overflow-hidden"
-          onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
-        >
-          <div className="relative shrink-0">
-            <Avatar className="w-9 h-9 ring-2 ring-primary/20">
-              <AvatarImage src={otherUser?.avatar_url || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
-                {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            {isOnline && (
-              <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-                currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
-              )} />
-            )}
-          </div>
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <h2 className="font-semibold truncate text-sm flex items-center gap-1">{otherUser?.display_name || 'Loading...'} {otherUser?.id && <VerifiedBadge userId={otherUser.id} size="sm" />}</h2>
-            <p className="text-xs text-muted-foreground truncate">
-              {isTyping ? (
-                <span className="text-primary flex items-center gap-1 animate-pulse">
-                  {getActivityIcon(activityType)}
-                  {getActivityText(activityType)}
-                </span>
-              ) : isOnline ? (
-                <span className={currentSection === 'messages' ? 'text-blue-500' : 'text-emerald-500'}>
-                  {currentSection === 'messages' ? 'Active now' : 'Online'}
-                </span>
-              ) : lastSeen ? (
-                `last seen ${formatLastSeen(lastSeen)}`
-              ) : (
-                <span className="text-gray-400">Offline</span>
+      {/* Header - Glassmorphic premium style */}
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-md z-50 min-h-[56px]">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="md:hidden shrink-0 h-9 w-9 -ml-2 rounded-full hover:bg-muted"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div 
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
+          >
+            <div className="relative shrink-0">
+              <Avatar className="w-10 h-10 ring-2 ring-border">
+                <AvatarImage src={otherUser?.avatar_url || ''} />
+                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
+                  {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              {isOnline && (
+                <div className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+                  currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
+                )} />
               )}
-            </p>
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm leading-tight truncate flex items-center gap-1">
+                {otherUser?.display_name || 'Loading...'} 
+                {otherUser?.id && <VerifiedBadge userId={otherUser.id} size="sm" />}
+              </h3>
+              <p className="text-[10px] font-medium truncate">
+                {isTyping ? (
+                  <span className="text-primary flex items-center gap-1 animate-pulse">
+                    {getActivityIcon(activityType)}
+                    {getActivityText(activityType)}
+                  </span>
+                ) : isOnline ? (
+                  <span className={currentSection === 'messages' ? 'text-blue-500' : 'text-emerald-500'}>
+                    {currentSection === 'messages' ? 'Active now' : 'Online'}
+                  </span>
+                ) : lastSeen ? (
+                  <span className="text-muted-foreground">{`last seen ${formatLastSeen(lastSeen)}`}</span>
+                ) : (
+                  <span className="text-muted-foreground">Offline</span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Action buttons - Always visible, never shrink */}
-        <div className="flex items-center gap-0.5 shrink-0">
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
-            onClick={() => initiateCall('voice')}
-          >
-            <Phone className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
             onClick={() => initiateCall('video')}
           >
-            <Video className="w-4 h-4" />
+            <Video className="w-[18px] h-[18px]" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
+            onClick={() => initiateCall('voice')}
+          >
+            <Phone className="w-[18px] h-[18px]" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10">
-                <MoreVertical className="w-4 h-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted">
+                <MoreVertical className="w-[18px] h-[18px]" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
