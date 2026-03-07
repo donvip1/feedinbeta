@@ -797,6 +797,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
           setInviteUsername(''); setInviteSearchResults([]);
         }} />
       <PollSystem isOpen={showPollCreator} onClose={() => setShowPollCreator(false)} streamId={streamId} />
+      <PredictionSystem isOpen={showPrediction} onClose={() => setShowPrediction(false)} streamId={streamId} isHost={isHost} userCredits={userCredits} />
 
       {showGiftModal && (
         <LiveGiftModal isOpen={showGiftModal} onClose={() => setShowGiftModal(false)} streamId={streamId}
