@@ -284,32 +284,34 @@ export const ChatMediaViewer = ({
     >
       {/* Header */}
       {showControls && (
-        <div className="absolute top-0 left-0 right-0 z-10 safe-area-top animate-in slide-in-from-top duration-150">
+        <div 
+          className="absolute top-0 left-0 right-0 z-20 safe-area-top animate-in slide-in-from-top duration-150"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
             <div className="flex items-center gap-2.5">
               <Button
                 variant="ghost" size="icon"
                 className="text-white hover:bg-white/20 h-9 w-9"
-                onClick={(e) => { e.stopPropagation(); haptic('light'); onClose(); }}
+                onClick={() => { haptic('light'); onClose(); }}
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <p className="text-white font-medium text-sm">{senderName}</p>
+                <p className="text-white font-medium text-sm">{isOwn ? 'You' : senderName}</p>
                 {timestamp && <p className="text-white/60 text-[10px]">{timestamp}</p>}
               </div>
             </div>
 
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon"
                   className="text-white hover:bg-white/20 h-9 w-9"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-44 z-[110]">
                 {isImage && onEdit && (
                   <DropdownMenuItem onClick={onEdit}>
                     <Edit3 className="w-3.5 h-3.5 mr-2" /> Edit
