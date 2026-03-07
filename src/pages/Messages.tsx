@@ -549,19 +549,19 @@ export default function Messages() {
         />
       )}
       
-      {/* Sidebar */}
+      {/* Sidebar - with transition effect when chat is selected */}
       <div className={cn(
-        "flex-col w-full md:w-80 border-r z-10 transition-colors duration-300",
+        "flex-col w-full md:w-80 border-r z-10 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
         selectedConversationId ? 'hidden md:flex' : 'flex',
         secretMode ? "bg-slate-900 border-slate-800" : "bg-background border-border"
       )}>
-        {/* User Header - TikTok Style */}
+        {/* Premium Header */}
         <div className={cn(
-          "pt-4 border-b transition-colors duration-300",
+          "pt-6 border-b transition-colors duration-300",
           secretMode ? "border-slate-800 bg-slate-900/80" : "border-border bg-background/80 backdrop-blur-md"
         )}>
-          {/* Title & Top Icons */}
-          <div className="flex items-center justify-between mb-4 px-4">
+          {/* Title & Actions */}
+          <div className="flex items-center justify-between mb-5 px-5">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -571,32 +571,28 @@ export default function Messages() {
               >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <h1 className={cn(
-                    "text-xl font-bold",
-                    secretMode 
-                      ? "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400" 
-                      : "text-foreground"
-                  )}>
-                    {secretMode ? "Secret Mode" : "Inbox"}
-                  </h1>
-                  {!secretMode && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-background shadow-sm animate-pulse" />
-                  )}
-                </div>
-              </div>
+              <h1 className={cn(
+                "text-3xl font-black tracking-tight",
+                secretMode 
+                  ? "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400" 
+                  : "bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent"
+              )}>
+                {secretMode ? "Secret" : "FeedIn"}
+              </h1>
+              {!secretMode && (
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-background shadow-sm animate-pulse" />
+              )}
             </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSecretMode(!secretMode)}
                 className={cn(
-                  "w-9 h-9 transition-colors",
+                  "w-10 h-10 rounded-2xl transition-colors",
                   secretMode 
                     ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
-                    : "hover:bg-muted"
+                    : "bg-muted hover:bg-muted/80"
                 )}
                 title={secretMode ? "Exit Secret Mode" : "Enter Secret Mode"}
               >
@@ -605,30 +601,41 @@ export default function Messages() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  if (activeTab === 'chats') setShowNewConversation(true);
-                  else if (activeTab === 'groups') setShowCreateGroup(true);
-                }}
-                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setShowMessageSettings(true)}
-                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
-                title="Message Settings"
+                className={cn(
+                  "w-10 h-10 rounded-2xl",
+                  secretMode ? "bg-slate-800 hover:bg-slate-700" : "bg-muted hover:bg-muted/80"
+                )}
               >
-                <MoreVertical className="w-5 h-5" />
+                <Settings className="w-5 h-5" />
               </Button>
             </div>
           </div>
           
-          {/* TikTok-style Stories Bar - Always visible above tabs */}
+          {/* Search Bar - Premium style */}
+          <div className={cn(
+            "relative px-5 mb-4 group",
+            secretMode ? "" : ""
+          )}>
+            <Search className="absolute left-9 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
+            <input 
+              type="text" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              placeholder="Search encrypted chats..." 
+              className={cn(
+                "w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none border border-transparent transition-all shadow-inner",
+                secretMode 
+                  ? "bg-slate-800 text-white placeholder:text-slate-500 focus:border-red-500/20" 
+                  : "bg-muted focus:border-primary/20 focus:bg-card"
+              )} 
+            />
+          </div>
+          
+          {/* TikTok-style Stories Bar */}
           <TikTokStoriesBar />
           
-          {/* Navigation Tabs */}
+          {/* Bold Text Tabs */}
           <div className="pb-1">
             <MessagingTabs
               activeTab={activeTab}
@@ -637,25 +644,6 @@ export default function Messages() {
               secretMode={secretMode}
             />
           </div>
-        </div>
-
-        {/* Search Bar - Outside header for scrolling */}
-        <div className={cn(
-          "relative px-4 py-2",
-          secretMode ? "bg-slate-900" : "bg-background"
-        )}>
-          <div className="absolute inset-y-0 left-7 flex items-center pointer-events-none">
-            <Search className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <Input
-            placeholder={`Search ${activeTab}...`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={cn(
-              "w-full rounded-xl py-2.5 pl-10 pr-4 text-sm",
-              secretMode && "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-            )}
-          />
         </div>
 
         <ScrollArea className="flex-1">
