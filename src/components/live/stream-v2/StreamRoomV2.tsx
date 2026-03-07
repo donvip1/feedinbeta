@@ -690,7 +690,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
           setHostCards(cards);
           if (stream?.id) {
             await supabase.from('live_streams').update({
-              stream_features: { ...features, host_cards: cards }
+              stream_features: { ...features, host_cards: cards } as any
             }).eq('id', stream.id);
           }
         }}
