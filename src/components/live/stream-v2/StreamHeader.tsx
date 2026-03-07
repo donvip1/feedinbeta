@@ -71,7 +71,7 @@ export const StreamHeader = ({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        <AICatchUpPanel streamId={streamId} />
+        {showAIPulse && <AICatchUpPanel streamId={streamId} />}
 
         <button
           onClick={onSettings}
