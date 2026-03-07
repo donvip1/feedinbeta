@@ -268,6 +268,13 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       })
       .on('broadcast', { event: 'co_broadcast_invite' }, (payload: any) => {
         if (payload.payload?.user_id === user?.id) { toast.success('You have been invited to co-broadcast!'); fetchViewers(); }
+      })
+      .on('broadcast', { event: 'light_flash' }, () => {
+        setIsLightFlashing(true);
+        setTimeout(() => setIsLightFlashing(false), 600);
+      })
+      .on('broadcast', { event: 'sound_effect' }, () => {
+        playTriggerSound();
       }).subscribe();
 
     // Poll channel
