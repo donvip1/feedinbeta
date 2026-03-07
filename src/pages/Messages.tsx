@@ -646,7 +646,7 @@ export default function Messages() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 px-5">
           {/* Chats Content with TikTok-style Stories at top */}
           {activeTab === 'chats' && (
             <div className="pb-20">
@@ -724,7 +724,7 @@ export default function Messages() {
                   )}
                 </div>
               ) : (
-                <div className="px-2">
+                <div>
                   {filteredConversations.map((conv, index) => (
                     <TikTokConversationItem
                       key={conv.id}
@@ -901,6 +901,37 @@ export default function Messages() {
           )}
         </ScrollArea>
       </div>
+
+      {/* Expandable FAB */}
+      {!selectedConversationId && (
+        <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3 md:hidden">
+          {isFabExpanded && (
+            <div className="flex flex-col gap-3 animate-fade-in">
+              <button 
+                onClick={() => { setShowCreateGroup(true); setIsFabExpanded(false); }} 
+                className="flex items-center gap-3 px-5 py-4 bg-foreground text-background rounded-2xl shadow-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+              >
+                <Users2 className="w-[18px] h-[18px]" /> Create Space
+              </button>
+              <button 
+                onClick={() => { setShowNewConversation(true); setIsFabExpanded(false); }} 
+                className="flex items-center gap-3 px-5 py-4 bg-card rounded-2xl shadow-2xl border border-border text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+              >
+                <UserPlus className="w-[18px] h-[18px] text-primary" /> New Contact
+              </button>
+            </div>
+          )}
+          <button 
+            onClick={() => setIsFabExpanded(!isFabExpanded)} 
+            className={cn(
+              "w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all",
+              isFabExpanded ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"
+            )}
+          >
+            <Plus className={cn("w-7 h-7 transition-transform", isFabExpanded && "rotate-45")} />
+          </button>
+        </div>
+      )}
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
