@@ -83,7 +83,7 @@ export const TikTokConversationItem = ({
   };
   
   return (
-    <div className="relative overflow-hidden rounded-[28px] mb-2">
+    <div className="relative overflow-hidden rounded-[24px] mb-1.5">
       {/* Archive action behind */}
       {swipeX > 0 && (
         <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-amber-500 text-white px-4 rounded-r-[28px]"
@@ -99,10 +99,10 @@ export const TikTokConversationItem = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "flex items-center gap-4 p-4 group cursor-pointer transition-all w-full relative rounded-[28px] border",
+          "flex items-center gap-3 p-3.5 group cursor-pointer transition-all w-full relative rounded-[24px] border",
           isSelected 
             ? "bg-primary/10 border-primary/20" 
-            : "bg-muted/30 hover:bg-card border-border/50 shadow-sm active:scale-[0.98]"
+            : "bg-muted/20 hover:bg-card border-border/40 active:scale-[0.98]"
         )}
         style={{
           transform: swipeX > 0 ? `translateX(-${swipeX}px)` : undefined,
@@ -119,8 +119,8 @@ export const TikTokConversationItem = ({
           )}>
             <Avatar className={cn(
               "shadow-sm",
-              hasStoryRing ? "w-[52px] h-[52px]" : "w-14 h-14"
-            )} style={{ borderRadius: '20px' }}>
+              hasStoryRing ? "w-[48px] h-[48px]" : "w-12 h-12"
+            )} style={{ borderRadius: '16px' }}>
               <AvatarImage 
                 src={avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`} 
                 className="rounded-[20px]"

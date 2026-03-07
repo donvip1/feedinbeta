@@ -1633,10 +1633,10 @@ export const ModernChatInterface = ({
 
       {/* Input Area - Premium style */}
       {!showVoiceRecorder && (
-        <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-t border-border/50 z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-t border-border/50 z-40 pb-[max(8px,env(safe-area-inset-bottom))]">
           {/* AI Reply Suggestions */}
           {showAiSuggestions && messages.length > 0 && user && (
-            <div className="px-3 pt-2 pb-0">
+            <div className="px-3 pt-2 pb-1">
               <AIReplySuggestions
                 conversationId={conversationId}
                 lastMessages={messages.slice(-5).map(m => ({
@@ -1653,37 +1653,73 @@ export const ModernChatInterface = ({
             </div>
           )}
 
-          {/* MediaDock appears ABOVE input row */}
+          {/* MediaDock appears ABOVE input row - full width, clear reveal */}
+          {showMediaDock && (
+            <div className="bg-card/95 backdrop-blur-lg border-b border-border/30 animate-fade-in">
+              <div className="flex items-center gap-5 overflow-x-auto no-scrollbar py-3 px-4">
+                {[
+                  { icon: Camera, label: 'Camera', color: 'bg-blue-500', type: 'image' as const, accept: 'image/*' },
+                  { icon: ImageIcon, label: 'Gallery', color: 'bg-purple-500', type: 'image' as const, accept: 'image/*,video/*' },
+                  { icon: Paperclip, label: 'Document', color: 'bg-orange-500', type: 'file' as const, accept: '*/*' },
+                  { icon: Mic, label: 'Audio', color: 'bg-pink-500', type: 'file' as const, accept: 'audio/*' },
+                ].map((item, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => {
+                      // Trigger file select through the AttachmentPicker
+                      const input = document.querySelector<HTMLInputElement>('input[type="file"][class="hidden"]');
+                      if (input) {
+                        input.accept = item.accept;
+                        input.click();
+                      }
+                    }}
+                    className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+                    disabled={sending || uploadingFile}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
+                      item.color
+                    )}>
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hidden file input for AttachmentPicker */}
           <AttachmentPicker
             onFileSelect={handleFileSelect}
-            isExpanded={showMediaDock}
+            isExpanded={false}
             onToggle={() => setShowMediaDock(!showMediaDock)}
           />
 
-          {/* Unified input row - all items inside one bar */}
+          {/* Unified input row */}
           <div className="px-3 py-2">
-            <div className="flex items-end gap-1.5 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 px-2 py-1.5">
-              {/* Plus button - always visible */}
+            <div className="flex items-center gap-1 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 pl-1.5 pr-1.5 py-1">
+              {/* Plus button */}
               <Button
                 variant="ghost"
                 size="icon"
                 disabled={sending || uploadingFile}
                 onClick={() => setShowMediaDock(!showMediaDock)}
                 className={cn(
-                  "shrink-0 h-9 w-9 rounded-full transition-all duration-200",
+                  "shrink-0 h-8 w-8 rounded-full transition-all duration-200",
                   showMediaDock 
                     ? "bg-foreground text-background hover:bg-foreground/90" 
                     : "text-muted-foreground hover:bg-muted/80"
                 )}
               >
-                <Plus className={cn("w-5 h-5 transition-transform duration-200", showMediaDock && "rotate-45")} />
+                <Plus className={cn("w-4 h-4 transition-transform duration-200", showMediaDock && "rotate-45")} />
               </Button>
 
-              {/* Gift button - fades out when typing */}
+              {/* Gift button - fades when typing */}
               {otherUser?.id && (
                 <div className={cn(
-                  "transition-all duration-200 overflow-hidden",
-                  newMessage.trim() ? "w-0 opacity-0 scale-75" : "w-9 opacity-100 scale-100"
+                  "transition-all duration-200 overflow-hidden flex items-center",
+                  newMessage.trim() ? "w-0 opacity-0" : "w-8 opacity-100"
                 )}>
                   <ChatGiftButton 
                     recipientId={otherUser.id} 
@@ -1694,7 +1730,7 @@ export const ModernChatInterface = ({
                 </div>
               )}
 
-              {/* Text input - takes full remaining width */}
+              {/* Text input */}
               <Input
                 ref={inputRef}
                 placeholder="Message..."
@@ -1721,7 +1757,7 @@ export const ModernChatInterface = ({
                     }
                   }
                 }}
-                className="flex-1 min-w-0 bg-transparent border-none outline-none py-2 px-2 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0 h-9"
+                className="flex-1 min-w-0 bg-transparent border-none outline-none py-1.5 px-2 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0 h-8"
                 disabled={sending || uploadingFile}
               />
 
@@ -1731,12 +1767,12 @@ export const ModernChatInterface = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full hover:bg-primary/10 shrink-0"
+                    className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
                   >
-                    <Smile className="w-5 h-5 text-muted-foreground" />
+                    <Smile className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
+                <PopoverContent className="w-auto p-2 rounded-2xl" align="end" side="top" sideOffset={8}>
                   <div className="flex gap-1">
                     {EMOJI_QUICK.map((emoji) => (
                       <button
@@ -1754,14 +1790,14 @@ export const ModernChatInterface = ({
                 </PopoverContent>
               </Popover>
 
-              {/* Right side: Send when typing, AI+Mic when idle */}
+              {/* Right side actions */}
               {newMessage.trim() || previewMedia ? (
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center">
                   {newMessage.trim() && !previewMedia && (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="shrink-0 h-9 w-9 rounded-full hover:bg-primary/10"
+                      className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10"
                       onClick={() => setShowScheduleModal(true)}
                       title="Schedule message"
                     >
@@ -1770,7 +1806,7 @@ export const ModernChatInterface = ({
                   )}
                   <Button
                     size="icon"
-                    className="shrink-0 h-9 w-9 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                    className="shrink-0 h-8 w-8 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
                     onClick={() => {
                       if (previewMedia) {
                         handleSend(previewMedia.url, previewMedia.type);
@@ -1784,12 +1820,12 @@ export const ModernChatInterface = ({
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center">
                   <Button
                     size="icon"
                     variant="ghost"
                     className={cn(
-                      "shrink-0 h-9 w-9 rounded-full",
+                      "shrink-0 h-8 w-8 rounded-full",
                       showAiSuggestions ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted/80"
                     )}
                     onClick={() => setShowAiSuggestions(!showAiSuggestions)}
@@ -1800,7 +1836,7 @@ export const ModernChatInterface = ({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:bg-muted/80"
+                    className="shrink-0 h-8 w-8 rounded-full text-muted-foreground hover:bg-muted/80"
                     onClick={() => setShowVoiceRecorder(true)}
                   >
                     <Mic className="w-4 h-4" />
