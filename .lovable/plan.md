@@ -1,42 +1,45 @@
+# Full System Structure Audit + Implementation Plan
 
+## ✅ Part 1: PULSE Panel Enhancement (DONE)
 
-## Plan: Restructure Emoji Picker & Sticker System
+Host-editable cards added to `AICatchUpPanel.tsx`:
+- Host can add/remove custom cards (announcements, promo codes, product highlights)
+- Cards support: emoji icon, title, body text, optional link
+- Stored in `live_streams.stream_features.host_cards` JSON
+- Viewers see published cards; host sees edit controls
+- Visual: dark glassmorphic cards with bold italic text, yellow accent labels
 
-### What's changing
+---
 
-**Current state:** The "Sticker Picker" is actually an emoji picker with categorized emoji packs. The emoji button in the input bar only shows 6 quick emojis in a tiny popover.
+## Part 2: System Structure — What's Missing
 
-**Target state:**
-1. **Emoji button (😊)** opens a full Telegram/WhatsApp-style emoji keyboard with all the current categorized packs (Emotions, Gestures, Animals, Love, Food, Activities) plus additional categories (Objects, Travel, Symbols, Flags). Tabbed navigation at bottom, search bar at top, recently used section.
-2. **Sticker button** opens a sticker picker for **image/video stickers** (Telegram-style animated/static sticker packs), not emojis. Initially shows placeholder sticker packs with sample sticker images.
+### A. Messaging — Missing
+- Music file sharing (up to 4min) — no audio file validation or music-specific UI
+- Audio notes — voice recorder exists but no dedicated "audio note" type
 
-### Changes
+### B. Groups — Missing
+- Go Live from group — no button/flow to start a livestream scoped to a group
+- Group channels (Telegram-style) — no channel concept within groups
 
-**1. Rename & repurpose `StickerPicker.tsx` → `EmojiKeyboard.tsx`**
-- Move all emoji pack data here and expand significantly (~200+ emojis across 10 categories: Smileys, People, Gestures, Animals, Food, Activities, Travel, Objects, Symbols, Flags)
-- Add a "Recently Used" tab that persists to localStorage
-- Add a search/filter bar at top
-- Grid layout: 8 columns, WhatsApp/Telegram hybrid styling
-- Bottom tab bar with category icons
-- Opens from the emoji (😊) button instead of the sticker button
+### C. Stories — Missing
+- Audio note stories — no option to record/upload audio-only stories
+- Music file attachment (up to 4min) — music library is hardcoded samples, no user upload
+- Text-only stories — must upload media, no text/gradient story option
 
-**2. Rewrite `StickerPicker.tsx` for image/video stickers**
-- New component that displays image-based sticker packs
-- Initially ships with a few built-in packs using free sticker images (placeholder URLs)
-- Stickers sent as image messages with a `sticker` type flag
-- Grid of sticker thumbnails (4 columns, larger cells)
-- Pack tabs at bottom with pack preview icons
+### D. Calling — Missing
+- Screen sharing — LiveKit supports it but UI toggle may not be wired
 
-**3. Update `ModernChatInterface.tsx`**
-- Emoji button (Smile icon) → opens `EmojiKeyboard` as a drawer panel (like current sticker picker)
-- Sticker button → opens new image-based `StickerPicker`
-- Remove the tiny `EMOJI_QUICK` popover
-- Both panels are mutually exclusive (opening one closes the other)
+### E. Live Streaming — Missing
+- Go Live from group chat — no integration point
 
-### File changes
-| File | Action |
-|------|--------|
-| `src/components/messages/EmojiKeyboard.tsx` | **Create** — full emoji keyboard with 10 categories, search, recents |
-| `src/components/messages/StickerPicker.tsx` | **Rewrite** — image/video sticker packs (Telegram-style) |
-| `src/components/messages/ModernChatInterface.tsx` | **Update** — wire emoji button to EmojiKeyboard, sticker button to new StickerPicker, remove EMOJI_QUICK popover |
+### F. Channels (Telegram-style) — MISSING ENTIRELY
 
+---
+
+## Implementation Order
+
+1. ~~PULSE host cards~~ ✅
+2. Audio notes + music files in stories
+3. Music/audio file sharing in chat (4min limit)
+4. Go Live from Group
+5. Channels system (needs dedicated planning)

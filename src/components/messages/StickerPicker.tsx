@@ -8,69 +8,90 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface StickerPack {
   id: string;
   name: string;
-  icon: string;
-  stickers: string[];
+  thumbnail: string;
+  stickers: Array<{
+    url: string;
+    type: 'image' | 'video';
+  }>;
 }
 
-const BUILT_IN_PACKS: StickerPack[] = [
+// Built-in sticker packs with placeholder Telegram-style stickers (using emoji placeholders for now)
+// In production, these would be actual sticker image/video URLs
+const BUILT_IN_STICKER_PACKS: StickerPack[] = [
   {
-    id: 'emotions',
-    name: 'Emotions',
-    icon: '😀',
+    id: 'pepe',
+    name: 'Pepe',
+    thumbnail: 'https://em-content.zobj.net/source/telegram/386/frog_1f438.webp',
     stickers: [
-      '😀', '😂', '🥹', '😍', '🥰', '😘', '😜', '🤪',
-      '😎', '🤩', '🥳', '😤', '😡', '🥺', '😭', '😱',
-      '🤯', '🫠', '😶‍🌫️', '🤑', '🫡', '🤫', '🫣', '😈',
+      { url: 'https://em-content.zobj.net/source/telegram/386/frog_1f438.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/crying-face_1f622.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/face-with-tears-of-joy_1f602.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/thinking-face_1f914.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/smiling-face-with-heart-eyes_1f60d.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/face-with-steam-from-nose_1f624.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/sleeping-face_1f634.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/waving-hand_1f44b.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/thumbs-up_1f44d.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/clapping-hands_1f44f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/fire_1f525.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/party-popper_1f389.webp', type: 'image' },
     ],
   },
   {
-    id: 'gestures',
-    name: 'Gestures',
-    icon: '👋',
+    id: 'hearts',
+    name: 'Hearts',
+    thumbnail: 'https://em-content.zobj.net/source/telegram/386/red-heart_2764-fe0f.webp',
     stickers: [
-      '👋', '🤝', '👍', '👎', '✌️', '🤞', '🫶', '👏',
-      '🙌', '💪', '🫰', '🤌', '👊', '✊', '🤙', '🫵',
-      '☝️', '👆', '👇', '👈', '👉', '🖐️', '🤚', '🫱',
+      { url: 'https://em-content.zobj.net/source/telegram/386/red-heart_2764-fe0f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/orange-heart_1f9e1.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/yellow-heart_1f49b.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/green-heart_1f49a.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/blue-heart_1f499.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/purple-heart_1f49c.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/sparkling-heart_1f496.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/growing-heart_1f497.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/beating-heart_1f493.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/revolving-hearts_1f49e.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/heart-with-arrow_1f498.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/kiss-mark_1f48b.webp', type: 'image' },
     ],
   },
   {
     id: 'animals',
     name: 'Animals',
-    icon: '🐱',
+    thumbnail: 'https://em-content.zobj.net/source/telegram/386/cat-face_1f431.webp',
     stickers: [
-      '🐱', '🐶', '🐻', '🐼', '🦊', '🐯', '🦁', '🐮',
-      '🐷', '🐸', '🐵', '🐔', '🦄', '🐝', '🦋', '🐢',
-      '🐬', '🦈', '🐙', '🦜', '🦩', '🐧', '🐨', '🦥',
+      { url: 'https://em-content.zobj.net/source/telegram/386/cat-face_1f431.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/dog-face_1f436.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/bear_1f43b.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/panda_1f43c.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/fox_1f98a.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/lion_1f981.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/unicorn_1f984.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/monkey-face_1f435.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/penguin_1f427.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/chicken_1f414.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/butterfly_1f98b.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/turtle_1f422.webp', type: 'image' },
     ],
   },
   {
-    id: 'love',
-    name: 'Love',
-    icon: '❤️',
+    id: 'gestures',
+    name: 'Gestures',
+    thumbnail: 'https://em-content.zobj.net/source/telegram/386/ok-hand_1f44c.webp',
     stickers: [
-      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
-      '💕', '💞', '💓', '💗', '💖', '💝', '💘', '💌',
-      '🫀', '💋', '💐', '🌹', '🌺', '🌸', '💒', '💍',
-    ],
-  },
-  {
-    id: 'food',
-    name: 'Food',
-    icon: '🍕',
-    stickers: [
-      '🍕', '🍔', '🌮', '🍣', '🍜', '🍩', '🧁', '🎂',
-      '🍦', '🍪', '🍫', '🍿', '☕', '🧋', '🍺', '🥤',
-      '🍉', '🍇', '🍓', '🥑', '🌶️', '🥕', '🌽', '🍳',
-    ],
-  },
-  {
-    id: 'activities',
-    name: 'Activities',
-    icon: '⚽',
-    stickers: [
-      '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎮', '🎯',
-      '🎪', '🎨', '🎭', '🎬', '🎤', '🎧', '🎵', '🎶',
-      '🎸', '🥁', '🏆', '🥇', '🎖️', '🏅', '🎗️', '🎟️',
+      { url: 'https://em-content.zobj.net/source/telegram/386/ok-hand_1f44c.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/victory-hand_270c-fe0f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/crossed-fingers_1f91e.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/flexed-biceps_1f4aa.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/folded-hands_1f64f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/handshake_1f91d.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/raising-hands_1f64c.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/oncoming-fist_1f44a.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/call-me-hand_1f919.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/pinching-hand_1f90f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/love-you-gesture_1f91f.webp', type: 'image' },
+      { url: 'https://em-content.zobj.net/source/telegram/386/sign-of-the-horns_1f918.webp', type: 'image' },
     ],
   },
 ];
@@ -78,25 +99,25 @@ const BUILT_IN_PACKS: StickerPack[] = [
 interface StickerPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectSticker: (sticker: string) => void;
+  onSelectSticker: (stickerUrl: string, type: 'image' | 'video') => void;
 }
 
 export const StickerPicker = ({ isOpen, onClose, onSelectSticker }: StickerPickerProps) => {
-  const [activePack, setActivePack] = useState(BUILT_IN_PACKS[0].id);
+  const [activePack, setActivePack] = useState(BUILT_IN_STICKER_PACKS[0].id);
 
-  const currentPack = BUILT_IN_PACKS.find(p => p.id === activePack) || BUILT_IN_PACKS[0];
+  const currentPack = BUILT_IN_STICKER_PACKS.find(p => p.id === activePack) || BUILT_IN_STICKER_PACKS[0];
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0, y: 20, height: 0 }}
-          animate={{ opacity: 1, y: 0, height: 280 }}
+          animate={{ opacity: 1, y: 0, height: 320 }}
           exit={{ opacity: 0, y: 20, height: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="bg-card border-t border-border/50 overflow-hidden"
         >
-          {/* Header with pack name and close */}
+          {/* Header */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {currentPack.name}
@@ -106,38 +127,59 @@ export const StickerPicker = ({ isOpen, onClose, onSelectSticker }: StickerPicke
             </Button>
           </div>
 
-          {/* Sticker grid */}
-          <ScrollArea className="h-[210px]">
-            <div className="grid grid-cols-8 gap-0.5 p-2">
+          {/* Sticker grid - 4 columns for larger sticker images */}
+          <ScrollArea className="h-[240px]">
+            <div className="grid grid-cols-4 gap-2 p-3">
               {currentPack.stickers.map((sticker, i) => (
                 <button
                   key={`${activePack}-${i}`}
                   onClick={() => {
-                    onSelectSticker(sticker);
+                    onSelectSticker(sticker.url, sticker.type);
                     onClose();
                   }}
-                  className="flex items-center justify-center h-10 w-full rounded-lg hover:bg-muted/60 active:scale-90 transition-all text-2xl"
+                  className="flex items-center justify-center aspect-square rounded-xl hover:bg-muted/60 active:scale-90 transition-all p-2"
                 >
-                  {sticker}
+                  {sticker.type === 'video' ? (
+                    <video
+                      src={sticker.url}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <img
+                      src={sticker.url}
+                      alt="sticker"
+                      className="w-full h-full object-contain"
+                      loading="lazy"
+                    />
+                  )}
                 </button>
               ))}
             </div>
           </ScrollArea>
 
-          {/* Pack tabs at bottom - Telegram style */}
+          {/* Pack tabs at bottom */}
           <div className="flex items-center border-t border-border/30 overflow-x-auto no-scrollbar">
-            {BUILT_IN_PACKS.map((pack) => (
+            {BUILT_IN_STICKER_PACKS.map((pack) => (
               <button
                 key={pack.id}
                 onClick={() => setActivePack(pack.id)}
                 className={cn(
-                  "flex items-center justify-center min-w-[44px] h-9 text-lg transition-all",
+                  "flex items-center justify-center min-w-[48px] h-10 transition-all p-1.5",
                   activePack === pack.id
                     ? "bg-primary/10 border-b-2 border-primary"
                     : "hover:bg-muted/50"
                 )}
               >
-                {pack.icon}
+                <img 
+                  src={pack.thumbnail} 
+                  alt={pack.name} 
+                  className="w-6 h-6 object-contain"
+                  loading="lazy"
+                />
               </button>
             ))}
           </div>

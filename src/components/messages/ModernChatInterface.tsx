@@ -33,8 +33,9 @@ import { ChatGiftButton } from './ChatGiftButton';
 import { ForwardMessageSheet } from './ForwardMessageSheet';
 import { MuteConversationSheet } from './MuteConversationSheet';
 import { StickerPicker } from './StickerPicker';
+import { EmojiKeyboard } from './EmojiKeyboard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,7 +104,7 @@ interface ChatInterfaceProps {
   onHighlightCleared?: () => void;
 }
 
-const EMOJI_QUICK = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 const MESSAGES_PER_PAGE = 50;
 
 export const ModernChatInterface = ({ 
@@ -161,6 +162,9 @@ export const ModernChatInterface = ({
   
   // Sticker picker state
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  
+  // Emoji keyboard state
+  const [showEmojiKeyboard, setShowEmojiKeyboard] = useState(false);
   
   // Scheduling state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -1700,13 +1704,23 @@ export const ModernChatInterface = ({
             onToggle={() => setShowMediaDock(!showMediaDock)}
           />
 
-          {/* Sticker Picker - Telegram-style drawer */}
+          {/* Emoji Keyboard - full panel */}
+          <EmojiKeyboard
+            isOpen={showEmojiKeyboard}
+            onClose={() => setShowEmojiKeyboard(false)}
+            onSelectEmoji={(emoji) => {
+              setNewMessage(prev => prev + emoji);
+              handleTyping('typing');
+            }}
+          />
+
+          {/* Sticker Picker - Telegram-style image stickers */}
           <StickerPicker
             isOpen={showStickerPicker}
             onClose={() => setShowStickerPicker(false)}
-            onSelectSticker={(sticker) => {
-              setNewMessage(prev => prev + sticker);
-              handleTyping('typing');
+            onSelectSticker={(stickerUrl, type) => {
+              // Send sticker as a media message
+              handleSend(stickerUrl, type === 'video' ? 'video/webm' : 'image/webp');
             }}
           />
 
@@ -1775,34 +1789,22 @@ export const ModernChatInterface = ({
                 disabled={sending || uploadingFile}
               />
 
-              {/* Emoji - always visible */}
-              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
-                  >
-                    <Smile className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2 rounded-2xl" align="end" side="top" sideOffset={8}>
-                  <div className="flex gap-1">
-                    {EMOJI_QUICK.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setNewMessage(prev => prev + emoji);
-                          handleTyping('typing');
-                        }}
-                        className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+              {/* Emoji button - opens full keyboard */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 rounded-full shrink-0",
+                  showEmojiKeyboard ? "text-primary bg-primary/10" : "hover:bg-primary/10"
+                )}
+                onClick={() => {
+                  setShowEmojiKeyboard(!showEmojiKeyboard);
+                  if (showStickerPicker) setShowStickerPicker(false);
+                  handleTyping('emoji');
+                }}
+              >
+                <Smile className="w-4 h-4 text-muted-foreground" />
+              </Button>
 
               {/* Sticker button - hides while typing */}
               <div className={cn(
@@ -1816,7 +1818,10 @@ export const ModernChatInterface = ({
                     "h-8 w-8 rounded-full shrink-0",
                     showStickerPicker ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-primary/10"
                   )}
-                  onClick={() => setShowStickerPicker(!showStickerPicker)}
+                  onClick={() => {
+                    setShowStickerPicker(!showStickerPicker);
+                    if (showEmojiKeyboard) setShowEmojiKeyboard(false);
+                  }}
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
