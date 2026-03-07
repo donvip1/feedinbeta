@@ -151,7 +151,7 @@ const LiveStreamDetail = () => {
   // Show live room with new Twitter-style UI
   if (showRoom && stream) {
     return (
-      <TwitterStreamRoom 
+      <StreamRoomV2 
         streamId={stream.id} 
         onClose={() => {
           setShowRoom(false);
