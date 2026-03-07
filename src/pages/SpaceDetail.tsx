@@ -231,8 +231,8 @@ const SpaceDetail = () => {
     );
   }
 
-  // Show live room with new Twitter-style UI
-  if (showRoom && space) {
+  // Show live room - either explicitly joined or active in context
+  if ((showRoom || isActiveInContext) && space) {
     return (
       <TwitterSpaceRoom 
         spaceId={space.id} 
