@@ -50,7 +50,7 @@ serve(async (req) => {
   try {
     // Authenticate user via JWT
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -65,9 +65,10 @@ serve(async (req) => {
       auth: { persistSession: false }
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data, error: authError } = await supabase.auth.getClaims(token);
     
-    if (authError || !user) {
+    if (authError || !data?.claims) {
       console.error("Authentication error:", authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
@@ -75,7 +76,8 @@ serve(async (req) => {
       );
     }
 
-    console.log("Authenticated user:", user.id);
+    const userId = data.claims.sub;
+    console.log("Authenticated user:", userId);
 
     // Parse and validate request body
     const body = await req.json();
