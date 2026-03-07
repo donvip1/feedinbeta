@@ -1719,8 +1719,7 @@ export const ModernChatInterface = ({
             isOpen={showStickerPicker}
             onClose={() => setShowStickerPicker(false)}
             onSelectSticker={(stickerUrl, type) => {
-              // Send sticker as a media message
-              handleSend(stickerUrl, type === 'video' ? 'video/webm' : 'image/webp');
+              handleSend(stickerUrl, type === 'video' ? 'video/webm' : 'image/webp', ' ');
             }}
           />
 
