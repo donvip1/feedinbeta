@@ -96,6 +96,13 @@ export const ModernMessageBubble = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+
+  // Detect if this message is a sticker (sent from built-in sticker packs)
+  const isSticker = !!(
+    message.media_url && 
+    !message.content?.trim() &&
+    (message.media_url.includes('em-content.zobj.net') || message.media_url.includes('/stickers/'))
+  );
   
   // Long press detection
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -299,146 +306,198 @@ export const ModernMessageBubble = ({
             </div>
           )}
 
-          {/* Story Reply/Reaction Indicator */}
-          {(message.reply_metadata?.type === 'story_reply' || message.reply_metadata?.type === 'story_reaction') && (
-            <div className={cn(
-              "flex items-center gap-3 p-2 mb-1.5 rounded-xl backdrop-blur-sm border",
-              isOwn ? "bg-white/10 border-white/20" : "bg-primary/10 border-primary/20"
-            )}>
-              {message.reply_metadata.story_media_url && (
-                <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-primary/40 shadow-md">
-                  {message.reply_metadata.story_media_type?.startsWith('video') ? (
-                    <video 
-                      src={message.reply_metadata.story_media_url} 
-                      className="w-full h-full object-cover"
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src={message.reply_metadata.story_media_url} 
-                      alt="Story" 
-                      className="w-full h-full object-cover"
-                    />
+          {/* STICKER: Render without bubble frame */}
+          {isSticker ? (
+            <div className="relative">
+              <div
+                onClick={handleBubbleClick}
+                onContextMenu={handleContextMenu}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                className="cursor-pointer active:scale-95 transition-transform select-none"
+              >
+                <img
+                  src={message.media_url!}
+                  alt="Sticker"
+                  className="w-[140px] h-[140px] object-contain drop-shadow-md"
+                  loading="lazy"
+                />
+                {/* Time below sticker */}
+                <div className={cn(
+                  "flex items-center gap-1 mt-0.5",
+                  isOwn ? 'justify-end' : 'justify-start'
+                )}>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatTime(message.created_at)}
+                  </span>
+                  {isOwn && (
+                    <span className={cn(
+                      "transition-colors",
+                      message.status === 'read' ? 'text-sky-300' : 'text-muted-foreground/50'
+                    )}>
+                      {message.status === 'sending' && <Check className="w-3.5 h-3.5" />}
+                      {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
+                      {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
+                      {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5" />}
+                    </span>
                   )}
                 </div>
-              )}
-              <div className="flex flex-col">
-                <span className="text-xs font-medium opacity-90">
-                  {message.reply_metadata?.type === 'story_reaction' ? 'Reacted to story' : 'Replied to story'}
-                </span>
-                <span className="text-[10px] opacity-60">Tap to view</span>
               </div>
-            </div>
-          )}
 
-          {/* Regular Reply Indicator */}
-          {message.reply_to_message && (
-            <div className={cn(
-              "flex items-start gap-2 p-2 mb-1 rounded-xl border-l-2 border-primary/50",
-              isOwn ? "bg-white/10" : "bg-primary/5"
-            )}>
-              {message.reply_to_message.media_url && (
-                <div className="w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
-                  {message.reply_to_message.media_type?.startsWith('video') ? (
-                    <video 
-                      src={message.reply_to_message.media_url} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : message.reply_to_message.media_type?.startsWith('image') ? (
-                    <img 
-                      src={message.reply_to_message.media_url} 
-                      alt="Reply" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <FileText className="w-3 h-3" />
+              {/* Reactions */}
+              {message.reactions && message.reactions.length > 0 && (
+                <MessageReactionsDisplay
+                  reactions={message.reactions}
+                  isOwn={isOwn}
+                  currentUserId={currentUserId}
+                  onReact={(emoji) => onReact(message.id, emoji)}
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Story Reply/Reaction Indicator */}
+              {(message.reply_metadata?.type === 'story_reply' || message.reply_metadata?.type === 'story_reaction') && (
+                <div className={cn(
+                  "flex items-center gap-3 p-2 mb-1.5 rounded-xl backdrop-blur-sm border",
+                  isOwn ? "bg-white/10 border-white/20" : "bg-primary/10 border-primary/20"
+                )}>
+                  {message.reply_metadata.story_media_url && (
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-primary/40 shadow-md">
+                      {message.reply_metadata.story_media_type?.startsWith('video') ? (
+                        <video 
+                          src={message.reply_metadata.story_media_url} 
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      ) : (
+                        <img 
+                          src={message.reply_metadata.story_media_url} 
+                          alt="Story" 
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
                   )}
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium opacity-90">
+                      {message.reply_metadata?.type === 'story_reaction' ? 'Reacted to story' : 'Replied to story'}
+                    </span>
+                    <span className="text-[10px] opacity-60">Tap to view</span>
+                  </div>
                 </div>
               )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-xs text-primary">{message.reply_to_message.sender.display_name}</p>
-                <p className="truncate text-xs opacity-70">{message.reply_to_message.content}</p>
-              </div>
-            </div>
-          )}
 
-          <div className="relative">
-            {/* Message Bubble - Tap or long-press to open context menu */}
-            <div
-              onClick={handleBubbleClick}
-              onContextMenu={handleContextMenu}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              className={cn(
-                "px-2.5 py-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98] select-none",
-                bubbleRadius,
-                isOwn
-                  ? 'bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'
-                  : 'bg-card text-card-foreground shadow-sm border border-border/50'
-              )}
-            >
-              {renderMedia()}
-              {message.content && !message.media_type?.includes('file') && (
-                (() => {
-                  const emojiSize = getEmojiSizeClass(message.content);
-                  const isEmoji = isEmojiOnly(message.content);
-                  return (
-                    <p className={cn(
-                      "break-words whitespace-pre-wrap",
-                      emojiSize ? emojiSize : "text-[15px] leading-relaxed",
-                      isEmoji && "text-center py-1"
-                    )}>
-                      {message.content}
-                    </p>
-                  );
-                })()
-              )}
-              
-              {/* Link Preview */}
-              {firstUrl && !message.media_url && (
-                <LinkPreviewCard url={firstUrl} isOwn={isOwn} />
-              )}
-              
-              {/* Inline Time and Status */}
-              <div className={cn(
-                "flex items-center gap-1 mt-0.5 -mb-0.5",
-                isOwn ? 'justify-end' : 'justify-start'
-              )}>
-                {message.edited_at && (
-                  <span className="text-[10px] opacity-50">edited</span>
-                )}
-                <span className={cn(
-                  "text-[10px]",
-                  isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+              {/* Regular Reply Indicator */}
+              {message.reply_to_message && (
+                <div className={cn(
+                  "flex items-start gap-2 p-2 mb-1 rounded-xl border-l-2 border-primary/50",
+                  isOwn ? "bg-white/10" : "bg-primary/5"
                 )}>
-                  {formatTime(message.created_at)}
-                </span>
-                {isOwn && (
-                  <span className={cn(
-                    "transition-colors",
-                    message.status === 'read' ? 'text-sky-300' : 'text-primary-foreground/50'
+                  {message.reply_to_message.media_url && (
+                    <div className="w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
+                      {message.reply_to_message.media_type?.startsWith('video') ? (
+                        <video 
+                          src={message.reply_to_message.media_url} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : message.reply_to_message.media_type?.startsWith('image') ? (
+                        <img 
+                          src={message.reply_to_message.media_url} 
+                          alt="Reply" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <FileText className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-xs text-primary">{message.reply_to_message.sender.display_name}</p>
+                    <p className="truncate text-xs opacity-70">{message.reply_to_message.content}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="relative">
+                {/* Message Bubble - Tap or long-press to open context menu */}
+                <div
+                  onClick={handleBubbleClick}
+                  onContextMenu={handleContextMenu}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  className={cn(
+                    "px-2.5 py-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98] select-none",
+                    bubbleRadius,
+                    isOwn
+                      ? 'bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'
+                      : 'bg-card text-card-foreground shadow-sm border border-border/50'
+                  )}
+                >
+                  {renderMedia()}
+                  {message.content && !message.media_type?.includes('file') && (
+                    (() => {
+                      const emojiSize = getEmojiSizeClass(message.content);
+                      const isEmoji = isEmojiOnly(message.content);
+                      return (
+                        <p className={cn(
+                          "break-words whitespace-pre-wrap",
+                          emojiSize ? emojiSize : "text-[15px] leading-relaxed",
+                          isEmoji && "text-center py-1"
+                        )}>
+                          {message.content}
+                        </p>
+                      );
+                    })()
+                  )}
+                  
+                  {/* Link Preview */}
+                  {firstUrl && !message.media_url && (
+                    <LinkPreviewCard url={firstUrl} isOwn={isOwn} />
+                  )}
+                  
+                  {/* Inline Time and Status */}
+                  <div className={cn(
+                    "flex items-center gap-1 mt-0.5 -mb-0.5",
+                    isOwn ? 'justify-end' : 'justify-start'
                   )}>
-                    {message.status === 'sending' && <Check className="w-3.5 h-3.5" />}
-                    {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
-                    {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
-                    {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5" />}
-                  </span>
+                    {message.edited_at && (
+                      <span className="text-[10px] opacity-50">edited</span>
+                    )}
+                    <span className={cn(
+                      "text-[10px]",
+                      isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      {formatTime(message.created_at)}
+                    </span>
+                    {isOwn && (
+                      <span className={cn(
+                        "transition-colors",
+                        message.status === 'read' ? 'text-sky-300' : 'text-primary-foreground/50'
+                      )}>
+                        {message.status === 'sending' && <Check className="w-3.5 h-3.5" />}
+                        {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
+                        {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
+                        {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5" />}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Telegram-style Reactions Display */}
+                {message.reactions && message.reactions.length > 0 && (
+                  <MessageReactionsDisplay
+                    reactions={message.reactions}
+                    isOwn={isOwn}
+                    currentUserId={currentUserId}
+                    onReact={(emoji) => onReact(message.id, emoji)}
+                  />
                 )}
               </div>
-            </div>
-
-            {/* Telegram-style Reactions Display */}
-            {message.reactions && message.reactions.length > 0 && (
-              <MessageReactionsDisplay
-                reactions={message.reactions}
-                isOwn={isOwn}
-                currentUserId={currentUserId}
-                onReact={(emoji) => onReact(message.id, emoji)}
-              />
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
