@@ -911,11 +911,12 @@ const Feed = () => {
 
               return (
                 <Fragment key={uniqueKey}>
-                  <div className={cn(
-                    // Videos tab: snap scrolling (TikTok-style)
-                    // Photo+ tab: no snap, free-flowing (Facebook-style)
-                    activeTab === 'videos' && "snap-start snap-always"
-                  )}>
+                    <div className={cn(
+                      // Videos tab: snap scrolling (TikTok-style)
+                      // Photo+ tab: no snap, free-flowing with card spacing
+                      activeTab === 'videos' && "snap-start snap-always",
+                      activeTab === 'photosText' && "mb-2 mx-3"
+                    )}>
                     <ImmersivePostCard
                       post={post}
                       isPromoted={post._isPromoted || post._isSponsored || false}

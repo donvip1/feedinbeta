@@ -657,13 +657,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       <div 
         ref={postRef}
         className={cn(
-          "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
+          "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden flex flex-col transition-all duration-300",
           // In immersive mode, card takes full viewport height
-          isImmersiveMode && "h-[100dvh] max-w-none",
+          isImmersiveMode && "h-[100dvh] max-w-none rounded-none",
           // Video layout: full viewport height for TikTok-style
-          !isImmersiveMode && layoutType === 'video' && "h-[calc(100dvh-68px)]",
-          // Photo+ layout: content-driven height with minimal padding, no fixed height
-          !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-2"
+          !isImmersiveMode && layoutType === 'video' && "h-[calc(100dvh-68px)] rounded-none sm:rounded-2xl",
+          // Photo+ layout: content-driven height, card-style with rounded corners and shadow
+          !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-2 rounded-2xl shadow-sm border border-border/30"
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

@@ -1711,7 +1711,7 @@ export const ModernChatInterface = ({
           />
 
           {/* Unified input row */}
-          <div className="px-3 py-2">
+          <div className="px-3.5 py-2.5">
             <div className="flex items-center gap-1 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 pl-1.5 pr-1.5 py-1">
               {/* Plus button */}
               <Button
