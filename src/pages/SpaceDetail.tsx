@@ -202,7 +202,12 @@ const SpaceDetail = () => {
     setShowReplay(true);
   };
 
-  if (loading || authLoading) {
+  // If we have an active space context for this space, skip lobby entirely
+  const isActiveInContext = spaceContext?.spaceState.isActive && 
+    (spaceContext.spaceState.spaceInfo?.id === spaceId || 
+     spaceContext.spaceState.spaceInfo?.id === space?.id);
+
+  if ((loading || authLoading) && !isActiveInContext) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
