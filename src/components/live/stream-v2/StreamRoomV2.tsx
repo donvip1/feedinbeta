@@ -115,6 +115,9 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const [showReactions, setShowReactions] = useState(false);
   const [showRefill, setShowRefill] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showPrediction, setShowPrediction] = useState(false);
+  const [isLightFlashing, setIsLightFlashing] = useState(false);
+  const [latestTickerEvent, setLatestTickerEvent] = useState<string | undefined>();
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
   const [inviteSearching, setInviteSearching] = useState(false);
