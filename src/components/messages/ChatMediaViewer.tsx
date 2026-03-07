@@ -47,6 +47,7 @@ export const ChatMediaViewer = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [swipeY, setSwipeY] = useState(0);
   const [swipeStartY, setSwipeStartY] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { haptic } = useNativeFeatures();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,6 +72,7 @@ export const ChatMediaViewer = ({
       setSwipeY(0);
       setIsPlaying(false);
       setCurrentTime(0);
+      setMenuOpen(false);
     }
   }, [isOpen]);
 
@@ -101,6 +103,16 @@ export const ChatMediaViewer = ({
     };
   }, [isSeeking, isOpen]);
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !menuOpen) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, menuOpen, onClose]);
+
   const getTouchDistance = (touches: React.TouchList): number => {
     if (touches.length < 2) return 0;
     const dx = touches[0].clientX - touches[1].clientX;
@@ -127,7 +139,6 @@ export const ChatMediaViewer = ({
         setIsDragging(true);
         setLastTouchCenter({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       } else {
-        // Swipe-to-dismiss
         setSwipeStartY(e.touches[0].clientY);
       }
     }
@@ -165,7 +176,6 @@ export const ChatMediaViewer = ({
     setLastTouchDistance(0);
     setIsDragging(false);
     
-    // Swipe-to-dismiss
     if (swipeY > 120) {
       haptic('light');
       onClose();
@@ -178,7 +188,6 @@ export const ChatMediaViewer = ({
     if (scale < 1) { setScale(1); setPosition({ x: 0, y: 0 }); }
     if (scale === 1) setPosition({ x: 0, y: 0 });
 
-    // Double-tap to zoom
     if (e.touches.length === 0 && e.changedTouches.length === 1) {
       const now = Date.now();
       if (now - lastTap < 300) {
@@ -260,7 +269,7 @@ export const ChatMediaViewer = ({
   };
 
   const toggleControls = () => {
-    if (scale === 1) setShowControls(!showControls);
+    if (scale === 1 && !menuOpen) setShowControls(!showControls);
   };
 
   if (!isOpen) return null;
@@ -272,7 +281,6 @@ export const ChatMediaViewer = ({
       ref={containerRef}
       className="fixed inset-0 z-[100] bg-black animate-in fade-in duration-200"
       style={{ opacity }}
-      onClick={toggleControls}
     >
       {/* Header */}
       {showControls && (

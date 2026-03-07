@@ -189,6 +189,8 @@ export const ModernMessageBubble = ({
           mediaType={message.media_type}
           fileSize={message.file_size || undefined}
           isOwn={isOwn}
+          senderName={message.profiles?.display_name || (isOwn ? 'You' : 'Unknown')}
+          timestamp={format(new Date(message.created_at), 'MMM d, h:mm a')}
         />
       );
     }
@@ -207,6 +209,8 @@ export const ModernMessageBubble = ({
         mediaType={message.media_type || 'application/octet-stream'}
         fileSize={message.file_size || undefined}
         isOwn={isOwn}
+        senderName={message.profiles?.display_name || (isOwn ? 'You' : 'Unknown')}
+        timestamp={format(new Date(message.created_at), 'MMM d, h:mm a')}
       />
     );
   };
