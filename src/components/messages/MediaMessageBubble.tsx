@@ -111,9 +111,6 @@ export const MediaMessageBubble = ({
     }
   };
 
-  const handleCloseViewer = () => {
-    setShowViewer(false);
-  };
 
   if (downloadState === 'downloaded' && loadedMediaUrl) {
     if (mediaType.startsWith('image')) {
