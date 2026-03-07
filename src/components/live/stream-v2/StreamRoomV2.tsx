@@ -724,7 +724,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       <POVSwitcher angles={cameraAngles} onSelectAngle={handlePOVSelect} />
 
       {/* Right-side panel: co-broadcasters + viewers */}
-      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide"
+      <div className="absolute right-3 bottom-36 z-30 flex flex-col items-center gap-1.5 max-h-[40vh] overflow-y-auto scrollbar-hide"
         style={{ transform: 'translateZ(0)', overscrollBehavior: 'contain' }}>
         {!isHost && (
           <button onClick={() => {
