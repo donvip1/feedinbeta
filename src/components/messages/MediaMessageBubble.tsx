@@ -52,18 +52,12 @@ export const MediaMessageBubble = ({
   const [showViewer, setShowViewer] = useState(false);
   const [showStickerModal, setShowStickerModal] = useState(false);
   const [estimatedSize, setEstimatedSize] = useState<number | undefined>(fileSize);
-  const closeGuardRef = React.useRef(false);
-
   const openViewer = () => {
-    if (closeGuardRef.current) return;
     setShowViewer(true);
   };
 
   const handleCloseViewer = () => {
     setShowViewer(false);
-    // Prevent the click-through from reopening the viewer
-    closeGuardRef.current = true;
-    setTimeout(() => { closeGuardRef.current = false; }, 400);
   };
 
   useEffect(() => {

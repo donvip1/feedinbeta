@@ -1,18 +1,45 @@
+# Full System Structure Audit + Implementation Plan
 
+## ✅ Part 1: PULSE Panel Enhancement (DONE)
 
-## Root Cause
+Host-editable cards added to `AICatchUpPanel.tsx`:
+- Host can add/remove custom cards (announcements, promo codes, product highlights)
+- Cards support: emoji icon, title, body text, optional link
+- Stored in `live_streams.stream_features.host_cards` JSON
+- Viewers see published cards; host sees edit controls
+- Visual: dark glassmorphic cards with bold italic text, yellow accent labels
 
-The `ChatMediaViewer` is rendered **inline** inside `MediaMessageBubble` (sibling to the image thumbnail). When the back button closes the viewer and it unmounts, the same touch/click event "falls through" to the image thumbnail underneath and **immediately reopens** it. The 400ms guard ref is not reliably preventing this on mobile because React state updates and unmounting can race with native touch events.
+---
 
-## Fix
+## Part 2: System Structure — What's Missing
 
-**Render `ChatMediaViewer` via a React Portal** so it lives at `document.body` level, completely outside the message bubble DOM tree. This makes it physically impossible for close-tap events to propagate to the thumbnail.
+### A. Messaging — Missing
+- Music file sharing (up to 4min) — no audio file validation or music-specific UI
+- Audio notes — voice recorder exists but no dedicated "audio note" type
 
-### Changes
+### B. Groups — Missing
+- Go Live from group — no button/flow to start a livestream scoped to a group
+- Group channels (Telegram-style) — no channel concept within groups
 
-**`ChatMediaViewer.tsx`** -- Wrap the entire return in `ReactDOM.createPortal(..., document.body)`. This ensures the overlay is in a separate DOM subtree from the chat bubbles.
+### C. Stories — Missing
+- Audio note stories — no option to record/upload audio-only stories
+- Music file attachment (up to 4min) — music library is hardcoded samples, no user upload
+- Text-only stories — must upload media, no text/gradient story option
 
-**`MediaMessageBubble.tsx`** -- Simplify the close guard logic (can reduce timeout or remove entirely since the portal eliminates the propagation issue). Keep `showViewer` state as-is.
+### D. Calling — Missing
+- Screen sharing — LiveKit supports it but UI toggle may not be wired
 
-This is a 2-file, ~10-line change that eliminates the bug at its architectural root rather than patching timing heuristics.
+### E. Live Streaming — Missing
+- Go Live from group chat — no integration point
 
+### F. Channels (Telegram-style) — MISSING ENTIRELY
+
+---
+
+## Implementation Order
+
+1. ~~PULSE host cards~~ ✅
+2. Audio notes + music files in stories
+3. Music/audio file sharing in chat (4min limit)
+4. Go Live from Group
+5. Channels system (needs dedicated planning)
