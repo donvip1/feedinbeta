@@ -43,6 +43,22 @@ import { InStreamRechargeSheet } from '../InStreamRechargeSheet';
 import { useStreamStore } from '@/stores/useStreamStore';
 import type { PKParticipant } from '../unified/PKBattleBar';
 
+// Audio context for sound triggers
+let audioCtx: AudioContext | null = null;
+const playTriggerSound = () => {
+  if (!audioCtx) audioCtx = new AudioContext();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.5);
+};
+
 interface StreamRoomV2Props {
   streamId: string;
   onClose: () => void;
