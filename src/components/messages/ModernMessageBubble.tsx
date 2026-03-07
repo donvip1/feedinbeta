@@ -310,13 +310,55 @@ export const ModernMessageBubble = ({
 
           {/* STICKER: Render without bubble frame */}
           {isSticker ? (
-            <StickerMessage
-              message={message}
-              isOwn={isOwn}
-              formatTime={formatTime}
-              onContextMenu={handleContextMenu}
-              handleBubbleClick={handleBubbleClick}
-            />
+            <div className="relative">
+              <div
+                onClick={handleBubbleClick}
+                onContextMenu={handleContextMenu}
+                onTouchStart={(e) => {
+                  // Long press to save sticker
+                  const timer = setTimeout(() => {
+                    const { saveSticker, isStickerSaved } = useStickerStore.getState();
+                    if (!isStickerSaved(message.media_url!)) {
+                      saveSticker({ url: message.media_url!, type: (message.media_type?.includes('video') ? 'video' : 'image') as 'image' | 'video' });
+                      toast.success('Sticker saved to your collection!');
+                    } else {
+                      toast.info('Sticker already saved');
+                    }
+                  }, 600);
+                  (e.currentTarget as any).__stickerTimer = timer;
+                }}
+                onTouchEnd={(e) => {
+                  clearTimeout((e.currentTarget as any).__stickerTimer);
+                }}
+                className="cursor-pointer active:scale-95 transition-transform select-none"
+              >
+                <img
+                  src={message.media_url!}
+                  alt="Sticker"
+                  className="w-[140px] h-[140px] object-contain drop-shadow-md"
+                  loading="lazy"
+                />
+                {/* Time below sticker */}
+                <div className={cn(
+                  "flex items-center gap-1 mt-0.5",
+                  isOwn ? 'justify-end' : 'justify-start'
+                )}>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatTime(message.created_at)}
+                  </span>
+                  {isOwn && (
+                    <span className={cn(
+                      "transition-colors",
+                      message.status === 'read' ? 'text-sky-300' : 'text-muted-foreground/50'
+                    )}>
+                      {message.status === 'sending' && <Check className="w-3.5 h-3.5" />}
+                      {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
+                      {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
+                      {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5" />}
+                    </span>
+                  )}
+                </div>
+              </div>
 
               {/* Reactions */}
               {message.reactions && message.reactions.length > 0 && (
