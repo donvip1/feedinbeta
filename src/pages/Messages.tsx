@@ -557,11 +557,11 @@ export default function Messages() {
       )}>
         {/* Premium Header */}
         <div className={cn(
-          "pt-6 border-b transition-colors duration-300",
+          "pt-[max(1.5rem,env(safe-area-inset-top))] border-b transition-colors duration-300",
           secretMode ? "border-slate-800 bg-slate-900/80" : "border-border bg-background/80 backdrop-blur-md"
         )}>
           {/* Title & Actions */}
-          <div className="flex items-center justify-between mb-5 px-5">
+          <div className="flex items-center justify-between mb-4 px-4">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -572,7 +572,7 @@ export default function Messages() {
                 <ChevronLeft className="w-6 h-6" />
               </Button>
               <h1 className={cn(
-                "text-3xl font-black tracking-tight",
+                "text-2xl font-black tracking-tight",
                 secretMode 
                   ? "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400" 
                   : "bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent"
@@ -580,51 +580,48 @@ export default function Messages() {
                 {secretMode ? "Secret" : "FeedIn"}
               </h1>
               {!secretMode && (
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-background shadow-sm animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-emerald-500 border-2 border-background shadow-sm animate-pulse" />
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSecretMode(!secretMode)}
                 className={cn(
-                  "w-10 h-10 rounded-2xl transition-colors",
+                  "w-9 h-9 rounded-xl transition-colors",
                   secretMode 
                     ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
                     : "bg-muted hover:bg-muted/80"
                 )}
                 title={secretMode ? "Exit Secret Mode" : "Enter Secret Mode"}
               >
-                <Shield className="w-5 h-5" />
+                <Shield className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowMessageSettings(true)}
                 className={cn(
-                  "w-10 h-10 rounded-2xl",
+                  "w-9 h-9 rounded-xl",
                   secretMode ? "bg-slate-800 hover:bg-slate-700" : "bg-muted hover:bg-muted/80"
                 )}
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
           </div>
           
-          {/* Search Bar - Premium style */}
-          <div className={cn(
-            "relative px-5 mb-4 group",
-            secretMode ? "" : ""
-          )}>
-            <Search className="absolute left-9 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
+          {/* Search Bar */}
+          <div className="relative px-4 mb-3 group">
+            <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
             <input 
               type="text" 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
-              placeholder="Search encrypted chats..." 
+              placeholder="Search chats..." 
               className={cn(
-                "w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none border border-transparent transition-all shadow-inner",
+                "w-full rounded-xl py-3 pl-10 pr-4 text-sm outline-none border border-transparent transition-all",
                 secretMode 
                   ? "bg-slate-800 text-white placeholder:text-slate-500 focus:border-red-500/20" 
                   : "bg-muted focus:border-primary/20 focus:bg-card"
@@ -636,7 +633,7 @@ export default function Messages() {
           <TikTokStoriesBar />
           
           {/* Bold Text Tabs */}
-          <div className="pb-1">
+          <div className="pb-0.5">
             <MessagingTabs
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -646,7 +643,7 @@ export default function Messages() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-5">
+        <ScrollArea className="flex-1 px-3">
           {/* Chats Content with TikTok-style Stories at top */}
           {activeTab === 'chats' && (
             <div className="pb-20">
@@ -904,31 +901,37 @@ export default function Messages() {
 
       {/* Expandable FAB */}
       {!selectedConversationId && (
-        <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3 md:hidden">
+        <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2.5 md:hidden">
           {isFabExpanded && (
-            <div className="flex flex-col gap-3 animate-fade-in">
+            <motion.div 
+              className="flex flex-col gap-2.5"
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
               <button 
                 onClick={() => { setShowCreateGroup(true); setIsFabExpanded(false); }} 
-                className="flex items-center gap-3 px-5 py-4 bg-foreground text-background rounded-2xl shadow-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+                className="flex items-center gap-2.5 px-4 py-3 bg-foreground text-background rounded-2xl shadow-2xl text-[11px] font-black uppercase tracking-widest active:scale-95 transition-all"
               >
-                <Users2 className="w-[18px] h-[18px]" /> Create Space
+                <Users2 className="w-4 h-4" /> Create Space
               </button>
               <button 
                 onClick={() => { setShowNewConversation(true); setIsFabExpanded(false); }} 
-                className="flex items-center gap-3 px-5 py-4 bg-card rounded-2xl shadow-2xl border border-border text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+                className="flex items-center gap-2.5 px-4 py-3 bg-card rounded-2xl shadow-2xl border border-border text-[11px] font-black uppercase tracking-widest active:scale-95 transition-all"
               >
-                <UserPlus className="w-[18px] h-[18px] text-primary" /> New Contact
+                <UserPlus className="w-4 h-4 text-primary" /> New Contact
               </button>
-            </div>
+            </motion.div>
           )}
           <button 
             onClick={() => setIsFabExpanded(!isFabExpanded)} 
             className={cn(
-              "w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all",
+              "w-12 h-12 rounded-2xl shadow-2xl flex items-center justify-center transition-all",
               isFabExpanded ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"
             )}
           >
-            <Plus className={cn("w-7 h-7 transition-transform", isFabExpanded && "rotate-45")} />
+            <Plus className={cn("w-6 h-6 transition-transform duration-200", isFabExpanded && "rotate-45")} />
           </button>
         </div>
       )}

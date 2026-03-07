@@ -23,7 +23,7 @@ export const MessagingTabs = ({
   secretMode = false,
 }: MessagingTabsProps) => {
   return (
-    <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar pt-2">
+    <div className="flex items-center gap-5 px-4 overflow-x-auto no-scrollbar pt-1.5 pb-1">
       {tabs.map((tab) => (
         <button
           key={tab.id}
