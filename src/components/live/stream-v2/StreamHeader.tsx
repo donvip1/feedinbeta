@@ -1,6 +1,14 @@
 import { MoreHorizontal, Minimize2 } from 'lucide-react';
 import { AICatchUpPanel } from './AICatchUpPanel';
 
+interface HostCard {
+  id: string;
+  emoji: string;
+  title: string;
+  body: string;
+  link?: string;
+}
+
 interface StreamHeaderProps {
   streamId: string;
   streamTitle: string;
@@ -16,6 +24,8 @@ interface StreamHeaderProps {
   onMinimize: () => void;
   onEnd: () => void;
   showAIPulse?: boolean;
+  hostCards?: HostCard[];
+  onUpdateCards?: (cards: HostCard[]) => void;
 }
 
 const formatNumber = (num: number) => num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num.toString();
@@ -35,6 +45,8 @@ export const StreamHeader = ({
   onMinimize,
   onEnd,
   showAIPulse = true,
+  hostCards = [],
+  onUpdateCards,
 }: StreamHeaderProps) => {
   return (
     <div
@@ -71,7 +83,14 @@ export const StreamHeader = ({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        {showAIPulse && <AICatchUpPanel streamId={streamId} />}
+        {showAIPulse && (
+          <AICatchUpPanel
+            streamId={streamId}
+            isHost={isHost}
+            hostCards={hostCards}
+            onUpdateCards={onUpdateCards}
+          />
+        )}
 
         <button
           onClick={onSettings}

@@ -119,6 +119,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [showPrediction, setShowPrediction] = useState(false);
   const [isLightFlashing, setIsLightFlashing] = useState(false);
+  const [hostCards, setHostCards] = useState<Array<{ id: string; emoji: string; title: string; body: string; link?: string }>>([]);
   const [latestTickerEvent, setLatestTickerEvent] = useState<string | undefined>();
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
@@ -344,6 +345,11 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
     const { data: streamData, error } = await supabase.from('live_streams').select('*').eq('id', streamId).maybeSingle();
     if (error || !streamData) { toast.error('Stream not found'); onClose(); return; }
     setStream(streamData as any);
+    // Load host cards from stream_features
+    const sf = streamData.stream_features as any;
+    if (sf?.host_cards && Array.isArray(sf.host_cards)) {
+      setHostCards(sf.host_cards);
+    }
     if (streamData.room_type === 'pk_battle') { setBattleActive(true); setBattleTimeLeft(300); }
 
     const { data: hostData } = await supabase.from('profiles').select('id, display_name, username, avatar_url').eq('id', streamData.user_id).single() as any;
@@ -684,6 +690,15 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
         onSettings={() => setShowSettings(true)} onMinimize={handleMinimize}
         onEnd={isHost ? handleEndStream : handleViewerLeave}
         showAIPulse={showAIPulse}
+        hostCards={hostCards}
+        onUpdateCards={async (cards) => {
+          setHostCards(cards);
+          if (stream?.id) {
+            await supabase.from('live_streams').update({
+              stream_features: { ...features, host_cards: cards } as any
+            }).eq('id', stream.id);
+          }
+        }}
       />
 
       {/* PK Score Bar */}
