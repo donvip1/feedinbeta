@@ -706,7 +706,19 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       )}
 
       {/* Co-Pilot Joystick (host only) */}
-      <CoPilotJoystick isHost={isHost} onCreatePoll={() => setShowPollCreator(true)} />
+      <CoPilotJoystick
+        isHost={isHost}
+        onCreatePoll={() => setShowPollCreator(true)}
+        onLightTrigger={handleLightTrigger}
+        onSoundTrigger={handleSoundTrigger}
+        onPredictiveBet={() => setShowPrediction(true)}
+      />
+
+      {/* Hype system overlays */}
+      <HypeParticles />
+      <HypeMeter />
+      <EventTicker latestEvent={latestTickerEvent} />
+      <LightFlashOverlay isFlashing={isLightFlashing} />
 
       {/* POV Switcher */}
       <POVSwitcher angles={cameraAngles} onSelectAngle={handlePOVSelect} />
