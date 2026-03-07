@@ -613,7 +613,7 @@ export default function Messages() {
           </div>
           
           {/* Search Bar */}
-          <div className="relative px-4 mb-2.5 group">
+          <div className="relative px-4 mb-3 group">
             <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={15} />
             <input 
               type="text" 
@@ -643,7 +643,7 @@ export default function Messages() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-3">
+        <ScrollArea className="flex-1 px-4">
           {/* Chats Content with TikTok-style Stories at top */}
           {activeTab === 'chats' && (
             <div className="pb-20">
@@ -689,7 +689,7 @@ export default function Messages() {
                   />
                 </div>
               ) : showSkeleton ? (
-                <div className="space-y-1 px-2">
+                <div className="space-y-2 px-1">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="w-full p-3 flex items-center gap-3">
                       <Skeleton className="w-12 h-12 rounded-full" />

@@ -280,7 +280,7 @@ export const ModernMessageBubble = ({
         {showAvatar && !isLastInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
 
         <div className={cn(
-          "flex flex-col max-w-[78%] relative",
+          "flex flex-col max-w-[75%] relative",
           isOwn ? 'items-end' : 'items-start'
         )}>
           {/* Forwarded Label */}

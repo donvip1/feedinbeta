@@ -83,7 +83,7 @@ export const TikTokConversationItem = ({
   };
   
   return (
-    <div className="relative overflow-hidden rounded-xl mb-0.5">
+    <div className="relative overflow-hidden rounded-xl mb-1.5">
       {/* Archive action behind */}
       {swipeX > 0 && (
         <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-amber-500 text-white px-4 rounded-r-xl"
@@ -99,7 +99,7 @@ export const TikTokConversationItem = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "flex items-center gap-2.5 p-2.5 group cursor-pointer transition-all w-full relative rounded-xl border",
+          "flex items-center gap-3 px-3 py-3 group cursor-pointer transition-all w-full relative rounded-xl border",
           isSelected 
             ? "bg-primary/10 border-primary/20" 
             : "bg-muted/20 hover:bg-card border-border/40 active:scale-[0.98]"

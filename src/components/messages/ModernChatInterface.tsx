@@ -1401,11 +1401,11 @@ export const ModernChatInterface = ({
 
       {/* Messages - Flex grow to fill remaining space, scrollable */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2.5"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5"
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
-        <div className="py-3 space-y-3">
+        <div className="py-4 space-y-3">
           {/* Load older messages button */}
           {hasMoreMessages && (
             <div className="flex justify-center py-2">
