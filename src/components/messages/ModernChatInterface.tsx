@@ -33,6 +33,7 @@ import { ChatGiftButton } from './ChatGiftButton';
 import { ForwardMessageSheet } from './ForwardMessageSheet';
 import { MuteConversationSheet } from './MuteConversationSheet';
 import { StickerPicker } from './StickerPicker';
+import { EmojiKeyboard } from './EmojiKeyboard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -103,7 +104,7 @@ interface ChatInterfaceProps {
   onHighlightCleared?: () => void;
 }
 
-const EMOJI_QUICK = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 const MESSAGES_PER_PAGE = 50;
 
 export const ModernChatInterface = ({ 
@@ -161,6 +162,9 @@ export const ModernChatInterface = ({
   
   // Sticker picker state
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  
+  // Emoji keyboard state
+  const [showEmojiKeyboard, setShowEmojiKeyboard] = useState(false);
   
   // Scheduling state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
