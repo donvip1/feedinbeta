@@ -538,6 +538,22 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
     chatChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: { id: optimisticMsg.id, user_id: user.id, content, display_name: displayName, username, avatar_url: avatarUrl } });
     supabase.from('live_stream_messages').insert({ stream_id: streamId, user_id: user.id, content } as any);
     setReplyText('');
+    boostHype(2);
+  };
+
+  const handleLightTrigger = () => {
+    setIsLightFlashing(true);
+    setTimeout(() => setIsLightFlashing(false), 600);
+    supabase.channel(`stream-events-${streamId}`).send({ type: 'broadcast', event: 'light_flash', payload: {} });
+    setLatestTickerEvent('⚡️ LIGHT TRIGGER ACTIVATED!');
+    boostHype(3);
+  };
+
+  const handleSoundTrigger = () => {
+    playTriggerSound();
+    supabase.channel(`stream-events-${streamId}`).send({ type: 'broadcast', event: 'sound_effect', payload: {} });
+    setLatestTickerEvent('🔊 SOUND TRIGGER FIRED!');
+    boostHype(3);
   };
 
   const handleSendStreamGift = async (gift: typeof STREAM_GIFTS[0]) => {
