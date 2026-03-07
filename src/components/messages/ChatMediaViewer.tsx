@@ -47,6 +47,7 @@ export const ChatMediaViewer = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [swipeY, setSwipeY] = useState(0);
   const [swipeStartY, setSwipeStartY] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { haptic } = useNativeFeatures();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,6 +72,7 @@ export const ChatMediaViewer = ({
       setSwipeY(0);
       setIsPlaying(false);
       setCurrentTime(0);
+      setMenuOpen(false);
     }
   }, [isOpen]);
 
@@ -101,6 +103,16 @@ export const ChatMediaViewer = ({
     };
   }, [isSeeking, isOpen]);
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !menuOpen) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, menuOpen, onClose]);
+
   const getTouchDistance = (touches: React.TouchList): number => {
     if (touches.length < 2) return 0;
     const dx = touches[0].clientX - touches[1].clientX;
@@ -127,7 +139,6 @@ export const ChatMediaViewer = ({
         setIsDragging(true);
         setLastTouchCenter({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       } else {
-        // Swipe-to-dismiss
         setSwipeStartY(e.touches[0].clientY);
       }
     }
@@ -165,7 +176,6 @@ export const ChatMediaViewer = ({
     setLastTouchDistance(0);
     setIsDragging(false);
     
-    // Swipe-to-dismiss
     if (swipeY > 120) {
       haptic('light');
       onClose();
@@ -178,7 +188,6 @@ export const ChatMediaViewer = ({
     if (scale < 1) { setScale(1); setPosition({ x: 0, y: 0 }); }
     if (scale === 1) setPosition({ x: 0, y: 0 });
 
-    // Double-tap to zoom
     if (e.touches.length === 0 && e.changedTouches.length === 1) {
       const now = Date.now();
       if (now - lastTap < 300) {
@@ -260,7 +269,7 @@ export const ChatMediaViewer = ({
   };
 
   const toggleControls = () => {
-    if (scale === 1) setShowControls(!showControls);
+    if (scale === 1 && !menuOpen) setShowControls(!showControls);
   };
 
   if (!isOpen) return null;
@@ -272,36 +281,37 @@ export const ChatMediaViewer = ({
       ref={containerRef}
       className="fixed inset-0 z-[100] bg-black animate-in fade-in duration-200"
       style={{ opacity }}
-      onClick={toggleControls}
     >
       {/* Header */}
       {showControls && (
-        <div className="absolute top-0 left-0 right-0 z-10 safe-area-top animate-in slide-in-from-top duration-150">
+        <div 
+          className="absolute top-0 left-0 right-0 z-20 safe-area-top animate-in slide-in-from-top duration-150"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
             <div className="flex items-center gap-2.5">
               <Button
                 variant="ghost" size="icon"
                 className="text-white hover:bg-white/20 h-9 w-9"
-                onClick={(e) => { e.stopPropagation(); haptic('light'); onClose(); }}
+                onClick={() => { haptic('light'); onClose(); }}
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <p className="text-white font-medium text-sm">{senderName}</p>
+                <p className="text-white font-medium text-sm">{isOwn ? 'You' : senderName}</p>
                 {timestamp && <p className="text-white/60 text-[10px]">{timestamp}</p>}
               </div>
             </div>
 
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon"
                   className="text-white hover:bg-white/20 h-9 w-9"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-44 z-[110]">
                 {isImage && onEdit && (
                   <DropdownMenuItem onClick={onEdit}>
                     <Edit3 className="w-3.5 h-3.5 mr-2" /> Edit
@@ -338,6 +348,7 @@ export const ChatMediaViewer = ({
       {/* Media Content */}
       <div 
         className="absolute inset-0 flex items-center justify-center overflow-hidden"
+        onClick={toggleControls}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
