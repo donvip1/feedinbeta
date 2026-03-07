@@ -255,7 +255,7 @@ export const ModernMessageBubble = ({
         {/* Avatar */}
         {showAvatar && isLastInGroup && !isOwn && (
           <Avatar 
-            className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0 mt-auto"
+            className="w-7 h-7 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0 mt-auto"
             onClick={() => navigate(`/profile/${message.sender_id}`)}
           >
             <AvatarImage src={message.profiles.avatar_url || ''} />
@@ -264,10 +264,10 @@ export const ModernMessageBubble = ({
             </AvatarFallback>
           </Avatar>
         )}
-        {showAvatar && !isLastInGroup && !isOwn && <div className="w-8 flex-shrink-0" />}
+        {showAvatar && !isLastInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
 
         <div className={cn(
-          "flex flex-col max-w-[75%] relative",
+          "flex flex-col max-w-[78%] relative",
           isOwn ? 'items-end' : 'items-start'
         )}>
           {/* Forwarded Label */}
@@ -359,7 +359,7 @@ export const ModernMessageBubble = ({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               className={cn(
-                "px-3 py-2 transition-all duration-200 cursor-pointer active:scale-[0.98] select-none",
+                "px-2.5 py-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98] select-none",
                 bubbleRadius,
                 isOwn
                   ? 'bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'

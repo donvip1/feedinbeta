@@ -1270,22 +1270,22 @@ export const ModernChatInterface = ({
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-gradient-to-b from-background to-background/95 overflow-hidden">
       {/* Header - Glassmorphic premium style */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-md z-50 min-h-[56px]">
-        <div className="flex items-center gap-3">
+      <header className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-border/50 bg-background/80 backdrop-blur-md z-50 min-h-[48px]">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
-            className="md:hidden shrink-0 h-9 w-9 -ml-2 rounded-full hover:bg-muted"
+            className="md:hidden shrink-0 h-8 w-8 -ml-1 rounded-full hover:bg-muted"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4.5 h-4.5" />
           </Button>
           <div 
-            className="flex items-center gap-3 cursor-pointer"
+            className="flex items-center gap-2.5 cursor-pointer"
             onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
           >
             <div className="relative shrink-0">
-              <Avatar className="w-10 h-10 ring-2 ring-border">
+              <Avatar className="w-9 h-9 ring-2 ring-border">
                 <AvatarImage src={otherUser?.avatar_url || ''} />
                 <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
                   {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
@@ -1328,23 +1328,23 @@ export const ModernChatInterface = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted"
             onClick={() => initiateCall('video')}
           >
-            <Video className="w-[18px] h-[18px]" />
+            <Video className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted"
             onClick={() => initiateCall('voice')}
           >
-            <Phone className="w-[18px] h-[18px]" />
+            <Phone className="w-4 h-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted">
-                <MoreVertical className="w-[18px] h-[18px]" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted">
+                <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
@@ -1397,11 +1397,11 @@ export const ModernChatInterface = ({
 
       {/* Messages - Flex grow to fill remaining space, scrollable */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2.5"
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
-        <div className="py-4 space-y-4">
+        <div className="py-3 space-y-3">
           {/* Load older messages button */}
           {hasMoreMessages && (
             <div className="flex justify-center py-2">
@@ -1656,7 +1656,7 @@ export const ModernChatInterface = ({
           {/* MediaDock appears ABOVE input row - full width, clear reveal */}
           {showMediaDock && (
             <div className="bg-card/95 backdrop-blur-lg border-b border-border/30 animate-fade-in">
-              <div className="flex items-center gap-5 overflow-x-auto no-scrollbar py-3 px-4">
+              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-2.5 px-3">
                 {[
                   { icon: Camera, label: 'Camera', color: 'bg-blue-500', type: 'image' as const, accept: 'image/*' },
                   { icon: ImageIcon, label: 'Gallery', color: 'bg-purple-500', type: 'image' as const, accept: 'image/*,video/*' },
@@ -1677,10 +1677,10 @@ export const ModernChatInterface = ({
                     disabled={sending || uploadingFile}
                   >
                     <div className={cn(
-                      "w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
+                      "w-10 h-10 text-white rounded-xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
                       item.color
                     )}>
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="w-4 h-4" />
                     </div>
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
                   </button>
@@ -1757,7 +1757,7 @@ export const ModernChatInterface = ({
                     }
                   }
                 }}
-                className="flex-1 min-w-0 bg-transparent border-none outline-none py-1.5 px-2 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0 h-8"
+                className="flex-1 min-w-0 bg-transparent border-none outline-none py-1.5 px-2 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0 h-8"
                 disabled={sending || uploadingFile}
               />
 

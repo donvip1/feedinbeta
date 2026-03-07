@@ -561,18 +561,18 @@ export default function Messages() {
           secretMode ? "border-slate-800 bg-slate-900/80" : "border-border bg-background/80 backdrop-blur-md"
         )}>
           {/* Title & Actions */}
-          <div className="flex items-center justify-between mb-4 px-4">
+          <div className="flex items-center justify-between mb-3 px-4">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/feed')}
-                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
+                className={cn("w-8 h-8", secretMode ? "hover:bg-slate-800" : "")}
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5" />
               </Button>
               <h1 className={cn(
-                "text-2xl font-black tracking-tight",
+                "text-xl font-black tracking-tight",
                 secretMode 
                   ? "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400" 
                   : "bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent"
@@ -589,39 +589,39 @@ export default function Messages() {
                 size="icon"
                 onClick={() => setSecretMode(!secretMode)}
                 className={cn(
-                  "w-9 h-9 rounded-xl transition-colors",
+                  "w-8 h-8 rounded-xl transition-colors",
                   secretMode 
                     ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
                     : "bg-muted hover:bg-muted/80"
                 )}
                 title={secretMode ? "Exit Secret Mode" : "Enter Secret Mode"}
               >
-                <Shield className="w-4 h-4" />
+                <Shield className="w-3.5 h-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowMessageSettings(true)}
                 className={cn(
-                  "w-9 h-9 rounded-xl",
+                  "w-8 h-8 rounded-xl",
                   secretMode ? "bg-slate-800 hover:bg-slate-700" : "bg-muted hover:bg-muted/80"
                 )}
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
           
           {/* Search Bar */}
-          <div className="relative px-4 mb-3 group">
-            <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
+          <div className="relative px-4 mb-2.5 group">
+            <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={15} />
             <input 
               type="text" 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
               placeholder="Search chats..." 
               className={cn(
-                "w-full rounded-xl py-3 pl-10 pr-4 text-sm outline-none border border-transparent transition-all",
+                "w-full rounded-lg py-2.5 pl-9 pr-4 text-sm outline-none border border-transparent transition-all",
                 secretMode 
                   ? "bg-slate-800 text-white placeholder:text-slate-500 focus:border-red-500/20" 
                   : "bg-muted focus:border-primary/20 focus:bg-card"

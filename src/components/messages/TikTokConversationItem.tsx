@@ -83,10 +83,10 @@ export const TikTokConversationItem = ({
   };
   
   return (
-    <div className="relative overflow-hidden rounded-[24px] mb-1.5">
+    <div className="relative overflow-hidden rounded-xl mb-0.5">
       {/* Archive action behind */}
       {swipeX > 0 && (
-        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-amber-500 text-white px-4 rounded-r-[28px]"
+        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-amber-500 text-white px-4 rounded-r-xl"
           style={{ width: swipeX }}
         >
           <Archive className="w-5 h-5" />
@@ -99,7 +99,7 @@ export const TikTokConversationItem = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "flex items-center gap-3 p-3.5 group cursor-pointer transition-all w-full relative rounded-[24px] border",
+          "flex items-center gap-2.5 p-2.5 group cursor-pointer transition-all w-full relative rounded-xl border",
           isSelected 
             ? "bg-primary/10 border-primary/20" 
             : "bg-muted/20 hover:bg-card border-border/40 active:scale-[0.98]"
@@ -112,20 +112,19 @@ export const TikTokConversationItem = ({
         {/* Avatar with online/live indicator */}
         <div className="relative shrink-0">
           <div className={cn(
-            "rounded-[20px] overflow-hidden",
+            "rounded-full overflow-hidden",
             hasStoryRing 
               ? "p-[2px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600" 
               : ""
           )}>
             <Avatar className={cn(
               "shadow-sm",
-              hasStoryRing ? "w-[48px] h-[48px]" : "w-12 h-12"
-            )} style={{ borderRadius: '16px' }}>
+              hasStoryRing ? "w-[44px] h-[44px]" : "w-11 h-11"
+            )}>
               <AvatarImage 
                 src={avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`} 
-                className="rounded-[20px]"
               />
-              <AvatarFallback className="bg-gradient-to-br from-primary/60 to-primary text-primary-foreground rounded-[20px]">
+              <AvatarFallback className="bg-gradient-to-br from-primary/60 to-primary text-primary-foreground text-sm">
                 {displayName?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
@@ -147,7 +146,7 @@ export const TikTokConversationItem = ({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-center mb-0.5">
-            <h5 className="font-bold text-[16px] truncate flex items-center gap-1 tracking-tight text-foreground">
+            <h5 className="font-semibold text-[14px] truncate flex items-center gap-1 tracking-tight text-foreground">
               <span className="truncate">{displayName}</span>
               {userId && <VerifiedBadge userId={userId} size="sm" />}
               {isMuted && <BellOff className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
