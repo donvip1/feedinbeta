@@ -96,6 +96,13 @@ export const ModernMessageBubble = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+
+  // Detect if this message is a sticker (sent from built-in sticker packs)
+  const isSticker = !!(
+    message.media_url && 
+    !message.content?.trim() &&
+    (message.media_url.includes('em-content.zobj.net') || message.media_url.includes('/stickers/'))
+  );
   
   // Long press detection
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
