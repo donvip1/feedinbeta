@@ -118,7 +118,7 @@ export const MediaMessageBubble = ({
         <>
           <div 
             className="relative group/media overflow-hidden rounded-lg mb-0.5 cursor-pointer"
-            onClick={() => setShowViewer(true)}
+            onClick={openViewer}
           >
             <img 
               src={loadedMediaUrl} 
@@ -133,7 +133,7 @@ export const MediaMessageBubble = ({
               </div>
               <button 
                 className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
-                onClick={(e) => { e.stopPropagation(); setShowViewer(true); }}
+                onClick={(e) => { e.stopPropagation(); openViewer(); }}
               >
                 <Maximize2 className="w-3 h-3 text-white" />
               </button>
@@ -171,7 +171,7 @@ export const MediaMessageBubble = ({
         <>
           <div 
             className="relative overflow-hidden rounded-lg mb-0.5 cursor-pointer"
-            onClick={() => setShowViewer(true)}
+            onClick={openViewer}
           >
             <video 
               src={loadedMediaUrl} 
@@ -190,7 +190,7 @@ export const MediaMessageBubble = ({
               </div>
               <button 
                 className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
-                onClick={(e) => { e.stopPropagation(); setShowViewer(true); }}
+                onClick={(e) => { e.stopPropagation(); openViewer(); }}
               >
                 <Maximize2 className="w-3 h-3 text-white" />
               </button>
