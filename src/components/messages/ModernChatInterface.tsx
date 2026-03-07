@@ -35,7 +35,7 @@ import { MuteConversationSheet } from './MuteConversationSheet';
 import { StickerPicker } from './StickerPicker';
 import { EmojiKeyboard } from './EmojiKeyboard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
