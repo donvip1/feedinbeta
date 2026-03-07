@@ -453,6 +453,63 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             </div>
           </div>
 
+          {/* Stream Features */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Stream Features</label>
+
+            <div className="flex items-center justify-between py-3 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                  <Flame className="w-4 h-4 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Hype System</p>
+                  <p className="text-[10px] text-slate-500">Particles, meter & event ticker</p>
+                </div>
+              </div>
+              <Switch checked={featureHype} onCheckedChange={setFeatureHype} />
+            </div>
+
+            <div className="flex items-center justify-between py-3 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                  <Gamepad2 className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Co-Pilot Tools</p>
+                  <p className="text-[10px] text-slate-500">Polls, light, sound & predictions</p>
+                </div>
+              </div>
+              <Switch checked={featureCoPilot} onCheckedChange={setFeatureCoPilot} />
+            </div>
+
+            <div className="flex items-center justify-between py-3 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">AI PULSE Panel</p>
+                  <p className="text-[10px] text-slate-500">AI catch-up summaries & sentiment</p>
+                </div>
+              </div>
+              <Switch checked={featureAIPulse} onCheckedChange={setFeatureAIPulse} />
+            </div>
+
+            <div className="flex items-center justify-between py-3 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                  <Heart className="w-4 h-4 text-rose-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Chat Reactions</p>
+                  <p className="text-[10px] text-slate-500">Flying emoji reactions in chat</p>
+                </div>
+              </div>
+              <Switch checked={featureChatReactions} onCheckedChange={setFeatureChatReactions} />
+            </div>
+          </div>
+
           {/* Security Notice */}
           <div className="bg-white/[0.03] rounded-2xl p-4 flex items-center gap-3 border border-white/5">
             <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center flex-shrink-0">
