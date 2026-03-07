@@ -1700,6 +1700,16 @@ export const ModernChatInterface = ({
             onToggle={() => setShowMediaDock(!showMediaDock)}
           />
 
+          {/* Sticker Picker - Telegram-style drawer */}
+          <StickerPicker
+            isOpen={showStickerPicker}
+            onClose={() => setShowStickerPicker(false)}
+            onSelectSticker={(sticker) => {
+              setNewMessage(prev => prev + sticker);
+              handleTyping('typing');
+            }}
+          />
+
           {/* Unified input row */}
           <div className="px-3 py-2">
             <div className="flex items-center gap-1 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 pl-1.5 pr-1.5 py-1">
