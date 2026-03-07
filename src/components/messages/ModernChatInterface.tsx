@@ -146,6 +146,7 @@ export const ModernChatInterface = ({
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
   const [mediaUploadType, setMediaUploadType] = useState<'image' | 'video' | 'file'>('image');
   const [showMediaUpload, setShowMediaUpload] = useState(false);
+  const [showMediaDock, setShowMediaDock] = useState(false);
   
   // Pending file for inline preview (before sending)
   const [pendingFile, setPendingFile] = useState<File | null>(null);

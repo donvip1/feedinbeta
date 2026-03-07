@@ -8,6 +8,8 @@ interface AttachmentPickerProps {
   onFileSelect: (file: File, type: 'image' | 'video' | 'file') => void;
   onLocationSelect?: () => void;
   disabled?: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
@@ -22,9 +24,10 @@ const mediaItems = [
 export const AttachmentPicker = ({ 
   onFileSelect, 
   onLocationSelect, 
-  disabled 
+  disabled,
+  isExpanded,
+  onToggle,
 }: AttachmentPickerProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentType, setCurrentType] = useState<'image' | 'video' | 'file'>('image');
   const [currentAccept, setCurrentAccept] = useState('image/*');
@@ -42,7 +45,6 @@ export const AttachmentPicker = ({
       return;
     }
 
-    // Determine actual type from file
     let type = currentType;
     if (file.type.startsWith('video/')) type = 'video';
     else if (file.type.startsWith('image/')) type = 'image';
@@ -50,13 +52,12 @@ export const AttachmentPicker = ({
 
     onFileSelect(file, type);
     e.target.value = '';
-    setIsExpanded(false);
+    onToggle();
   };
 
   const handleItemClick = (item: typeof mediaItems[0]) => {
     setCurrentType(item.type);
     setCurrentAccept(item.accept);
-    // Use setTimeout to ensure state is set before click
     setTimeout(() => {
       fileInputRef.current?.click();
     }, 0);
@@ -64,54 +65,55 @@ export const AttachmentPicker = ({
 
   return (
     <>
-      {/* Expanded MediaDock */}
+      {/* MediaDock - renders ABOVE the input bar */}
       {isExpanded && (
-        <div className="absolute bottom-full left-0 right-0 bg-background/95 backdrop-blur-lg border-t border-border/50 animate-fade-in">
-          <div className="flex gap-4 overflow-x-auto no-scrollbar py-4 px-4">
+        <div className="bg-background/95 backdrop-blur-lg border-b border-border/30 animate-fade-in">
+          <div className="flex gap-4 overflow-x-auto no-scrollbar py-3 px-4">
             {mediaItems.map((item, i) => (
               <button 
                 key={i} 
                 onClick={() => handleItemClick(item)} 
-                className="flex flex-col items-center gap-2 flex-shrink-0 group"
+                className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
                 disabled={disabled}
               >
                 <div className={cn(
-                  "w-14 h-14 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
+                  "w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
                   item.color
                 )}>
                   <item.icon className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
               </button>
             ))}
             {onLocationSelect && (
               <button 
-                onClick={() => { onLocationSelect(); setIsExpanded(false); }}
-                className="flex flex-col items-center gap-2 flex-shrink-0 group"
+                onClick={() => { onLocationSelect(); onToggle(); }}
+                className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
               >
-                <div className="w-14 h-14 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform">
+                <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform">
                   <MapPin className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Location</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">Location</span>
               </button>
             )}
           </div>
         </div>
       )}
 
+      {/* Plus toggle button - rendered inline in the parent input row */}
       <Button
         variant="ghost"
         size="icon"
         disabled={disabled}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={onToggle}
         className={cn(
-          "shrink-0 rounded-2xl transition-all",
+          "shrink-0 h-9 w-9 rounded-full transition-all",
           isExpanded 
             ? "bg-foreground text-background hover:bg-foreground/90" 
-            : "bg-muted text-muted-foreground hover:bg-muted/80"
+            : "text-muted-foreground hover:bg-muted/80"
         )}
       >
-        <Plus className={cn("w-5 h-5 transition-transform", isExpanded && "rotate-45")} />
+        <Plus className={cn("w-5 h-5 transition-transform duration-200", isExpanded && "rotate-45")} />
       </Button>
 
       <input
