@@ -90,6 +90,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const { createBattle, sendChallenge } = usePKBattle(streamId);
   const updateStreak = useStreamStore((s) => s.updateStreak);
   const resetStream = useStreamStore((s) => s.resetStream);
+  const boostHype = useStreamStore((s) => s.boostHype);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
