@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Camera, Image, FileText, MapPin, Music, Plus } from 'lucide-react';
+import { Camera, Image, FileText, MapPin, Music } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -63,58 +62,52 @@ export const AttachmentPicker = ({
     }, 0);
   };
 
+  if (!isExpanded) {
+    return (
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={currentAccept}
+        className="hidden"
+        onChange={handleFileChange}
+      />
+    );
+  }
+
   return (
     <>
-      {/* MediaDock - renders ABOVE the input bar */}
-      {isExpanded && (
-        <div className="bg-background/95 backdrop-blur-lg border-b border-border/30 animate-fade-in">
-          <div className="flex gap-4 overflow-x-auto no-scrollbar py-3 px-4">
-            {mediaItems.map((item, i) => (
-              <button 
-                key={i} 
-                onClick={() => handleItemClick(item)} 
-                className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
-                disabled={disabled}
-              >
-                <div className={cn(
-                  "w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
-                  item.color
-                )}>
-                  <item.icon className="w-5 h-5" />
-                </div>
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
-              </button>
-            ))}
-            {onLocationSelect && (
-              <button 
-                onClick={() => { onLocationSelect(); onToggle(); }}
-                className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
-              >
-                <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">Location</span>
-              </button>
-            )}
-          </div>
+      {/* MediaDock - renders ABOVE the input row */}
+      <div className="bg-background/95 backdrop-blur-lg border-b border-border/30 animate-fade-in">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar py-3 px-4">
+          {mediaItems.map((item, i) => (
+            <button 
+              key={i} 
+              onClick={() => handleItemClick(item)} 
+              className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+              disabled={disabled}
+            >
+              <div className={cn(
+                "w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform",
+                item.color
+              )}>
+                <item.icon className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{item.label}</span>
+            </button>
+          ))}
+          {onLocationSelect && (
+            <button 
+              onClick={() => { onLocationSelect(); onToggle(); }}
+              className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+            >
+              <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg group-active:scale-90 transition-transform">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">Location</span>
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Plus toggle button - rendered inline in the parent input row */}
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={disabled}
-        onClick={onToggle}
-        className={cn(
-          "shrink-0 h-9 w-9 rounded-full transition-all",
-          isExpanded 
-            ? "bg-foreground text-background hover:bg-foreground/90" 
-            : "text-muted-foreground hover:bg-muted/80"
-        )}
-      >
-        <Plus className={cn("w-5 h-5 transition-transform duration-200", isExpanded && "rotate-45")} />
-      </Button>
+      </div>
 
       <input
         ref={fileInputRef}
