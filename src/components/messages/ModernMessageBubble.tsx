@@ -182,6 +182,11 @@ export const ModernMessageBubble = ({
   const renderMedia = () => {
     if (!message.media_url) return null;
 
+    const mediaDeleteProps = {
+      onDeleteForMe: onDelete ? () => onDelete(message.id) : undefined,
+      onDeleteForEveryone: isOwn && onDelete ? () => onDelete(message.id) : undefined,
+    };
+
     if (message.media_type?.startsWith('image') || message.media_type?.startsWith('video')) {
       return (
         <MediaMessageBubble
@@ -191,6 +196,8 @@ export const ModernMessageBubble = ({
           isOwn={isOwn}
           senderName={message.profiles?.display_name || (isOwn ? 'You' : 'Unknown')}
           timestamp={format(new Date(message.created_at), 'MMM d, h:mm a')}
+          messageId={message.id}
+          {...mediaDeleteProps}
         />
       );
     }
@@ -211,6 +218,8 @@ export const ModernMessageBubble = ({
         isOwn={isOwn}
         senderName={message.profiles?.display_name || (isOwn ? 'You' : 'Unknown')}
         timestamp={format(new Date(message.created_at), 'MMM d, h:mm a')}
+        messageId={message.id}
+        {...mediaDeleteProps}
       />
     );
   };
