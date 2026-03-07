@@ -83,7 +83,7 @@ export const TikTokConversationItem = ({
   };
   
   return (
-    <div className="relative overflow-hidden rounded-[24px] mb-1.5">
+    <div className="relative overflow-hidden rounded-xl mb-0.5">
       {/* Archive action behind */}
       {swipeX > 0 && (
         <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-amber-500 text-white px-4 rounded-r-xl"
