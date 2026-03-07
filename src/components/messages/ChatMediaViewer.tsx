@@ -348,6 +348,7 @@ export const ChatMediaViewer = ({
       {/* Media Content */}
       <div 
         className="absolute inset-0 flex items-center justify-center overflow-hidden"
+        onClick={toggleControls}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
