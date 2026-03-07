@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Download, Image as ImageIcon, Film, FileText, Mic, RefreshCw, Maximize2 } from 'lucide-react';
+import { Download, Image as ImageIcon, Film, FileText, Mic, RefreshCw, Maximize2, Play } from 'lucide-react';
 import { ChatMediaViewer } from './ChatMediaViewer';
 import { CreateStickerModal } from './CreateStickerModal';
 import { downloadManager, formatFileSize } from '@/lib/download-manager';
@@ -48,7 +48,6 @@ export const MediaMessageBubble = ({
   const [showStickerModal, setShowStickerModal] = useState(false);
   const [estimatedSize, setEstimatedSize] = useState<number | undefined>(fileSize);
 
-  // Auto-display media for sender's own messages
   useEffect(() => {
     if (isOwn && mediaUrl) {
       setLoadedMediaUrl(mediaUrl);
@@ -60,7 +59,6 @@ export const MediaMessageBubble = ({
   const label = getMediaTypeLabel(mediaType);
   const sizeText = formatFileSize(estimatedSize);
 
-  // Fetch media with progress
   const handleDownload = async () => {
     if (downloadState === 'downloading') return;
     
@@ -69,7 +67,6 @@ export const MediaMessageBubble = ({
 
     try {
       const response = await fetch(mediaUrl);
-      
       if (!response.ok) throw new Error('Failed to fetch media');
 
       const contentLength = response.headers.get('content-length');
@@ -95,7 +92,6 @@ export const MediaMessageBubble = ({
         if (total) {
           setDownloadProgress(Math.round((received / total) * 100));
         } else {
-          // Simulate progress if content-length not available
           setDownloadProgress(Math.min(90, received / 10000));
         }
       }
@@ -119,38 +115,35 @@ export const MediaMessageBubble = ({
       return (
         <>
           <div 
-            className="relative group/media overflow-hidden rounded-xl mb-1 cursor-pointer"
+            className="relative group/media overflow-hidden rounded-lg mb-0.5 cursor-pointer"
             onClick={() => setShowViewer(true)}
           >
             <img 
               src={loadedMediaUrl} 
               alt="Shared" 
-              className="max-w-[280px] max-h-[320px] object-cover rounded-xl transition-transform duration-200 group-hover/media:scale-[1.02]"
+              className="w-full max-w-[260px] max-h-[340px] object-cover rounded-lg"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
             
-            {/* Transparent file size overlay - visible for both sender and receiver */}
-            <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-0.5">
-                <ImageIcon className="w-3 h-3 text-white/90" />
+            <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+                <ImageIcon className="w-2.5 h-2.5 text-white/90" />
                 {sizeText && (
-                  <span className="text-[10px] font-medium text-white/90">{sizeText}</span>
+                  <span className="text-[9px] font-medium text-white/90">{sizeText}</span>
                 )}
               </div>
-              {/* Fullscreen icon button */}
               <button 
-                className="w-7 h-7 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
+                className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowViewer(true);
                 }}
               >
-                <Maximize2 className="w-3.5 h-3.5 text-white" />
+                <Maximize2 className="w-3 h-3 text-white" />
               </button>
             </div>
           </div>
           
-          {/* WhatsApp-style fullscreen viewer with actions */}
           <ChatMediaViewer
             isOpen={showViewer}
             onClose={() => setShowViewer(false)}
@@ -170,7 +163,6 @@ export const MediaMessageBubble = ({
             }}
           />
 
-          {/* Sticker creation modal */}
           <CreateStickerModal
             isOpen={showStickerModal}
             onClose={() => setShowStickerModal(false)}
@@ -187,38 +179,37 @@ export const MediaMessageBubble = ({
       return (
         <>
           <div 
-            className="relative overflow-hidden rounded-xl mb-1 cursor-pointer"
+            className="relative overflow-hidden rounded-lg mb-0.5 cursor-pointer"
             onClick={() => setShowViewer(true)}
           >
             <video 
               src={loadedMediaUrl} 
-              className="max-w-[280px] max-h-[320px] rounded-xl"
+              className="w-full max-w-[260px] max-h-[360px] rounded-lg object-cover"
               playsInline
               muted
+              preload="metadata"
             />
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
-              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Film className="w-6 h-6 text-white" />
+            <div className="absolute inset-0 bg-black/25 flex items-center justify-center pointer-events-none">
+              <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
+                <Play className="w-5 h-5 text-white ml-0.5" />
               </div>
             </div>
             
-            {/* Transparent file size overlay - visible for both sender and receiver */}
-            <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between z-10">
-              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-0.5">
-                <Film className="w-3 h-3 text-white/90" />
+            <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between z-10">
+              <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+                <Film className="w-2.5 h-2.5 text-white/90" />
                 {sizeText && (
-                  <span className="text-[10px] font-medium text-white/90">{sizeText}</span>
+                  <span className="text-[9px] font-medium text-white/90">{sizeText}</span>
                 )}
               </div>
-              {/* Fullscreen icon button */}
               <button 
-                className="w-7 h-7 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
+                className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowViewer(true);
                 }}
               >
-                <Maximize2 className="w-3.5 h-3.5 text-white" />
+                <Maximize2 className="w-3 h-3 text-white" />
               </button>
             </div>
           </div>
@@ -240,13 +231,13 @@ export const MediaMessageBubble = ({
 
     if (mediaType.startsWith('audio')) {
       return (
-        <div className="mb-1 min-w-[200px]">
-          <audio src={loadedMediaUrl} controls className="w-full" />
+        <div className="mb-0.5 min-w-[180px]">
+          <audio src={loadedMediaUrl} controls className="w-full h-8" />
         </div>
       );
     }
 
-    // Generic file - offer download
+    // Generic file
     return (
       <button 
         onClick={() => {
@@ -258,23 +249,23 @@ export const MediaMessageBubble = ({
           }
         }}
         className={cn(
-          "flex items-center gap-3 p-3 rounded-xl mb-1 transition-all w-full text-left",
+          "flex items-center gap-2.5 p-2.5 rounded-lg mb-0.5 transition-all w-full text-left",
           isOwn 
             ? "bg-white/10 hover:bg-white/20" 
             : "bg-primary/5 hover:bg-primary/10"
         )}
       >
         <div className={cn(
-          "w-10 h-10 rounded-lg flex items-center justify-center",
+          "w-9 h-9 rounded-lg flex items-center justify-center",
           isOwn ? "bg-white/20" : "bg-primary/10"
         )}>
-          <FileText className="w-5 h-5" />
+          <FileText className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">File downloaded</p>
-          {sizeText && <p className="text-xs opacity-70">{sizeText}</p>}
+          {sizeText && <p className="text-[11px] opacity-70">{sizeText}</p>}
         </div>
-        <Download className="w-5 h-5 opacity-70" />
+        <Download className="w-4 h-4 opacity-70" />
       </button>
     );
   }
@@ -283,19 +274,17 @@ export const MediaMessageBubble = ({
   return (
     <div 
       className={cn(
-        "relative overflow-hidden rounded-xl mb-1 cursor-pointer",
-        "min-w-[200px] min-h-[80px]"
+        "relative overflow-hidden rounded-lg mb-0.5 cursor-pointer",
+        "min-w-[180px] min-h-[70px]"
       )}
       onClick={downloadState === 'error' ? handleDownload : (downloadState === 'idle' ? handleDownload : undefined)}
     >
-      {/* Blurred background placeholder */}
       <div className={cn(
         "absolute inset-0 flex items-center justify-center",
         isOwn 
           ? "bg-white/10 backdrop-blur-sm" 
           : "bg-primary/5 backdrop-blur-sm"
       )}>
-        {/* Pattern based on media type */}
         {mediaType.startsWith('image') && (
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
         )}
@@ -304,28 +293,27 @@ export const MediaMessageBubble = ({
         )}
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center p-6 gap-3">
+      <div className="relative z-10 flex flex-col items-center justify-center p-5 gap-2.5">
         {downloadState === 'idle' && (
           <>
             <div className={cn(
-              "w-14 h-14 rounded-full flex items-center justify-center transition-all",
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all",
               isOwn ? "bg-white/20" : "bg-primary/20"
             )}>
-              <MediaIcon className="w-6 h-6" />
+              <MediaIcon className="w-5 h-5" />
             </div>
             <div className="text-center">
               <p className={cn(
-                "text-sm font-medium",
+                "text-[13px] font-medium",
                 isOwn ? "text-white" : "text-foreground"
               )}>
                 {label} {sizeText && `• ${sizeText}`}
               </p>
               <p className={cn(
-                "text-xs mt-1 flex items-center gap-1 justify-center",
+                "text-[11px] mt-0.5 flex items-center gap-1 justify-center",
                 isOwn ? "text-white/70" : "text-muted-foreground"
               )}>
-                <Download className="w-3 h-3" />
+                <Download className="w-2.5 h-2.5" />
                 Tap to download
               </p>
             </div>
@@ -335,48 +323,26 @@ export const MediaMessageBubble = ({
         {downloadState === 'downloading' && (
           <>
             <div className={cn(
-              "w-14 h-14 rounded-full flex items-center justify-center relative",
+              "w-12 h-12 rounded-full flex items-center justify-center relative",
               isOwn ? "bg-white/20" : "bg-primary/20"
             )}>
               <div className="absolute inset-0">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 56 56">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" className="opacity-20" />
                   <circle
-                    cx="28"
-                    cy="28"
-                    r="24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    className="opacity-20"
-                  />
-                  <circle
-                    cx="28"
-                    cy="28"
-                    r="24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
+                    cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5"
                     strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 24}`}
-                    strokeDashoffset={`${2 * Math.PI * 24 * (1 - downloadProgress / 100)}`}
-                    className={cn(
-                      "transition-all duration-300",
-                      isOwn ? "text-white" : "text-primary"
-                    )}
+                    strokeDasharray={`${2 * Math.PI * 20}`}
+                    strokeDashoffset={`${2 * Math.PI * 20 * (1 - downloadProgress / 100)}`}
+                    className={cn("transition-all duration-300", isOwn ? "text-white" : "text-primary")}
                   />
                 </svg>
               </div>
-              <span className={cn(
-                "text-xs font-bold z-10",
-                isOwn ? "text-white" : "text-primary"
-              )}>
+              <span className={cn("text-[10px] font-bold z-10", isOwn ? "text-white" : "text-primary")}>
                 {downloadProgress}%
               </span>
             </div>
-            <p className={cn(
-              "text-xs",
-              isOwn ? "text-white/70" : "text-muted-foreground"
-            )}>
+            <p className={cn("text-[11px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
               Downloading...
             </p>
           </>
@@ -384,18 +350,12 @@ export const MediaMessageBubble = ({
 
         {downloadState === 'error' && (
           <>
-            <div className={cn(
-              "w-14 h-14 rounded-full flex items-center justify-center",
-              "bg-destructive/20"
-            )}>
-              <RefreshCw className="w-6 h-6 text-destructive" />
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-destructive/20">
+              <RefreshCw className="w-5 h-5 text-destructive" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-destructive">Download failed</p>
-              <p className={cn(
-                "text-xs mt-1",
-                isOwn ? "text-white/70" : "text-muted-foreground"
-              )}>
+              <p className="text-[13px] font-medium text-destructive">Download failed</p>
+              <p className={cn("text-[11px] mt-0.5", isOwn ? "text-white/70" : "text-muted-foreground")}>
                 Tap to retry
               </p>
             </div>
