@@ -15,6 +15,7 @@ interface StreamHeaderProps {
   onSettings: () => void;
   onMinimize: () => void;
   onEnd: () => void;
+  showAIPulse?: boolean;
 }
 
 const formatNumber = (num: number) => num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num.toString();
@@ -33,6 +34,7 @@ export const StreamHeader = ({
   onSettings,
   onMinimize,
   onEnd,
+  showAIPulse = true,
 }: StreamHeaderProps) => {
   return (
     <div
