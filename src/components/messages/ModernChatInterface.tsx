@@ -1704,13 +1704,23 @@ export const ModernChatInterface = ({
             onToggle={() => setShowMediaDock(!showMediaDock)}
           />
 
-          {/* Sticker Picker - Telegram-style drawer */}
+          {/* Emoji Keyboard - full panel */}
+          <EmojiKeyboard
+            isOpen={showEmojiKeyboard}
+            onClose={() => setShowEmojiKeyboard(false)}
+            onSelectEmoji={(emoji) => {
+              setNewMessage(prev => prev + emoji);
+              handleTyping('typing');
+            }}
+          />
+
+          {/* Sticker Picker - Telegram-style image stickers */}
           <StickerPicker
             isOpen={showStickerPicker}
             onClose={() => setShowStickerPicker(false)}
-            onSelectSticker={(sticker) => {
-              setNewMessage(prev => prev + sticker);
-              handleTyping('typing');
+            onSelectSticker={(stickerUrl, type) => {
+              // Send sticker as a media message
+              handleSend(stickerUrl, type === 'video' ? 'video/webm' : 'image/webp');
             }}
           />
 
