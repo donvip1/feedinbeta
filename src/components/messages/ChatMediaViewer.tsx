@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ArrowLeft, MoreVertical, Edit3, Share2, Download, Trash2, Scissors,
   Play, Pause, Maximize, Minimize, Volume2, VolumeX, UserX, Users,
@@ -290,7 +291,7 @@ export const ChatMediaViewer = ({
 
   const opacity = swipeY > 0 ? Math.max(0.3, 1 - swipeY / 300) : 1;
 
-  return (
+  return createPortal(
     <div
       ref={containerRef}
       className="fixed inset-0 z-[9999] bg-black animate-in fade-in duration-200"
