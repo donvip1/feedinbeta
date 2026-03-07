@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Radio, Loader2, Video, Users, Play, Lock, Clock } from 'lucide-react';
-import { TwitterStreamRoom } from '@/components/live/twitter-space';
+import { StreamRoomV2 } from '@/components/live/stream-v2';
 import { useOptionalLiveStreamContext } from '@/context/LiveStreamContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
