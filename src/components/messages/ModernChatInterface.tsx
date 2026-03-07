@@ -1634,7 +1634,7 @@ export const ModernChatInterface = ({
       {/* Input Area - Premium style */}
       {!showVoiceRecorder && (
         <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-t border-border/50 z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
-          {/* AI Reply Suggestions - inside footer */}
+          {/* AI Reply Suggestions */}
           {showAiSuggestions && messages.length > 0 && user && (
             <div className="px-3 pt-2 pb-0">
               <AIReplySuggestions
@@ -1652,97 +1652,125 @@ export const ModernChatInterface = ({
               />
             </div>
           )}
-          
-          <div className="p-3 flex flex-col gap-3">
-            <div className="flex items-end gap-2">
-              <div className="relative flex-1">
-                <AttachmentPicker onFileSelect={handleFileSelect} />
-              </div>
-              
-              {/* Gift Button */}
-              {otherUser?.id && (
-                <ChatGiftButton 
-                  recipientId={otherUser.id} 
-                  recipientName={otherUser.display_name || 'User'}
-                  recipientAvatar={otherUser.avatar_url}
-                  conversationId={conversationId}
-                />
-              )}
-              
-              <div className="flex-1 bg-muted/50 rounded-2xl p-1.5 flex items-end border border-transparent focus-within:border-primary/30">
-                <Input
-                  ref={inputRef}
-                  placeholder="Message..."
-                  value={newMessage}
-                  onFocus={() => {
-                    handleTyping('focused');
-                    setTimeout(() => scrollToBottom(), 300);
-                  }}
-                  onBlur={() => {
-                    if (!newMessage.trim()) stopTyping();
-                  }}
-                  onChange={(e) => {
-                    setNewMessage(e.target.value);
-                    if (e.target.value.trim()) handleTyping('typing');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (previewMedia) {
-                        handleSend(previewMedia.url, previewMedia.type);
-                      } else {
-                        handleSend();
-                      }
-                    }
-                  }}
-                  className="flex-1 bg-transparent border-none outline-none py-2 px-3 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0"
-                  disabled={sending || uploadingFile}
-                />
-                <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
-                    >
-                      <Smile className="w-5 h-5 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
-                    <div className="flex gap-1">
-                      {EMOJI_QUICK.map((emoji) => (
-                        <button
-                          key={emoji}
-                          onClick={() => {
-                            setNewMessage(prev => prev + emoji);
-                            handleTyping('typing');
-                          }}
-                          className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
 
+          {/* MediaDock appears ABOVE input row */}
+          <AttachmentPicker
+            onFileSelect={handleFileSelect}
+            isExpanded={showMediaDock}
+            onToggle={() => setShowMediaDock(!showMediaDock)}
+          />
+
+          {/* Unified input row - all items inside one bar */}
+          <div className="px-3 py-2">
+            <div className="flex items-end gap-1.5 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 px-2 py-1.5">
+              {/* Plus button - always visible */}
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={sending || uploadingFile}
+                onClick={() => setShowMediaDock(!showMediaDock)}
+                className={cn(
+                  "shrink-0 h-9 w-9 rounded-full transition-all duration-200",
+                  showMediaDock 
+                    ? "bg-foreground text-background hover:bg-foreground/90" 
+                    : "text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                <Plus className={cn("w-5 h-5 transition-transform duration-200", showMediaDock && "rotate-45")} />
+              </Button>
+
+              {/* Gift button - fades out when typing */}
+              {otherUser?.id && (
+                <div className={cn(
+                  "transition-all duration-200 overflow-hidden",
+                  newMessage.trim() ? "w-0 opacity-0 scale-75" : "w-9 opacity-100 scale-100"
+                )}>
+                  <ChatGiftButton 
+                    recipientId={otherUser.id} 
+                    recipientName={otherUser.display_name || 'User'}
+                    recipientAvatar={otherUser.avatar_url}
+                    conversationId={conversationId}
+                  />
+                </div>
+              )}
+
+              {/* Text input - takes full remaining width */}
+              <Input
+                ref={inputRef}
+                placeholder="Message..."
+                value={newMessage}
+                onFocus={() => {
+                  handleTyping('focused');
+                  setTimeout(() => scrollToBottom(), 300);
+                }}
+                onBlur={() => {
+                  if (!newMessage.trim()) stopTyping();
+                }}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  if (e.target.value.trim()) handleTyping('typing');
+                  if (showMediaDock) setShowMediaDock(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (previewMedia) {
+                      handleSend(previewMedia.url, previewMedia.type);
+                    } else {
+                      handleSend();
+                    }
+                  }
+                }}
+                className="flex-1 min-w-0 bg-transparent border-none outline-none py-2 px-2 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0 h-9"
+                disabled={sending || uploadingFile}
+              />
+
+              {/* Emoji - always visible */}
+              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full hover:bg-primary/10 shrink-0"
+                  >
+                    <Smile className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
+                  <div className="flex gap-1">
+                    {EMOJI_QUICK.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => {
+                          setNewMessage(prev => prev + emoji);
+                          handleTyping('typing');
+                        }}
+                        className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Right side: Send when typing, AI+Mic when idle */}
               {newMessage.trim() || previewMedia ? (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   {newMessage.trim() && !previewMedia && (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="shrink-0 rounded-full hover:bg-primary/10"
+                      className="shrink-0 h-9 w-9 rounded-full hover:bg-primary/10"
                       onClick={() => setShowScheduleModal(true)}
                       title="Schedule message"
                     >
-                      <Clock className="w-5 h-5 text-muted-foreground" />
+                      <Clock className="w-4 h-4 text-muted-foreground" />
                     </Button>
                   )}
                   <Button
                     size="icon"
-                    className="shrink-0 rounded-2xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                    className="shrink-0 h-9 w-9 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
                     onClick={() => {
                       if (previewMedia) {
                         handleSend(previewMedia.url, previewMedia.type);
@@ -1752,30 +1780,30 @@ export const ModernChatInterface = ({
                     }}
                     disabled={sending || uploadingFile}
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                   </Button>
                 </div>
               ) : (
-                <div className="flex gap-1">
+                <div className="flex items-center gap-0.5">
                   <Button
                     size="icon"
                     variant="ghost"
                     className={cn(
-                      "shrink-0 rounded-2xl",
-                      showAiSuggestions ? "text-primary bg-primary/10" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      "shrink-0 h-9 w-9 rounded-full",
+                      showAiSuggestions ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted/80"
                     )}
                     onClick={() => setShowAiSuggestions(!showAiSuggestions)}
                     title="AI Smart Replies"
                   >
-                    <Sparkles className="w-5 h-5" />
+                    <Sparkles className="w-4 h-4" />
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="shrink-0 rounded-2xl bg-muted text-muted-foreground hover:bg-muted/80"
+                    className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:bg-muted/80"
                     onClick={() => setShowVoiceRecorder(true)}
                   >
-                    <Mic className="w-5 h-5" />
+                    <Mic className="w-4 h-4" />
                   </Button>
                 </div>
               )}
