@@ -1630,158 +1630,155 @@ export const ModernChatInterface = ({
         </div>
       )}
 
-      {/* AI Reply Suggestions */}
-      {showAiSuggestions && messages.length > 0 && !showVoiceRecorder && user && (
-        <div className="flex-shrink-0 px-3 pt-2 pb-0 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40">
-          <AIReplySuggestions
-            conversationId={conversationId}
-            lastMessages={messages.slice(-5).map(m => ({
-              content: m.content,
-              sender_id: m.sender_id
-            }))}
-            currentUserId={user.id}
-            onSelectSuggestion={(suggestion) => {
-              setNewMessage(suggestion);
-              setShowAiSuggestions(false);
-            }}
-            onClose={() => setShowAiSuggestions(false)}
-          />
-        </div>
-      )}
-
-      {/* Input Area - At bottom in flex layout */}
+      {/* Input Area - Premium style */}
       {!showVoiceRecorder && (
-        <div className="flex-shrink-0 p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <div className="flex items-end gap-2">
-            <AttachmentPicker onFileSelect={handleFileSelect} />
-            
-            {/* Gift Button */}
-            {otherUser?.id && (
-              <ChatGiftButton 
-                recipientId={otherUser.id} 
-                recipientName={otherUser.display_name || 'User'}
-                recipientAvatar={otherUser.avatar_url}
+        <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-t border-border/50 z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
+          {/* AI Reply Suggestions - inside footer */}
+          {showAiSuggestions && messages.length > 0 && user && (
+            <div className="px-3 pt-2 pb-0">
+              <AIReplySuggestions
                 conversationId={conversationId}
+                lastMessages={messages.slice(-5).map(m => ({
+                  content: m.content,
+                  sender_id: m.sender_id
+                }))}
+                currentUserId={user.id}
+                onSelectSuggestion={(suggestion) => {
+                  setNewMessage(suggestion);
+                  setShowAiSuggestions(false);
+                }}
+                onClose={() => setShowAiSuggestions(false)}
               />
-            )}
-            
-            <div className="flex-1 relative">
-              <Input
-                ref={inputRef}
-                placeholder="Type a message..."
-                value={newMessage}
-                onFocus={() => {
-                  handleTyping('focused');
-                  // Scroll to bottom when input is focused to keep messages visible
-                  setTimeout(() => {
-                    scrollToBottom();
-                  }, 300);
-                }}
-                onBlur={() => {
-                  if (!newMessage.trim()) stopTyping();
-                }}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  if (e.target.value.trim()) {
-                    handleTyping('typing');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (previewMedia) {
-                      handleSend(previewMedia.url, previewMedia.type);
-                    } else {
-                      handleSend();
-                    }
-                  }
-                }}
-                className="pr-10 rounded-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
-                disabled={sending || uploadingFile}
-              />
-              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-primary/10"
-                  >
-                    <Smile className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
-                  <div className="flex gap-1">
-                    {EMOJI_QUICK.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setNewMessage(prev => prev + emoji);
-                          handleTyping('typing');
-                        }}
-                        className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
             </div>
-
-            {newMessage.trim() || previewMedia ? (
-              <div className="flex items-center gap-1">
-                {/* Schedule Button - only show for text messages */}
-                {newMessage.trim() && !previewMedia && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 rounded-full hover:bg-primary/10"
-                    onClick={() => setShowScheduleModal(true)}
-                    title="Schedule message"
-                  >
-                    <Clock className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  className="shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
-                  onClick={() => {
-                    if (previewMedia) {
-                      handleSend(previewMedia.url, previewMedia.type);
-                    } else {
-                      handleSend();
+          )}
+          
+          <div className="p-3 flex flex-col gap-3">
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <AttachmentPicker onFileSelect={handleFileSelect} />
+              </div>
+              
+              {/* Gift Button */}
+              {otherUser?.id && (
+                <ChatGiftButton 
+                  recipientId={otherUser.id} 
+                  recipientName={otherUser.display_name || 'User'}
+                  recipientAvatar={otherUser.avatar_url}
+                  conversationId={conversationId}
+                />
+              )}
+              
+              <div className="flex-1 bg-muted/50 rounded-2xl p-1.5 flex items-end border border-transparent focus-within:border-primary/30">
+                <Input
+                  ref={inputRef}
+                  placeholder="Message..."
+                  value={newMessage}
+                  onFocus={() => {
+                    handleTyping('focused');
+                    setTimeout(() => scrollToBottom(), 300);
+                  }}
+                  onBlur={() => {
+                    if (!newMessage.trim()) stopTyping();
+                  }}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    if (e.target.value.trim()) handleTyping('typing');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (previewMedia) {
+                        handleSend(previewMedia.url, previewMedia.type);
+                      } else {
+                        handleSend();
+                      }
                     }
                   }}
+                  className="flex-1 bg-transparent border-none outline-none py-2 px-3 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0"
                   disabled={sending || uploadingFile}
-                >
-                  <Send className="w-5 h-5" />
-                </Button>
+                />
+                <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
+                    >
+                      <Smile className="w-5 h-5 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
+                    <div className="flex gap-1">
+                      {EMOJI_QUICK.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => {
+                            setNewMessage(prev => prev + emoji);
+                            handleTyping('typing');
+                          }}
+                          className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-            ) : (
-              <div className="flex gap-1">
-                {/* AI Suggestions Toggle */}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={cn(
-                    "shrink-0 rounded-full",
-                    showAiSuggestions ? "text-primary bg-primary/10" : "hover:bg-primary/10"
+
+              {newMessage.trim() || previewMedia ? (
+                <div className="flex items-center gap-1">
+                  {newMessage.trim() && !previewMedia && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 rounded-full hover:bg-primary/10"
+                      onClick={() => setShowScheduleModal(true)}
+                      title="Schedule message"
+                    >
+                      <Clock className="w-5 h-5 text-muted-foreground" />
+                    </Button>
                   )}
-                  onClick={() => setShowAiSuggestions(!showAiSuggestions)}
-                  title="AI Smart Replies"
-                >
-                  <Sparkles className="w-5 h-5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="shrink-0 rounded-full hover:bg-primary/10"
-                  onClick={() => setShowVoiceRecorder(true)}
-                >
-                  <Mic className="w-5 h-5" />
-                </Button>
-              </div>
-            )}
+                  <Button
+                    size="icon"
+                    className="shrink-0 rounded-2xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                    onClick={() => {
+                      if (previewMedia) {
+                        handleSend(previewMedia.url, previewMedia.type);
+                      } else {
+                        handleSend();
+                      }
+                    }}
+                    disabled={sending || uploadingFile}
+                  >
+                    <Send className="w-5 h-5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "shrink-0 rounded-2xl",
+                      showAiSuggestions ? "text-primary bg-primary/10" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                    onClick={() => setShowAiSuggestions(!showAiSuggestions)}
+                    title="AI Smart Replies"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 rounded-2xl bg-muted text-muted-foreground hover:bg-muted/80"
+                    onClick={() => setShowVoiceRecorder(true)}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
