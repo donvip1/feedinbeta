@@ -55,6 +55,7 @@ import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
 import { MentionText } from '../MentionText';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { SpeakerActionSheet } from './SpeakerActionSheet';
 import { SpeakInviteDialog } from './SpeakInviteDialog';
@@ -113,6 +114,7 @@ interface FloatingReaction {
   emoji: string;
   left: number;
   displayName?: string;
+  userId?: string;
 }
 
 interface FloatingGiftReaction {
@@ -323,7 +325,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .channel(`space-reactions-${spaceId}`)
       .on('broadcast', { event: 'reaction' }, (payload: any) => {
         if (payload.payload?.user_id !== user?.id) {
-          handleFloatingReaction(payload.payload?.emoji, payload.payload?.display_name);
+          handleFloatingReaction(payload.payload?.emoji, payload.payload?.display_name, payload.payload?.user_id);
         }
       })
       .subscribe();
@@ -803,9 +805,9 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  const handleFloatingReaction = (emoji: string, displayName?: string) => {
+  const handleFloatingReaction = (emoji: string, displayName?: string, userId?: string) => {
     const id = `${Date.now()}-${Math.random()}`;
-    setFloatingReactions(prev => [...prev, { id, emoji, left: 35 + Math.random() * 30, displayName }]);
+    setFloatingReactions(prev => [...prev, { id, emoji, left: 35 + Math.random() * 30, displayName, userId }]);
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== id));
     }, 3000);
@@ -818,7 +820,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     const myDisplayName = speakers.find(s => s.user_id === user.id)?.profile?.display_name || 'Someone';
     
     // Show locally
-    handleFloatingReaction(emoji, myDisplayName);
+    handleFloatingReaction(emoji, myDisplayName, user.id);
     
     // Broadcast to others
     const channel = supabase.channel(`space-reactions-${spaceId}`);
