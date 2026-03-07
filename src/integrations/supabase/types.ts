@@ -7270,6 +7270,51 @@ export type Database = {
           },
         ]
       }
+      stream_polls: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          options: Json
+          question: string
+          stream_id: string | null
+          votes: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          options?: Json
+          question: string
+          stream_id?: string | null
+          votes?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          options?: Json
+          question?: string
+          stream_id?: string | null
+          votes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_polls_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stream_polls_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subjects: {
         Row: {
           category_id: string | null
