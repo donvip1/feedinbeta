@@ -518,6 +518,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
 
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
+    boostHype(5);
     const myName = viewers.find(v => v.user_id === user?.id)?.profile?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
     reactionsChannelRef.current?.send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id: user?.id, display_name: myName } });
