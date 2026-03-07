@@ -36,20 +36,22 @@ export const useAIToolCredits = ({
         .from('user_credits')
         .select('balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching credits:', error);
         return 0;
       }
 
+      const bal = data?.balance ?? 0;
+
       // Cache in localStorage for instant display
       localStorage.setItem('user_credits_cache', JSON.stringify({
-        balance: data?.balance || 0,
+        balance: bal,
         timestamp: Date.now(),
       }));
 
-      return data?.balance || 0;
+      return bal;
     },
     enabled: !!user?.id,
     staleTime: 30000, // 30 seconds
@@ -104,14 +106,14 @@ export const useAIToolCredits = ({
       return false;
     }
 
-    // Check balance
+    // Check balance server-side via the edge function — don't block on stale client cache
     const { data: currentBalance } = await supabase
       .from('user_credits')
       .select('balance')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    const actualBalance = currentBalance?.balance || 0;
+    const actualBalance = currentBalance?.balance ?? 0;
 
     if (actualBalance < creditCost) {
       toast.error(

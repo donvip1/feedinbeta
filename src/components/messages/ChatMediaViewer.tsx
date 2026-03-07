@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   ArrowLeft, MoreVertical, Edit3, Share2, Download, Trash2, Scissors,
-  Play, Pause, Maximize, Minimize, Volume2, VolumeX,
+  Play, Pause, Maximize, Minimize, Volume2, VolumeX, UserX, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +24,8 @@ interface ChatMediaViewerProps {
   isOwn?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDeleteForMe?: () => void;
+  onDeleteForEveryone?: () => void;
   onCreateSticker?: () => void;
 }
 
@@ -36,7 +38,7 @@ const formatDuration = (seconds: number) => {
 export const ChatMediaViewer = ({
   isOpen, onClose, mediaUrl, mediaType,
   senderName = 'Unknown', timestamp,
-  isOwn = false, onEdit, onDelete, onCreateSticker,
+  isOwn = false, onEdit, onDelete, onDeleteForMe, onDeleteForEveryone, onCreateSticker,
 }: ChatMediaViewerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -54,7 +56,6 @@ export const ChatMediaViewer = ({
   const progressRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<NodeJS.Timeout>();
   
-  // Pinch-to-zoom state
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [lastTouchDistance, setLastTouchDistance] = useState(0);
@@ -65,18 +66,22 @@ export const ChatMediaViewer = ({
   const isImage = mediaType.startsWith('image');
   const isVideo = mediaType.startsWith('video');
 
+  // Lock body scroll when viewer is open
   useEffect(() => {
     if (isOpen) {
+      document.body.style.overflow = 'hidden';
       setScale(1);
       setPosition({ x: 0, y: 0 });
       setSwipeY(0);
       setIsPlaying(false);
       setCurrentTime(0);
       setMenuOpen(false);
+    } else {
+      document.body.style.overflow = '';
     }
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  // Auto-hide controls for video
   useEffect(() => {
     if (isVideo && isPlaying && showControls) {
       controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
@@ -84,15 +89,12 @@ export const ChatMediaViewer = ({
     }
   }, [isVideo, isPlaying, showControls]);
 
-  // Video time update
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    
     const onTimeUpdate = () => !isSeeking && setCurrentTime(video.currentTime);
     const onLoadedMetadata = () => setDuration(video.duration);
     const onEnded = () => { setIsPlaying(false); setShowControls(true); };
-    
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('ended', onEnded);
@@ -103,15 +105,24 @@ export const ChatMediaViewer = ({
     };
   }, [isSeeking, isOpen]);
 
-  // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !menuOpen) onClose();
+      if (e.key === 'Escape' && !menuOpen) handleClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, menuOpen, onClose]);
+  }, [isOpen, menuOpen]);
+
+  const handleClose = useCallback(() => {
+    // Pause video if playing
+    if (videoRef.current && isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+    haptic('light');
+    onClose();
+  }, [onClose, haptic, isPlaying]);
 
   const getTouchDistance = (touches: React.TouchList): number => {
     if (touches.length < 2) return 0;
@@ -177,8 +188,7 @@ export const ChatMediaViewer = ({
     setIsDragging(false);
     
     if (swipeY > 120) {
-      haptic('light');
-      onClose();
+      handleClose();
       setSwipeY(0);
       return;
     }
@@ -205,7 +215,7 @@ export const ChatMediaViewer = ({
       }
       setLastTap(now);
     }
-  }, [scale, lastTap, haptic, swipeY, onClose]);
+  }, [scale, lastTap, haptic, swipeY, handleClose]);
 
   const handleSave = async () => {
     haptic('medium');
@@ -279,21 +289,24 @@ export const ChatMediaViewer = ({
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[100] bg-black animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] bg-black animate-in fade-in duration-200"
       style={{ opacity }}
     >
       {/* Header */}
       {showControls && (
         <div 
-          className="absolute top-0 left-0 right-0 z-20 safe-area-top animate-in slide-in-from-top duration-150"
+          className="absolute top-0 left-0 right-0 z-[10001] safe-area-top animate-in slide-in-from-top duration-150"
           onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
+          <div className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/80 to-transparent">
             <div className="flex items-center gap-2.5">
               <Button
                 variant="ghost" size="icon"
-                className="text-white hover:bg-white/20 h-9 w-9"
-                onClick={() => { haptic('light'); onClose(); }}
+                className="text-white hover:bg-white/20 h-9 w-9 active:scale-95 transition-transform"
+                onClick={(e) => { e.stopPropagation(); handleClose(); }}
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
@@ -303,41 +316,64 @@ export const ChatMediaViewer = ({
               </div>
             </div>
 
-            <DropdownMenu onOpenChange={setMenuOpen}>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={true}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon"
                   className="text-white hover:bg-white/20 h-9 w-9"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 z-[110]">
+              <DropdownMenuContent 
+                align="end" 
+                className="w-52 z-[10002] rounded-xl shadow-2xl border-border/50"
+                sideOffset={4}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
                 {isImage && onEdit && (
-                  <DropdownMenuItem onClick={onEdit}>
+                  <DropdownMenuItem onClick={() => { setMenuOpen(false); onEdit(); }}>
                     <Edit3 className="w-3.5 h-3.5 mr-2" /> Edit
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={handleShare}>
+                <DropdownMenuItem onClick={() => { setMenuOpen(false); handleShare(); }}>
                   <Share2 className="w-3.5 h-3.5 mr-2" /> Share
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSave}>
+                <DropdownMenuItem onClick={() => { setMenuOpen(false); handleSave(); }}>
                   <Download className="w-3.5 h-3.5 mr-2" /> Save to device
                 </DropdownMenuItem>
                 {isImage && onCreateSticker && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onCreateSticker}>
+                    <DropdownMenuItem onClick={() => { setMenuOpen(false); onCreateSticker(); }}>
                       <Scissors className="w-3.5 h-3.5 mr-2" /> Create sticker
                     </DropdownMenuItem>
                   </>
                 )}
-                {onDelete && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-                      <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
-                    </DropdownMenuItem>
-                  </>
+                <DropdownMenuSeparator />
+                {onDeleteForMe && (
+                  <DropdownMenuItem 
+                    onClick={() => { setMenuOpen(false); onDeleteForMe(); }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <UserX className="w-3.5 h-3.5 mr-2" /> Delete for me
+                  </DropdownMenuItem>
+                )}
+                {onDeleteForEveryone && isOwn && (
+                  <DropdownMenuItem 
+                    onClick={() => { setMenuOpen(false); onDeleteForEveryone(); }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Users className="w-3.5 h-3.5 mr-2" /> Delete for everyone
+                  </DropdownMenuItem>
+                )}
+                {onDelete && !onDeleteForMe && !onDeleteForEveryone && (
+                  <DropdownMenuItem 
+                    onClick={() => { setMenuOpen(false); onDelete(); }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                  </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -389,7 +425,6 @@ export const ChatMediaViewer = ({
               onPause={() => setIsPlaying(false)}
             />
             
-            {/* Center play button when paused */}
             {!isPlaying && (
               <button
                 className="absolute inset-0 flex items-center justify-center animate-in fade-in duration-150"
@@ -406,18 +441,18 @@ export const ChatMediaViewer = ({
 
       {/* Zoom indicator */}
       {scale > 1 && showControls && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-black/60 px-2.5 py-0.5 rounded-full text-white text-xs backdrop-blur-sm">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-black/60 px-2.5 py-0.5 rounded-full text-white text-xs backdrop-blur-sm z-[10001]">
           {Math.round(scale * 100)}%
         </div>
       )}
 
       {/* Video Controls Bar */}
       {isVideo && showControls && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 safe-area-bottom animate-in slide-in-from-bottom duration-150"
+        <div className="absolute bottom-0 left-0 right-0 z-[10001] safe-area-bottom animate-in slide-in-from-bottom duration-150"
           onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           <div className="bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-10 pb-3 px-4">
-            {/* Progress bar */}
             <div 
               ref={progressRef}
               className="relative h-6 flex items-center cursor-pointer group mb-2"
@@ -436,7 +471,6 @@ export const ChatMediaViewer = ({
               </div>
             </div>
             
-            {/* Controls row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button onClick={handleVideoToggle} className="text-white active:scale-90 transition-transform">
@@ -459,7 +493,10 @@ export const ChatMediaViewer = ({
 
       {/* Image bottom action bar */}
       {!isVideo && showControls && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 safe-area-bottom animate-in slide-in-from-bottom duration-150">
+        <div className="absolute bottom-0 left-0 right-0 z-[10001] safe-area-bottom animate-in slide-in-from-bottom duration-150"
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-around px-4 py-3 bg-gradient-to-t from-black/70 to-transparent">
             {isImage && onEdit && (
               <ActionButton icon={Edit3} label="Edit" onClick={(e) => { e.stopPropagation(); haptic('light'); onEdit(); }} />
@@ -468,9 +505,6 @@ export const ChatMediaViewer = ({
             <ActionButton icon={Download} label="Save" onClick={(e) => { e.stopPropagation(); handleSave(); }} />
             {isImage && onCreateSticker && (
               <ActionButton icon={Scissors} label="Sticker" onClick={(e) => { e.stopPropagation(); haptic('light'); onCreateSticker(); }} />
-            )}
-            {onDelete && (
-              <ActionButton icon={Trash2} label="Delete" onClick={(e) => { e.stopPropagation(); haptic('light'); onDelete(); }} destructive />
             )}
           </div>
         </div>

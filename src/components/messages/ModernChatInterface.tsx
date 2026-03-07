@@ -32,6 +32,7 @@ import { AIReplySuggestions } from './AIReplySuggestions';
 import { ChatGiftButton } from './ChatGiftButton';
 import { ForwardMessageSheet } from './ForwardMessageSheet';
 import { MuteConversationSheet } from './MuteConversationSheet';
+import { StickerPicker } from './StickerPicker';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -157,6 +158,9 @@ export const ModernChatInterface = ({
   
   // AI suggestions state
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
+  
+  // Sticker picker state
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   
   // Scheduling state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -1696,6 +1700,16 @@ export const ModernChatInterface = ({
             onToggle={() => setShowMediaDock(!showMediaDock)}
           />
 
+          {/* Sticker Picker - Telegram-style drawer */}
+          <StickerPicker
+            isOpen={showStickerPicker}
+            onClose={() => setShowStickerPicker(false)}
+            onSelectSticker={(sticker) => {
+              setNewMessage(prev => prev + sticker);
+              handleTyping('typing');
+            }}
+          />
+
           {/* Unified input row */}
           <div className="px-3 py-2">
             <div className="flex items-center gap-1 bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 pl-1.5 pr-1.5 py-1">
@@ -1789,6 +1803,29 @@ export const ModernChatInterface = ({
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {/* Sticker button - hides while typing */}
+              <div className={cn(
+                "transition-all duration-200 overflow-hidden flex items-center",
+                newMessage.trim() ? "w-0 opacity-0" : "w-8 opacity-100"
+              )}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 rounded-full shrink-0",
+                    showStickerPicker ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-primary/10"
+                  )}
+                  onClick={() => setShowStickerPicker(!showStickerPicker)}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
+                    <path d="M14 3v4a2 2 0 0 0 2 2h4" />
+                    <path d="M8 13h0" /><path d="M16 13h0" />
+                    <path d="M10 16s.8 1 2 1c1.3 0 2-1 2-1" />
+                  </svg>
+                </Button>
+              </div>
 
               {/* Right side actions */}
               {newMessage.trim() || previewMedia ? (

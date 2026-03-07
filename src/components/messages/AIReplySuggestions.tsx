@@ -43,20 +43,11 @@ export const AIReplySuggestions = ({
   });
 
   const generateSuggestions = async () => {
-    if (!hasEnoughCredits) {
-      toast({
-        title: 'Insufficient Credits',
-        description: `You need ${CREDIT_COST} credit for AI suggestions. Current balance: ${balance}`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
     setSuggestions([]);
 
     try {
-      // Deduct credits first
+      // Try to deduct credits — the server will check balance accurately
       const canProceed = await checkAndDeductCredits();
       if (!canProceed) {
         setIsLoading(false);
