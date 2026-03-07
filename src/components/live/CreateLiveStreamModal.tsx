@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Calendar, Radio, Clock, Swords, Hash, X, Lock, Globe, Shield } from "lucide-react";
+import { Video, Sparkles, Crown, Calendar, Radio, Clock, Swords, Hash, X, Lock, Globe, Shield, Flame, Gamepad2, Zap, Heart } from "lucide-react";
 import { CoverImageUpload } from "@/components/live/shared/CoverImageUpload";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { useNavigation } from "@/context/NavigationContext";
@@ -55,6 +55,12 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
+
+  // Feature toggles
+  const [featureHype, setFeatureHype] = useState(true);
+  const [featureCoPilot, setFeatureCoPilot] = useState(true);
+  const [featureAIPulse, setFeatureAIPulse] = useState(true);
+  const [featureChatReactions, setFeatureChatReactions] = useState(true);
 
   const addHashtag = (raw: string) => {
     const tag = raw.trim().replace(/^#/, '').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
@@ -143,6 +149,13 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       const effectiveRoomType: RoomType = streamMode === 'solo' ? 'video_broadcast' : 'pk_battle';
       const pkMaxSlots = streamMode === 'pk-4' ? 4 : 2;
 
+      const streamFeatures = {
+        hype_system: featureHype,
+        copilot_tools: featureCoPilot,
+        ai_pulse: featureAIPulse,
+        chat_reactions: featureChatReactions,
+      };
+
       const { data, error } = await supabase
         .from("live_streams")
         .insert({
@@ -162,6 +175,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           cover_image_url: coverImageUrl,
           is_private: isPrivate,
           share_link: Math.floor(100000 + Math.random() * 900000).toString(),
+          stream_features: streamFeatures,
         } as any)
         .select()
         .single();
@@ -185,6 +199,10 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setStreamMode('solo');
       setCoverImageUrl(null);
       setIsPrivate(false);
+      setFeatureHype(true);
+      setFeatureCoPilot(true);
+      setFeatureAIPulse(true);
+      setFeatureChatReactions(true);
     } catch (error: any) {
       console.error("Error creating stream:", error);
       toast.error(error.message || "Failed to create stream");
