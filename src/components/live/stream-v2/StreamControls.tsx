@@ -91,13 +91,15 @@ export const StreamControls = ({
           </div>
         </form>
 
-        {/* React */}
-        <button
-          onClick={onReact}
-          className="w-8 h-8 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
-        >
-          <Heart className="w-3.5 h-3.5 text-rose-400" />
-        </button>
+        {/* React — hidden if disabled */}
+        {onReact && (
+          <button
+            onClick={onReact}
+            className="w-8 h-8 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+          >
+            <Heart className="w-3.5 h-3.5 text-rose-400" />
+          </button>
+        )}
 
         {/* Refill credits */}
         <button
