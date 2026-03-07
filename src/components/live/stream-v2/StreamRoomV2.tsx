@@ -769,6 +769,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       <StreamControls
         replyText={replyText} onReplyTextChange={setReplyText} onSubmit={handleReplySubmit}
         onReact={() => setShowReactions(true)} onRefill={() => setShowRefill(true)}
+        onGift={() => setShowStreamGiftModal(true)}
         isPKMode={isPKMode} battleParticipants={battleParticipants}
         interactionTargetId={interactionTargetId} onSetTarget={setInteractionTargetId}
       />
