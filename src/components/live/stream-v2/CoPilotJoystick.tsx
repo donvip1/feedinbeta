@@ -40,13 +40,13 @@ export const CoPilotJoystick = ({
   };
 
   return (
-    <div className="absolute bottom-40 left-3 z-30">
+    <div className="absolute bottom-32 left-3 z-30">
       <AnimatePresence>
         {isOpen && (
           <>
             {MENU_ITEMS.map((item, index) => {
-              const angle = -90 + (index * 45); // spread upward
-              const radius = 60;
+              const angle = -90 + (index * 40);
+              const radius = 50;
               const x = Math.cos((angle * Math.PI) / 180) * radius;
               const y = Math.sin((angle * Math.PI) / 180) * radius;
 
@@ -54,17 +54,17 @@ export const CoPilotJoystick = ({
                 <motion.button
                   key={item.id}
                   initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
-                  animate={{ opacity: 1, x, y: y - 20, scale: 1 }}
+                  animate={{ opacity: 1, x, y: y - 16, scale: 1 }}
                   exit={{ opacity: 0, x: 0, y: 0, scale: 0 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 20, delay: index * 0.05 }}
                   onClick={() => handleAction(item.id)}
                   className={cn(
-                    'absolute w-11 h-11 rounded-full flex flex-col items-center justify-center backdrop-blur-xl border border-white/10 active:scale-90 transition-transform',
+                    'absolute w-9 h-9 rounded-full flex flex-col items-center justify-center backdrop-blur-xl border border-white/10 active:scale-90 transition-transform',
                     item.bg
                   )}
                 >
-                  <item.icon className={cn('w-4 h-4', item.color)} />
-                  <span className={cn('text-[7px] font-bold mt-0.5', item.color)}>{item.label}</span>
+                  <item.icon className={cn('w-3.5 h-3.5', item.color)} />
+                  <span className={cn('text-[6px] font-bold mt-0.5', item.color)}>{item.label}</span>
                 </motion.button>
               );
             })}
@@ -77,16 +77,16 @@ export const CoPilotJoystick = ({
         onClick={() => setIsOpen(!isOpen)}
         whileTap={{ scale: 0.9 }}
         className={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center backdrop-blur-xl border transition-all relative z-10',
+          'w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-xl border transition-all relative z-10',
           isOpen
             ? 'bg-white/20 border-white/30 rotate-45'
             : 'bg-black/40 border-white/10'
         )}
       >
         {isOpen ? (
-          <X className="w-4 h-4 text-white" />
+          <X className="w-3.5 h-3.5 text-white" />
         ) : (
-          <Gamepad2 className="w-4 h-4 text-cyan-400" />
+          <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
         )}
       </motion.button>
     </div>

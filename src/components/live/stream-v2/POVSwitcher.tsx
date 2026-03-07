@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Users, Camera, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStreamStore } from '@/stores/useStreamStore';
@@ -35,7 +34,7 @@ export const POVSwitcher = ({ angles, onSelectAngle }: POVSwitcherProps) => {
   };
 
   return (
-    <div className="absolute bottom-24 right-4 z-30 flex flex-col gap-4 pointer-events-auto">
+    <div className="absolute bottom-32 right-3 z-30 flex flex-col gap-2 pointer-events-auto">
       {angles.map((angle, index) => {
         const Icon = ANGLE_ICONS[index] || Camera;
         const isActive = (activeAngleId || angles[0]?.id) === angle.id;
@@ -46,13 +45,13 @@ export const POVSwitcher = ({ angles, onSelectAngle }: POVSwitcherProps) => {
             onClick={() => handleSelect(angle.id)}
             whileTap={{ scale: 0.9 }}
             className={cn(
-              'w-14 h-14 rounded-2xl border-2 transition-all flex items-center justify-center backdrop-blur-3xl',
+              'w-10 h-10 rounded-xl border-2 transition-all flex items-center justify-center backdrop-blur-3xl',
               isActive
-                ? 'border-yellow-400 bg-yellow-400/20 scale-110 shadow-[0_0_20px_rgba(234,179,8,0.4)]'
+                ? 'border-yellow-400 bg-yellow-400/20 scale-110 shadow-[0_0_15px_rgba(234,179,8,0.4)]'
                 : 'border-white/10 bg-black/40'
             )}
           >
-            <Icon size={20} className={isActive ? 'text-yellow-400' : 'text-white/60'} />
+            <Icon size={16} className={isActive ? 'text-yellow-400' : 'text-white/60'} />
           </motion.button>
         );
       })}
