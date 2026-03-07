@@ -1789,34 +1789,22 @@ export const ModernChatInterface = ({
                 disabled={sending || uploadingFile}
               />
 
-              {/* Emoji - always visible */}
-              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
-                  >
-                    <Smile className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2 rounded-2xl" align="end" side="top" sideOffset={8}>
-                  <div className="flex gap-1">
-                    {EMOJI_QUICK.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setNewMessage(prev => prev + emoji);
-                          handleTyping('typing');
-                        }}
-                        className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+              {/* Emoji button - opens full keyboard */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 rounded-full shrink-0",
+                  showEmojiKeyboard ? "text-primary bg-primary/10" : "hover:bg-primary/10"
+                )}
+                onClick={() => {
+                  setShowEmojiKeyboard(!showEmojiKeyboard);
+                  if (showStickerPicker) setShowStickerPicker(false);
+                  handleTyping('emoji');
+                }}
+              >
+                <Smile className="w-4 h-4 text-muted-foreground" />
+              </Button>
 
               {/* Sticker button - hides while typing */}
               <div className={cn(
