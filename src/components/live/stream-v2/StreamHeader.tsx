@@ -15,6 +15,7 @@ interface StreamHeaderProps {
   onSettings: () => void;
   onMinimize: () => void;
   onEnd: () => void;
+  showAIPulse?: boolean;
 }
 
 const formatNumber = (num: number) => num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num.toString();
@@ -33,6 +34,7 @@ export const StreamHeader = ({
   onSettings,
   onMinimize,
   onEnd,
+  showAIPulse = true,
 }: StreamHeaderProps) => {
   return (
     <div
@@ -69,7 +71,7 @@ export const StreamHeader = ({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        <AICatchUpPanel streamId={streamId} />
+        {showAIPulse && <AICatchUpPanel streamId={streamId} />}
 
         <button
           onClick={onSettings}

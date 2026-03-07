@@ -4326,6 +4326,7 @@ export type Database = {
           share_link: string | null
           started_at: string | null
           status: string
+          stream_features: Json | null
           stream_key: string
           stream_ready: boolean | null
           tags: string[] | null
@@ -4363,6 +4364,7 @@ export type Database = {
           share_link?: string | null
           started_at?: string | null
           status?: string
+          stream_features?: Json | null
           stream_key: string
           stream_ready?: boolean | null
           tags?: string[] | null
@@ -4400,6 +4402,7 @@ export type Database = {
           share_link?: string | null
           started_at?: string | null
           status?: string
+          stream_features?: Json | null
           stream_key?: string
           stream_ready?: boolean | null
           tags?: string[] | null

@@ -67,7 +67,8 @@ interface StreamRoomV2Props {
 // Types
 interface GiftAnimation { id: string; emoji: string; senderName: string; receiverName: string; value: number; }
 interface Viewer { id: string; user_id: string; role: string; is_muted: boolean; has_raised_hand: boolean; is_co_broadcaster?: boolean; is_mic_on?: boolean; host_muted?: boolean; profile?: { display_name: string; username: string; avatar_url: string; is_verified?: boolean; }; }
-interface StreamData { id: string; title: string; description: string; user_id: string; status: string; viewer_count: number; category?: string; started_at?: string; cover_image_url?: string; room_type?: string; pk_max_slots?: number; }
+interface StreamFeatures { hype_system?: boolean; copilot_tools?: boolean; ai_pulse?: boolean; chat_reactions?: boolean; }
+interface StreamData { id: string; title: string; description: string; user_id: string; status: string; viewer_count: number; category?: string; started_at?: string; cover_image_url?: string; room_type?: string; pk_max_slots?: number; stream_features?: StreamFeatures; }
 interface FloatingReaction { id: string; emoji: string; left: number; displayName?: string; }
 interface FloatingGiftReaction { id: string | number; type: string; senderName?: string; emoji?: string; }
 interface Reply { id: string; user_id: string; user: string; handle: string; time: string; text: string; avatar: string; likes: number; liked_by_me: boolean; isGift?: boolean; }
@@ -157,6 +158,13 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const isHost = stream?.user_id === user?.id;
   const isPKMode = stream?.room_type === 'pk_battle';
   const pkMaxSlots = (stream as any)?.pk_max_slots || 2;
+
+  // Feature flags from stream settings (with PK mode defaults)
+  const features = stream?.stream_features || {} as StreamFeatures;
+  const showHype = (features.hype_system !== false) && !isPKMode; // auto-hide in PK
+  const showCoPilot = (features.copilot_tools !== false) && !isPKMode; // auto-hide in PK
+  const showAIPulse = features.ai_pulse !== false;
+  const showChatReactions = features.chat_reactions !== false;
 
   // Camera angles for POV switcher
   const cameraAngles = [
@@ -675,6 +683,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
         onGift={() => setShowStreamGiftModal(true)} onShare={() => setShowShare(true)}
         onSettings={() => setShowSettings(true)} onMinimize={handleMinimize}
         onEnd={isHost ? handleEndStream : handleViewerLeave}
+        showAIPulse={showAIPulse}
       />
 
       {/* PK Score Bar */}
@@ -705,19 +714,21 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
         </div>
       )}
 
-      {/* Co-Pilot Joystick (host only) */}
-      <CoPilotJoystick
-        isHost={isHost}
-        onCreatePoll={() => setShowPollCreator(true)}
-        onLightTrigger={handleLightTrigger}
-        onSoundTrigger={handleSoundTrigger}
-        onPredictiveBet={() => setShowPrediction(true)}
-      />
+      {/* Co-Pilot Joystick (host only, hidden in PK by default) */}
+      {showCoPilot && (
+        <CoPilotJoystick
+          isHost={isHost}
+          onCreatePoll={() => setShowPollCreator(true)}
+          onLightTrigger={handleLightTrigger}
+          onSoundTrigger={handleSoundTrigger}
+          onPredictiveBet={() => setShowPrediction(true)}
+        />
+      )}
 
-      {/* Hype system overlays */}
-      <HypeParticles />
-      <HypeMeter />
-      <EventTicker latestEvent={latestTickerEvent} />
+      {/* Hype system overlays (hidden in PK by default) */}
+      {showHype && <HypeParticles />}
+      {showHype && <HypeMeter />}
+      {showHype && <EventTicker latestEvent={latestTickerEvent} />}
       <LightFlashOverlay isFlashing={isLightFlashing} />
 
       {/* POV Switcher */}
@@ -768,7 +779,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       {/* Bottom controls */}
       <StreamControls
         replyText={replyText} onReplyTextChange={setReplyText} onSubmit={handleReplySubmit}
-        onReact={() => setShowReactions(true)} onRefill={() => setShowRefill(true)}
+        onReact={showChatReactions ? () => setShowReactions(true) : undefined} onRefill={() => setShowRefill(true)}
         onGift={() => setShowStreamGiftModal(true)}
         isPKMode={isPKMode} battleParticipants={battleParticipants}
         interactionTargetId={interactionTargetId} onSetTarget={setInteractionTargetId}
