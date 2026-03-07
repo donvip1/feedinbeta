@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
-  Gift, Sparkles, Clock, BellOff, Bell, Plus, Camera
+  Gift, Sparkles, Clock, BellOff, Bell, Plus, Camera, Sticker
 } from 'lucide-react';
 import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ScheduleMessageModal } from './ScheduleMessageModal';
