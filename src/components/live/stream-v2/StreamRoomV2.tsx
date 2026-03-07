@@ -22,6 +22,11 @@ import { StreamControls } from './StreamControls';
 import { GiftOverlay } from './GiftOverlay';
 import { StreamGuests } from './StreamGuests';
 import { PollSystem } from './PollSystem';
+import { HypeParticles } from './HypeParticles';
+import { HypeMeter } from './HypeMeter';
+import { EventTicker } from './EventTicker';
+import { LightFlashOverlay } from './LightFlashOverlay';
+import { PredictionSystem } from './PredictionSystem';
 import {
   ShareSheet, SettingsSheet, ReactionPicker,
   InStreamGiftSheet, InviteModal,
@@ -37,6 +42,22 @@ import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { InStreamRechargeSheet } from '../InStreamRechargeSheet';
 import { useStreamStore } from '@/stores/useStreamStore';
 import type { PKParticipant } from '../unified/PKBattleBar';
+
+// Audio context for sound triggers
+let audioCtx: AudioContext | null = null;
+const playTriggerSound = () => {
+  if (!audioCtx) audioCtx = new AudioContext();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.5);
+};
 
 interface StreamRoomV2Props {
   streamId: string;
@@ -69,6 +90,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const { createBattle, sendChallenge } = usePKBattle(streamId);
   const updateStreak = useStreamStore((s) => s.updateStreak);
   const resetStream = useStreamStore((s) => s.resetStream);
+  const boostHype = useStreamStore((s) => s.boostHype);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -94,6 +116,9 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const [showReactions, setShowReactions] = useState(false);
   const [showRefill, setShowRefill] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showPrediction, setShowPrediction] = useState(false);
+  const [isLightFlashing, setIsLightFlashing] = useState(false);
+  const [latestTickerEvent, setLatestTickerEvent] = useState<string | undefined>();
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
   const [inviteSearching, setInviteSearching] = useState(false);
@@ -243,6 +268,13 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       })
       .on('broadcast', { event: 'co_broadcast_invite' }, (payload: any) => {
         if (payload.payload?.user_id === user?.id) { toast.success('You have been invited to co-broadcast!'); fetchViewers(); }
+      })
+      .on('broadcast', { event: 'light_flash' }, () => {
+        setIsLightFlashing(true);
+        setTimeout(() => setIsLightFlashing(false), 600);
+      })
+      .on('broadcast', { event: 'sound_effect' }, () => {
+        playTriggerSound();
       }).subscribe();
 
     // Poll channel
@@ -424,6 +456,8 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   };
 
   const handleGiftEvent = async (giftData: any) => {
+    boostHype(10);
+    setLatestTickerEvent(`💎 ${giftData.gift_type?.toUpperCase() || 'GIFT'} RECEIVED!`);
     if (giftData.receiver_id === stream?.user_id) setHostGiftTotal(prev => prev + (giftData.credit_value || 0));
     if (isPKMode) setBattleParticipants(prev => prev.map(p => p.id === giftData.receiver_id ? { ...p, score: p.score + (giftData.credit_value || 0) } : p));
 
@@ -486,6 +520,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
 
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
+    boostHype(5);
     const myName = viewers.find(v => v.user_id === user?.id)?.profile?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
     reactionsChannelRef.current?.send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id: user?.id, display_name: myName } });
@@ -505,6 +540,22 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
     chatChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: { id: optimisticMsg.id, user_id: user.id, content, display_name: displayName, username, avatar_url: avatarUrl } });
     supabase.from('live_stream_messages').insert({ stream_id: streamId, user_id: user.id, content } as any);
     setReplyText('');
+    boostHype(2);
+  };
+
+  const handleLightTrigger = () => {
+    setIsLightFlashing(true);
+    setTimeout(() => setIsLightFlashing(false), 600);
+    supabase.channel(`stream-events-${streamId}`).send({ type: 'broadcast', event: 'light_flash', payload: {} });
+    setLatestTickerEvent('⚡️ LIGHT TRIGGER ACTIVATED!');
+    boostHype(3);
+  };
+
+  const handleSoundTrigger = () => {
+    playTriggerSound();
+    supabase.channel(`stream-events-${streamId}`).send({ type: 'broadcast', event: 'sound_effect', payload: {} });
+    setLatestTickerEvent('🔊 SOUND TRIGGER FIRED!');
+    boostHype(3);
   };
 
   const handleSendStreamGift = async (gift: typeof STREAM_GIFTS[0]) => {
@@ -655,7 +706,19 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       )}
 
       {/* Co-Pilot Joystick (host only) */}
-      <CoPilotJoystick isHost={isHost} onCreatePoll={() => setShowPollCreator(true)} />
+      <CoPilotJoystick
+        isHost={isHost}
+        onCreatePoll={() => setShowPollCreator(true)}
+        onLightTrigger={handleLightTrigger}
+        onSoundTrigger={handleSoundTrigger}
+        onPredictiveBet={() => setShowPrediction(true)}
+      />
+
+      {/* Hype system overlays */}
+      <HypeParticles />
+      <HypeMeter />
+      <EventTicker latestEvent={latestTickerEvent} />
+      <LightFlashOverlay isFlashing={isLightFlashing} />
 
       {/* POV Switcher */}
       <POVSwitcher angles={cameraAngles} onSelectAngle={handlePOVSelect} />
@@ -706,6 +769,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
       <StreamControls
         replyText={replyText} onReplyTextChange={setReplyText} onSubmit={handleReplySubmit}
         onReact={() => setShowReactions(true)} onRefill={() => setShowRefill(true)}
+        onGift={() => setShowStreamGiftModal(true)}
         isPKMode={isPKMode} battleParticipants={battleParticipants}
         interactionTargetId={interactionTargetId} onSetTarget={setInteractionTargetId}
       />
@@ -733,6 +797,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
           setInviteUsername(''); setInviteSearchResults([]);
         }} />
       <PollSystem isOpen={showPollCreator} onClose={() => setShowPollCreator(false)} streamId={streamId} />
+      <PredictionSystem isOpen={showPrediction} onClose={() => setShowPrediction(false)} streamId={streamId} isHost={isHost} userCredits={userCredits} />
 
       {showGiftModal && (
         <LiveGiftModal isOpen={showGiftModal} onClose={() => setShowGiftModal(false)} streamId={streamId}

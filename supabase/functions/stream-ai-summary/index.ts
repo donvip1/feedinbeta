@@ -25,7 +25,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch last 15 minutes of chat messages
     const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const { data: messages, error: msgError } = await supabase
       .from("live_stream_messages")
@@ -35,20 +34,17 @@ serve(async (req) => {
       .order("created_at", { ascending: true })
       .limit(200);
 
-    if (msgError) {
-      console.error("Error fetching messages:", msgError);
-    }
+    if (msgError) console.error("Error fetching messages:", msgError);
 
     const chatLog = (messages || []).map((m: any) => m.content).join("\n");
 
     if (!chatLog.trim()) {
       return new Response(
-        JSON.stringify({ bullets: ["No recent chat activity to summarize."], pinnedLinks: [] }),
+        JSON.stringify({ bullets: ["No recent chat activity to summarize."], pinnedLinks: [], hotTopic: "", sentimentScore: 50, sentimentLabel: "Neutral" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Call Lovable AI with tool calling for structured output
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -60,11 +56,11 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You are a live stream assistant. Summarize chat conversations into concise bullet points and extract any URLs mentioned.",
+            content: "You are a live stream analytics assistant. Analyze chat conversations to provide summaries, sentiment analysis, trending topics, and extract URLs.",
           },
           {
             role: "user",
-            content: `Summarize the following live stream chat from the last 15 minutes into 3 key bullet points. Also extract any URLs/links mentioned.\n\nChat log:\n${chatLog}`,
+            content: `Analyze the following live stream chat from the last 15 minutes. Provide:\n1. 3 concise bullet point summaries\n2. The dominant hot topic being discussed\n3. Overall sentiment score (0-100) and label (Positive/Neutral/Negative)\n4. Any URLs/links mentioned\n\nChat log:\n${chatLog}`,
           },
         ],
         tools: [
@@ -72,7 +68,7 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "stream_summary",
-              description: "Return a structured summary of the live stream chat",
+              description: "Return a structured analysis of the live stream chat",
               parameters: {
                 type: "object",
                 properties: {
@@ -86,8 +82,21 @@ serve(async (req) => {
                     items: { type: "string" },
                     description: "URLs or links mentioned in the chat",
                   },
+                  hotTopic: {
+                    type: "string",
+                    description: "The dominant topic being discussed, as a short compelling sentence",
+                  },
+                  sentimentScore: {
+                    type: "number",
+                    description: "Overall chat sentiment score from 0-100 (0=very negative, 100=very positive)",
+                  },
+                  sentimentLabel: {
+                    type: "string",
+                    enum: ["Positive", "Neutral", "Negative"],
+                    description: "Overall sentiment label",
+                  },
                 },
-                required: ["bullets", "pinnedLinks"],
+                required: ["bullets", "pinnedLinks", "hotTopic", "sentimentScore", "sentimentLabel"],
                 additionalProperties: false,
               },
             },
@@ -100,14 +109,12 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited, try again later" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (aiResponse.status === 402) {
         return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await aiResponse.text();
@@ -125,10 +132,9 @@ serve(async (req) => {
       });
     }
 
-    // Fallback if no tool call
     const fallbackContent = aiData.choices?.[0]?.message?.content || "";
     return new Response(
-      JSON.stringify({ bullets: [fallbackContent || "Unable to generate summary."], pinnedLinks: [] }),
+      JSON.stringify({ bullets: [fallbackContent || "Unable to generate summary."], pinnedLinks: [], hotTopic: "", sentimentScore: 50, sentimentLabel: "Neutral" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

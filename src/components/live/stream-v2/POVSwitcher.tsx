@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid } from 'lucide-react';
+import { Users, Camera, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStreamStore } from '@/stores/useStreamStore';
 
@@ -17,8 +17,13 @@ interface POVSwitcherProps {
   onSelectAngle: (angleId: string) => void;
 }
 
+const ANGLE_ICONS: Record<number, React.ElementType> = {
+  0: Users,
+  1: Camera,
+  2: Trophy,
+};
+
 export const POVSwitcher = ({ angles, onSelectAngle }: POVSwitcherProps) => {
-  const [isOpen, setIsOpen] = useState(false);
   const activeAngleId = useStreamStore((s) => s.activeAngleId);
   const setActiveAngleId = useStreamStore((s) => s.setActiveAngleId);
 
@@ -27,60 +32,30 @@ export const POVSwitcher = ({ angles, onSelectAngle }: POVSwitcherProps) => {
   const handleSelect = (id: string) => {
     setActiveAngleId(id);
     onSelectAngle(id);
-    setIsOpen(false);
   };
 
   return (
-    <div className="absolute bottom-40 right-3 z-30">
-      {/* Toggle button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center backdrop-blur-xl border transition-all active:scale-90',
-          isOpen
-            ? 'bg-white/20 border-white/30'
-            : 'bg-black/40 border-white/10'
-        )}
-      >
-        <LayoutGrid className="w-4 h-4 text-white" />
-      </button>
+    <div className="absolute bottom-24 right-4 z-30 flex flex-col gap-4 pointer-events-auto">
+      {angles.map((angle, index) => {
+        const Icon = ANGLE_ICONS[index] || Camera;
+        const isActive = (activeAngleId || angles[0]?.id) === angle.id;
 
-      {/* Thumbnail rail */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="absolute bottom-12 right-0 flex flex-col gap-2 p-2 bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10"
+        return (
+          <motion.button
+            key={angle.id}
+            onClick={() => handleSelect(angle.id)}
+            whileTap={{ scale: 0.9 }}
+            className={cn(
+              'w-14 h-14 rounded-2xl border-2 transition-all flex items-center justify-center backdrop-blur-3xl',
+              isActive
+                ? 'border-yellow-400 bg-yellow-400/20 scale-110 shadow-[0_0_20px_rgba(234,179,8,0.4)]'
+                : 'border-white/10 bg-black/40'
+            )}
           >
-            {angles.map((angle) => (
-              <button
-                key={angle.id}
-                onClick={() => handleSelect(angle.id)}
-                className={cn(
-                  'relative w-20 h-14 rounded-lg overflow-hidden border-2 transition-all active:scale-95',
-                  (activeAngleId || angles[0]?.id) === angle.id
-                    ? 'border-rose-500 ring-1 ring-rose-500/50'
-                    : 'border-white/10'
-                )}
-              >
-                {angle.thumbnailUrl ? (
-                  <img src={angle.thumbnailUrl} alt={angle.label} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-white/5 flex items-center justify-center">
-                    <span className="text-white/40 text-[10px] font-bold">{angle.label}</span>
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                  <span className="text-[8px] text-white/80 font-medium truncate block">{angle.label}</span>
-                </div>
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <Icon size={20} className={isActive ? 'text-yellow-400' : 'text-white/60'} />
+          </motion.button>
+        );
+      })}
     </div>
   );
 };

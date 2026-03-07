@@ -19,6 +19,9 @@ export interface StreamPoll {
 export interface AISummary {
   bullets: string[];
   pinnedLinks: string[];
+  hotTopic?: string;
+  sentimentScore?: number;
+  sentimentLabel?: string;
   generatedAt: string;
   loading: boolean;
 }
@@ -38,6 +41,10 @@ export interface StreamStoreState {
   // AI Catch-Me-Up
   aiSummary: AISummary | null;
   setAISummary: (summary: AISummary | null) => void;
+
+  // Hype
+  hypeLevel: number;
+  boostHype: (amount: number) => void;
 
   // Live Streak
   streaks: Record<string, { hostId: string; lastWatched: string; count: number }>;
@@ -78,6 +85,9 @@ export const useStreamStore = create<StreamStoreState>()(
       aiSummary: null,
       setAISummary: (summary) => set({ aiSummary: summary }),
 
+      hypeLevel: 0,
+      boostHype: (amount) => set((s) => ({ hypeLevel: Math.min(s.hypeLevel + amount, 100) })),
+
       streaks: {},
       updateStreak: (hostId) =>
         set((s) => {
@@ -116,6 +126,7 @@ export const useStreamStore = create<StreamStoreState>()(
           activeAngleId: null,
           polls: [],
           aiSummary: null,
+          hypeLevel: 0,
         }),
     }),
     {
