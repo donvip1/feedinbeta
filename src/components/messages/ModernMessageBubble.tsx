@@ -11,6 +11,8 @@ import { MessageContextMenu } from './MessageContextMenu';
 import { cn } from '@/lib/utils';
 import { getEmojiSizeClass, isEmojiOnly } from '@/lib/emoji-utils';
 import { LinkPreviewCard } from './LinkPreviewCard';
+import { useStickerStore } from '@/stores/stickerStore';
+import { toast } from 'sonner';
 
 interface MessageBubbleProps {
   message: {
@@ -308,41 +310,13 @@ export const ModernMessageBubble = ({
 
           {/* STICKER: Render without bubble frame */}
           {isSticker ? (
-            <div className="relative">
-              <div
-                onClick={handleBubbleClick}
-                onContextMenu={handleContextMenu}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-                className="cursor-pointer active:scale-95 transition-transform select-none"
-              >
-                <img
-                  src={message.media_url!}
-                  alt="Sticker"
-                  className="w-[140px] h-[140px] object-contain drop-shadow-md"
-                  loading="lazy"
-                />
-                {/* Time below sticker */}
-                <div className={cn(
-                  "flex items-center gap-1 mt-0.5",
-                  isOwn ? 'justify-end' : 'justify-start'
-                )}>
-                  <span className="text-[10px] text-muted-foreground">
-                    {formatTime(message.created_at)}
-                  </span>
-                  {isOwn && (
-                    <span className={cn(
-                      "transition-colors",
-                      message.status === 'read' ? 'text-sky-300' : 'text-muted-foreground/50'
-                    )}>
-                      {message.status === 'sending' && <Check className="w-3.5 h-3.5" />}
-                      {message.status === 'sent' && <Check className="w-3.5 h-3.5" />}
-                      {message.status === 'delivered' && <CheckCheck className="w-3.5 h-3.5" />}
-                      {message.status === 'read' && <CheckCheck className="w-3.5 h-3.5" />}
-                    </span>
-                  )}
-                </div>
-              </div>
+            <StickerMessage
+              message={message}
+              isOwn={isOwn}
+              formatTime={formatTime}
+              onContextMenu={handleContextMenu}
+              handleBubbleClick={handleBubbleClick}
+            />
 
               {/* Reactions */}
               {message.reactions && message.reactions.length > 0 && (
