@@ -1,0 +1,1 @@
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS stream_features jsonb DEFAULT '{"hype_system": true, "copilot_tools": true, "ai_pulse": true, "chat_reactions": true}'::jsonb;
