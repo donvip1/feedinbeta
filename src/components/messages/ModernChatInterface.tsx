@@ -1268,86 +1268,82 @@ export const ModernChatInterface = ({
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-gradient-to-b from-background to-background/95 overflow-hidden">
-      {/* Header - Flex shrink 0 to stay at top */}
-      <header className="flex-shrink-0 flex items-center gap-2 px-2 py-2 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[52px]">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="md:hidden shrink-0 h-8 w-8 hover:bg-primary/10"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        
-        <div 
-          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer overflow-hidden"
-          onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
-        >
-          <div className="relative shrink-0">
-            <Avatar className="w-9 h-9 ring-2 ring-primary/20">
-              <AvatarImage src={otherUser?.avatar_url || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
-                {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            {isOnline && (
-              <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-                currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
-              )} />
-            )}
-          </div>
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <h2 className="font-semibold truncate text-sm flex items-center gap-1">{otherUser?.display_name || 'Loading...'} {otherUser?.id && <VerifiedBadge userId={otherUser.id} size="sm" />}</h2>
-            <p className="text-xs text-muted-foreground truncate">
-              {isTyping ? (
-                <span className="text-primary flex items-center gap-1 animate-pulse">
-                  {getActivityIcon(activityType)}
-                  {getActivityText(activityType)}
-                </span>
-              ) : isOnline ? (
-                <span className={currentSection === 'messages' ? 'text-blue-500' : 'text-emerald-500'}>
-                  {currentSection === 'messages' ? 'Active now' : 'Online'}
-                </span>
-              ) : lastSeen ? (
-                `last seen ${formatLastSeen(lastSeen)}`
-              ) : (
-                <span className="text-gray-400">Offline</span>
+      {/* Header - Glassmorphic premium style */}
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-md z-50 min-h-[56px]">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="md:hidden shrink-0 h-9 w-9 -ml-2 rounded-full hover:bg-muted"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div 
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
+          >
+            <div className="relative shrink-0">
+              <Avatar className="w-10 h-10 ring-2 ring-border">
+                <AvatarImage src={otherUser?.avatar_url || ''} />
+                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
+                  {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              {isOnline && (
+                <div className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+                  currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
+                )} />
               )}
-            </p>
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm leading-tight truncate flex items-center gap-1">
+                {otherUser?.display_name || 'Loading...'} 
+                {otherUser?.id && <VerifiedBadge userId={otherUser.id} size="sm" />}
+              </h3>
+              <p className="text-[10px] font-medium truncate">
+                {isTyping ? (
+                  <span className="text-primary flex items-center gap-1 animate-pulse">
+                    {getActivityIcon(activityType)}
+                    {getActivityText(activityType)}
+                  </span>
+                ) : isOnline ? (
+                  <span className={currentSection === 'messages' ? 'text-blue-500' : 'text-emerald-500'}>
+                    {currentSection === 'messages' ? 'Active now' : 'Online'}
+                  </span>
+                ) : lastSeen ? (
+                  <span className="text-muted-foreground">{`last seen ${formatLastSeen(lastSeen)}`}</span>
+                ) : (
+                  <span className="text-muted-foreground">Offline</span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Action buttons - Always visible, never shrink */}
-        <div className="flex items-center gap-0.5 shrink-0">
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
-            onClick={() => initiateCall('voice')}
-          >
-            <Phone className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
             onClick={() => initiateCall('video')}
           >
-            <Video className="w-4 h-4" />
+            <Video className="w-[18px] h-[18px]" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted"
+            onClick={() => initiateCall('voice')}
+          >
+            <Phone className="w-[18px] h-[18px]" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10">
-                <MoreVertical className="w-4 h-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted">
+                <MoreVertical className="w-[18px] h-[18px]" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
@@ -1634,158 +1630,155 @@ export const ModernChatInterface = ({
         </div>
       )}
 
-      {/* AI Reply Suggestions */}
-      {showAiSuggestions && messages.length > 0 && !showVoiceRecorder && user && (
-        <div className="flex-shrink-0 px-3 pt-2 pb-0 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40">
-          <AIReplySuggestions
-            conversationId={conversationId}
-            lastMessages={messages.slice(-5).map(m => ({
-              content: m.content,
-              sender_id: m.sender_id
-            }))}
-            currentUserId={user.id}
-            onSelectSuggestion={(suggestion) => {
-              setNewMessage(suggestion);
-              setShowAiSuggestions(false);
-            }}
-            onClose={() => setShowAiSuggestions(false)}
-          />
-        </div>
-      )}
-
-      {/* Input Area - At bottom in flex layout */}
+      {/* Input Area - Premium style */}
       {!showVoiceRecorder && (
-        <div className="flex-shrink-0 p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <div className="flex items-end gap-2">
-            <AttachmentPicker onFileSelect={handleFileSelect} />
-            
-            {/* Gift Button */}
-            {otherUser?.id && (
-              <ChatGiftButton 
-                recipientId={otherUser.id} 
-                recipientName={otherUser.display_name || 'User'}
-                recipientAvatar={otherUser.avatar_url}
+        <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-t border-border/50 z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
+          {/* AI Reply Suggestions - inside footer */}
+          {showAiSuggestions && messages.length > 0 && user && (
+            <div className="px-3 pt-2 pb-0">
+              <AIReplySuggestions
                 conversationId={conversationId}
+                lastMessages={messages.slice(-5).map(m => ({
+                  content: m.content,
+                  sender_id: m.sender_id
+                }))}
+                currentUserId={user.id}
+                onSelectSuggestion={(suggestion) => {
+                  setNewMessage(suggestion);
+                  setShowAiSuggestions(false);
+                }}
+                onClose={() => setShowAiSuggestions(false)}
               />
-            )}
-            
-            <div className="flex-1 relative">
-              <Input
-                ref={inputRef}
-                placeholder="Type a message..."
-                value={newMessage}
-                onFocus={() => {
-                  handleTyping('focused');
-                  // Scroll to bottom when input is focused to keep messages visible
-                  setTimeout(() => {
-                    scrollToBottom();
-                  }, 300);
-                }}
-                onBlur={() => {
-                  if (!newMessage.trim()) stopTyping();
-                }}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  if (e.target.value.trim()) {
-                    handleTyping('typing');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (previewMedia) {
-                      handleSend(previewMedia.url, previewMedia.type);
-                    } else {
-                      handleSend();
-                    }
-                  }
-                }}
-                className="pr-10 rounded-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
-                disabled={sending || uploadingFile}
-              />
-              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-primary/10"
-                  >
-                    <Smile className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
-                  <div className="flex gap-1">
-                    {EMOJI_QUICK.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setNewMessage(prev => prev + emoji);
-                          handleTyping('typing');
-                        }}
-                        className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
             </div>
-
-            {newMessage.trim() || previewMedia ? (
-              <div className="flex items-center gap-1">
-                {/* Schedule Button - only show for text messages */}
-                {newMessage.trim() && !previewMedia && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 rounded-full hover:bg-primary/10"
-                    onClick={() => setShowScheduleModal(true)}
-                    title="Schedule message"
-                  >
-                    <Clock className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  className="shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
-                  onClick={() => {
-                    if (previewMedia) {
-                      handleSend(previewMedia.url, previewMedia.type);
-                    } else {
-                      handleSend();
+          )}
+          
+          <div className="p-3 flex flex-col gap-3">
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <AttachmentPicker onFileSelect={handleFileSelect} />
+              </div>
+              
+              {/* Gift Button */}
+              {otherUser?.id && (
+                <ChatGiftButton 
+                  recipientId={otherUser.id} 
+                  recipientName={otherUser.display_name || 'User'}
+                  recipientAvatar={otherUser.avatar_url}
+                  conversationId={conversationId}
+                />
+              )}
+              
+              <div className="flex-1 bg-muted/50 rounded-2xl p-1.5 flex items-end border border-transparent focus-within:border-primary/30">
+                <Input
+                  ref={inputRef}
+                  placeholder="Message..."
+                  value={newMessage}
+                  onFocus={() => {
+                    handleTyping('focused');
+                    setTimeout(() => scrollToBottom(), 300);
+                  }}
+                  onBlur={() => {
+                    if (!newMessage.trim()) stopTyping();
+                  }}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    if (e.target.value.trim()) handleTyping('typing');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (previewMedia) {
+                        handleSend(previewMedia.url, previewMedia.type);
+                      } else {
+                        handleSend();
+                      }
                     }
                   }}
+                  className="flex-1 bg-transparent border-none outline-none py-2 px-3 text-[15px] focus-visible:ring-0 focus-visible:ring-offset-0"
                   disabled={sending || uploadingFile}
-                >
-                  <Send className="w-5 h-5" />
-                </Button>
+                />
+                <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-primary/10 shrink-0"
+                    >
+                      <Smile className="w-5 h-5 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2 rounded-2xl" align="end">
+                    <div className="flex gap-1">
+                      {EMOJI_QUICK.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => {
+                            setNewMessage(prev => prev + emoji);
+                            handleTyping('typing');
+                          }}
+                          className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-            ) : (
-              <div className="flex gap-1">
-                {/* AI Suggestions Toggle */}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={cn(
-                    "shrink-0 rounded-full",
-                    showAiSuggestions ? "text-primary bg-primary/10" : "hover:bg-primary/10"
+
+              {newMessage.trim() || previewMedia ? (
+                <div className="flex items-center gap-1">
+                  {newMessage.trim() && !previewMedia && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 rounded-full hover:bg-primary/10"
+                      onClick={() => setShowScheduleModal(true)}
+                      title="Schedule message"
+                    >
+                      <Clock className="w-5 h-5 text-muted-foreground" />
+                    </Button>
                   )}
-                  onClick={() => setShowAiSuggestions(!showAiSuggestions)}
-                  title="AI Smart Replies"
-                >
-                  <Sparkles className="w-5 h-5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="shrink-0 rounded-full hover:bg-primary/10"
-                  onClick={() => setShowVoiceRecorder(true)}
-                >
-                  <Mic className="w-5 h-5" />
-                </Button>
-              </div>
-            )}
+                  <Button
+                    size="icon"
+                    className="shrink-0 rounded-2xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                    onClick={() => {
+                      if (previewMedia) {
+                        handleSend(previewMedia.url, previewMedia.type);
+                      } else {
+                        handleSend();
+                      }
+                    }}
+                    disabled={sending || uploadingFile}
+                  >
+                    <Send className="w-5 h-5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "shrink-0 rounded-2xl",
+                      showAiSuggestions ? "text-primary bg-primary/10" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                    onClick={() => setShowAiSuggestions(!showAiSuggestions)}
+                    title="AI Smart Replies"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 rounded-2xl bg-muted text-muted-foreground hover:bg-muted/80"
+                    onClick={() => setShowVoiceRecorder(true)}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
