@@ -6,7 +6,7 @@ interface StreamControlsProps {
   replyText: string;
   onReplyTextChange: (text: string) => void;
   onSubmit: () => void;
-  onReact: () => void;
+  onReact?: () => void;
   onRefill: () => void;
   onGift?: () => void;
   isPKMode: boolean;
