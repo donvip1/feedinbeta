@@ -159,6 +159,9 @@ export const ModernChatInterface = ({
   // AI suggestions state
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
   
+  // Sticker picker state
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  
   // Scheduling state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   
