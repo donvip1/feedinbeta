@@ -11,6 +11,8 @@ import { MessageContextMenu } from './MessageContextMenu';
 import { cn } from '@/lib/utils';
 import { getEmojiSizeClass, isEmojiOnly } from '@/lib/emoji-utils';
 import { LinkPreviewCard } from './LinkPreviewCard';
+import { useStickerStore } from '@/stores/stickerStore';
+import { toast } from 'sonner';
 
 interface MessageBubbleProps {
   message: {
@@ -97,11 +99,11 @@ export const ModernMessageBubble = ({
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
 
-  // Detect if this message is a sticker (sent from built-in sticker packs)
+  // Detect if this message is a sticker (sent from built-in or custom sticker packs)
   const isSticker = !!(
     message.media_url && 
     !message.content?.trim() &&
-    (message.media_url.includes('em-content.zobj.net') || message.media_url.includes('/stickers/'))
+    (message.media_url.includes('em-content.zobj.net') || message.media_url.includes('/stickers/') || message.media_type === 'image/webp' || message.media_type === 'sticker')
   );
   
   // Long press detection
@@ -312,8 +314,22 @@ export const ModernMessageBubble = ({
               <div
                 onClick={handleBubbleClick}
                 onContextMenu={handleContextMenu}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
+                onTouchStart={(e) => {
+                  // Long press to save sticker
+                  const timer = setTimeout(() => {
+                    const { saveSticker, isStickerSaved } = useStickerStore.getState();
+                    if (!isStickerSaved(message.media_url!)) {
+                      saveSticker({ url: message.media_url!, type: (message.media_type?.includes('video') ? 'video' : 'image') as 'image' | 'video' });
+                      toast.success('Sticker saved to your collection!');
+                    } else {
+                      toast.info('Sticker already saved');
+                    }
+                  }, 600);
+                  (e.currentTarget as any).__stickerTimer = timer;
+                }}
+                onTouchEnd={(e) => {
+                  clearTimeout((e.currentTarget as any).__stickerTimer);
+                }}
                 className="cursor-pointer active:scale-95 transition-transform select-none"
               >
                 <img
