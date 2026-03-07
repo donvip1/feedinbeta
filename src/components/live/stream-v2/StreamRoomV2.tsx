@@ -22,6 +22,11 @@ import { StreamControls } from './StreamControls';
 import { GiftOverlay } from './GiftOverlay';
 import { StreamGuests } from './StreamGuests';
 import { PollSystem } from './PollSystem';
+import { HypeParticles } from './HypeParticles';
+import { HypeMeter } from './HypeMeter';
+import { EventTicker } from './EventTicker';
+import { LightFlashOverlay } from './LightFlashOverlay';
+import { PredictionSystem } from './PredictionSystem';
 import {
   ShareSheet, SettingsSheet, ReactionPicker,
   InStreamGiftSheet, InviteModal,
