@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
-  Gift, Sparkles, Clock, BellOff, Bell, Plus, Camera, Sticker
+  Gift, Sparkles, Clock, BellOff, Bell, Plus, Camera
 } from 'lucide-react';
 import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ScheduleMessageModal } from './ScheduleMessageModal';
@@ -1793,6 +1793,29 @@ export const ModernChatInterface = ({
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {/* Sticker button - hides while typing */}
+              <div className={cn(
+                "transition-all duration-200 overflow-hidden flex items-center",
+                newMessage.trim() ? "w-0 opacity-0" : "w-8 opacity-100"
+              )}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 rounded-full shrink-0",
+                    showStickerPicker ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-primary/10"
+                  )}
+                  onClick={() => setShowStickerPicker(!showStickerPicker)}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
+                    <path d="M14 3v4a2 2 0 0 0 2 2h4" />
+                    <path d="M8 13h0" /><path d="M16 13h0" />
+                    <path d="M10 16s.8 1 2 1c1.3 0 2-1 2-1" />
+                  </svg>
+                </Button>
+              </div>
 
               {/* Right side actions */}
               {newMessage.trim() || previewMedia ? (
