@@ -159,6 +159,13 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   const isPKMode = stream?.room_type === 'pk_battle';
   const pkMaxSlots = (stream as any)?.pk_max_slots || 2;
 
+  // Feature flags from stream settings (with PK mode defaults)
+  const features = stream?.stream_features || {} as StreamFeatures;
+  const showHype = (features.hype_system !== false) && !isPKMode; // auto-hide in PK
+  const showCoPilot = (features.copilot_tools !== false) && !isPKMode; // auto-hide in PK
+  const showAIPulse = features.ai_pulse !== false;
+  const showChatReactions = features.chat_reactions !== false;
+
   // Camera angles for POV switcher
   const cameraAngles = [
     { id: 'host', label: host?.display_name || 'Host', isActive: true },
