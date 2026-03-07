@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowLeft, Search, Crown, Plus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
