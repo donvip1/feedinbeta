@@ -1,5 +1,4 @@
 import React from 'react';
-import { MessageSquare, Tv, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MessagingTabsProps {
@@ -11,9 +10,9 @@ interface MessagingTabsProps {
 }
 
 const tabs = [
-  { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
-  { id: 'groups' as const, icon: Users, label: 'Groups' },
-  { id: 'live' as const, icon: Tv, label: 'Live' },
+  { id: 'chats' as const, label: 'All' },
+  { id: 'groups' as const, label: 'Groups' },
+  { id: 'live' as const, label: 'Live' },
 ];
 
 export const MessagingTabs = ({
@@ -24,49 +23,44 @@ export const MessagingTabs = ({
   secretMode = false,
 }: MessagingTabsProps) => {
   return (
-    <div className="flex items-center justify-around px-2">
+    <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar pt-2">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
           className={cn(
-            "flex items-center gap-2 pb-2 px-3 text-sm font-medium transition-all relative",
+            "text-sm font-black transition-all pb-2 border-b-2 whitespace-nowrap relative",
             activeTab === tab.id 
               ? secretMode 
-                ? "text-red-400" 
-                : "text-primary"
-              : secretMode
-                ? "text-slate-400 hover:text-slate-300"
+                ? "border-destructive text-destructive" 
+                : "border-primary text-foreground"
+              : "border-transparent",
+            activeTab !== tab.id && (
+              secretMode
+                ? "text-muted-foreground/60 hover:text-muted-foreground"
                 : "text-muted-foreground hover:text-foreground"
+            )
           )}
         >
-          <tab.icon className="w-4 h-4" />
-          <span>{tab.label}</span>
+          {tab.label}
           
           {/* Unread Badge for Chats */}
           {tab.id === 'chats' && unreadCount > 0 && (
-            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full">
+            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1.5 bg-primary text-primary-foreground rounded-full inline-flex">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
           
           {/* Unread Badge for Groups */}
           {tab.id === 'groups' && groupUnreadCount > 0 && (
-            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full">
+            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1.5 bg-primary text-primary-foreground rounded-full inline-flex">
               {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
             </span>
           )}
           
-          {/* Active Indicator */}
-          {activeTab === tab.id && (
-            <div 
-              className={cn(
-                "absolute bottom-0 left-0 right-0 h-0.5 rounded-full animate-in fade-in slide-in-from-bottom-1",
-                secretMode 
-                  ? "bg-gradient-to-r from-red-500 to-orange-500" 
-                  : "bg-primary"
-              )}
-            />
+          {/* Live indicator dot */}
+          {tab.id === 'live' && (
+            <span className="ml-1 w-1.5 h-1.5 bg-destructive rounded-full inline-block animate-pulse mb-1" />
           )}
         </button>
       ))}
