@@ -120,6 +120,10 @@ export const ChatMediaViewer = ({
       videoRef.current.pause();
       setIsPlaying(false);
     }
+    // Block pointer events on the container so touch doesn't leak to elements beneath
+    if (containerRef.current) {
+      containerRef.current.style.pointerEvents = 'none';
+    }
     haptic('light');
     onClose();
   }, [onClose, haptic, isPlaying]);
