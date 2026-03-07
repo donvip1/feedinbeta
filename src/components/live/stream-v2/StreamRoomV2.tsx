@@ -683,6 +683,7 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
         onGift={() => setShowStreamGiftModal(true)} onShare={() => setShowShare(true)}
         onSettings={() => setShowSettings(true)} onMinimize={handleMinimize}
         onEnd={isHost ? handleEndStream : handleViewerLeave}
+        showAIPulse={showAIPulse}
       />
 
       {/* PK Score Bar */}
@@ -713,19 +714,21 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
         </div>
       )}
 
-      {/* Co-Pilot Joystick (host only) */}
-      <CoPilotJoystick
-        isHost={isHost}
-        onCreatePoll={() => setShowPollCreator(true)}
-        onLightTrigger={handleLightTrigger}
-        onSoundTrigger={handleSoundTrigger}
-        onPredictiveBet={() => setShowPrediction(true)}
-      />
+      {/* Co-Pilot Joystick (host only, hidden in PK by default) */}
+      {showCoPilot && (
+        <CoPilotJoystick
+          isHost={isHost}
+          onCreatePoll={() => setShowPollCreator(true)}
+          onLightTrigger={handleLightTrigger}
+          onSoundTrigger={handleSoundTrigger}
+          onPredictiveBet={() => setShowPrediction(true)}
+        />
+      )}
 
-      {/* Hype system overlays */}
-      <HypeParticles />
-      <HypeMeter />
-      <EventTicker latestEvent={latestTickerEvent} />
+      {/* Hype system overlays (hidden in PK by default) */}
+      {showHype && <HypeParticles />}
+      {showHype && <HypeMeter />}
+      {showHype && <EventTicker latestEvent={latestTickerEvent} />}
       <LightFlashOverlay isFlashing={isLightFlashing} />
 
       {/* POV Switcher */}
