@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, ChevronLeft, Archive } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, ChevronLeft, Archive, Bell, Settings, UserPlus, Users2 } from 'lucide-react';
 import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
@@ -90,6 +90,7 @@ export default function Messages() {
   const [showMessageSettings, setShowMessageSettings] = useState(false);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [isFabExpanded, setIsFabExpanded] = useState(false);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
 
