@@ -1,4 +1,4 @@
-import { Heart, Coins, Send } from 'lucide-react';
+import { Heart, Gift, Coins, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PKParticipant } from '../unified/PKBattleBar';
 
@@ -8,6 +8,7 @@ interface StreamControlsProps {
   onSubmit: () => void;
   onReact: () => void;
   onRefill: () => void;
+  onGift?: () => void;
   isPKMode: boolean;
   battleParticipants: PKParticipant[];
   interactionTargetId: string;
@@ -20,6 +21,7 @@ export const StreamControls = ({
   onSubmit,
   onReact,
   onRefill,
+  onGift,
   isPKMode,
   battleParticipants,
   interactionTargetId,
@@ -63,28 +65,28 @@ export const StreamControls = ({
       )}
 
       <div className="flex items-center gap-2">
-        {/* Chat input */}
+        {/* Chat input — reduced width */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
-          className="flex-1 min-w-0"
+          className="flex-1 min-w-0 max-w-[60%]"
         >
-          <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/10 rounded-full overflow-hidden">
+          <div className="flex items-center bg-black/60 backdrop-blur-3xl border border-white/10 rounded-full overflow-hidden focus-within:border-yellow-400 transition-all">
             <input
               type="text"
               value={replyText}
               onChange={(e) => onReplyTextChange(e.target.value)}
-              placeholder="Say something..."
-              className="flex-1 min-w-0 bg-transparent text-xs font-medium text-white placeholder-white/30 focus:outline-none px-3 py-2"
+              placeholder="Message the arena..."
+              className="flex-1 min-w-0 bg-transparent text-xs font-medium text-white placeholder-white/30 focus:outline-none px-4 py-2.5"
             />
             <button
               type="submit"
               disabled={!replyText.trim()}
-              className="w-8 h-8 flex items-center justify-center text-white disabled:opacity-30 shrink-0"
+              className="w-8 h-8 flex items-center justify-center text-white/30 hover:text-white disabled:opacity-30 shrink-0 transition-colors"
             >
-              <Send className="w-3 h-3" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </div>
         </form>
@@ -92,17 +94,25 @@ export const StreamControls = ({
         {/* React */}
         <button
           onClick={onReact}
-          className="w-8 h-8 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+          className="w-9 h-9 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
         >
           <Heart className="w-4 h-4 text-rose-400" />
         </button>
 
-        {/* Refill credits */}
+        {/* Refill credits — smaller */}
         <button
           onClick={onRefill}
-          className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
+          className="w-9 h-9 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
         >
-          <Coins className="w-4 h-4 text-white" />
+          <Coins className="w-4 h-4 text-amber-400" />
+        </button>
+
+        {/* Gift — prominent */}
+        <button
+          onClick={onGift}
+          className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 hover:scale-110 active:scale-95 transition-all shrink-0"
+        >
+          <Gift className="w-6 h-6 text-white" fill="currentColor" />
         </button>
       </div>
     </div>
