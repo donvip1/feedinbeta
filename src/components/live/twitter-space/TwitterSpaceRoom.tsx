@@ -55,6 +55,7 @@ import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
 import { MentionText } from '../MentionText';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { SpeakerActionSheet } from './SpeakerActionSheet';
 import { SpeakInviteDialog } from './SpeakInviteDialog';
@@ -113,6 +114,7 @@ interface FloatingReaction {
   emoji: string;
   left: number;
   displayName?: string;
+  userId?: string;
 }
 
 interface FloatingGiftReaction {
@@ -323,7 +325,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .channel(`space-reactions-${spaceId}`)
       .on('broadcast', { event: 'reaction' }, (payload: any) => {
         if (payload.payload?.user_id !== user?.id) {
-          handleFloatingReaction(payload.payload?.emoji, payload.payload?.display_name);
+          handleFloatingReaction(payload.payload?.emoji, payload.payload?.display_name, payload.payload?.user_id);
         }
       })
       .subscribe();
@@ -803,9 +805,9 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  const handleFloatingReaction = (emoji: string, displayName?: string) => {
+  const handleFloatingReaction = (emoji: string, displayName?: string, userId?: string) => {
     const id = `${Date.now()}-${Math.random()}`;
-    setFloatingReactions(prev => [...prev, { id, emoji, left: 35 + Math.random() * 30, displayName }]);
+    setFloatingReactions(prev => [...prev, { id, emoji, left: 35 + Math.random() * 30, displayName, userId }]);
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== id));
     }, 3000);
@@ -818,7 +820,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     const myDisplayName = speakers.find(s => s.user_id === user.id)?.profile?.display_name || 'Someone';
     
     // Show locally
-    handleFloatingReaction(emoji, myDisplayName);
+    handleFloatingReaction(emoji, myDisplayName, user.id);
     
     // Broadcast to others
     const channel = supabase.channel(`space-reactions-${spaceId}`);
@@ -1756,6 +1758,26 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           </div>
                         )}
                       </div>
+                      {/* Emoji reaction overlay on avatar */}
+                      <AnimatePresence>
+                        {floatingReactions
+                          .filter(r => r.userId === speaker.user_id)
+                          .slice(-1)
+                          .map(r => (
+                            <motion.div
+                              key={r.id}
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0, y: -30 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                              className="absolute -top-2 -right-2 z-20 text-2xl drop-shadow-lg pointer-events-none"
+                            >
+                              <div className="bg-black/60 backdrop-blur-sm rounded-full p-0.5">
+                                {r.emoji}
+                              </div>
+                            </motion.div>
+                          ))}
+                      </AnimatePresence>
                       {/* Microbadge indicators */}
                       <div className="absolute -bottom-0.5 -right-0.5 flex gap-0.5">
                         {isHostUser && (
@@ -1779,9 +1801,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                       className="text-center cursor-pointer"
                       onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
                     >
-                      <p className="text-xs font-black truncate max-w-[90px] group-hover:text-purple-400 transition-colors text-white">
-                        {speaker.profile?.display_name?.split(' ')[0] || 'User'}
-                      </p>
+                      <div className="flex items-center justify-center gap-0.5">
+                        <p className="text-xs font-black truncate max-w-[70px] group-hover:text-purple-400 transition-colors text-white">
+                          {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                        </p>
+                        <VerifiedBadge userId={speaker.user_id} size="sm" />
+                      </div>
                       <p className={cn(
                         "text-[8px] font-black uppercase tracking-widest",
                         isHostUser ? 'text-amber-400' : speaker.role === 'co_host' ? 'text-purple-400' : 'text-slate-500'
@@ -1820,12 +1845,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           </div>
                         )}
                       </div>
-                      <span 
-                        className="text-[10px] font-bold text-slate-500 truncate w-full text-center cursor-pointer hover:text-purple-400 transition-colors"
+                      <div 
+                        className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-purple-400 transition-colors"
                         onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
                       >
-                        {speaker.profile?.display_name?.split(' ')[0] || 'User'}
-                      </span>
+                        <span className="text-[10px] font-bold text-slate-500 truncate">
+                          {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                        </span>
+                        <VerifiedBadge userId={speaker.user_id} size="sm" />
+                      </div>
                     </div>
                   ))}
               </div>
