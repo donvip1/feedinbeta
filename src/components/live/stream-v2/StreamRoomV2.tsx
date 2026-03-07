@@ -456,6 +456,8 @@ export const StreamRoomV2 = ({ streamId, onClose }: StreamRoomV2Props) => {
   };
 
   const handleGiftEvent = async (giftData: any) => {
+    boostHype(10);
+    setLatestTickerEvent(`💎 ${giftData.gift_type?.toUpperCase() || 'GIFT'} RECEIVED!`);
     if (giftData.receiver_id === stream?.user_id) setHostGiftTotal(prev => prev + (giftData.credit_value || 0));
     if (isPKMode) setBattleParticipants(prev => prev.map(p => p.id === giftData.receiver_id ? { ...p, score: p.score + (giftData.credit_value || 0) } : p));
 
