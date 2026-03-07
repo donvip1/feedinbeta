@@ -514,7 +514,8 @@ export const ChatMediaViewer = ({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
