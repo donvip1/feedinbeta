@@ -221,7 +221,7 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="feedin-theme">
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="feedin-theme">
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
             <NavigationProvider>
