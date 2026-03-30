@@ -1,7 +1,8 @@
 import React, { useEffect, useState, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
@@ -184,6 +185,37 @@ appDataSync.initialize(queryClient);
 // Lazy fallback component for code splitting
 const LazyFallback = () => <LoadingScreen />;
 
+// Page transition wrapper - uses location key for smooth native-like transitions
+const pageVariants = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 },
+};
+const pageTransition = {
+  type: "tween" as const,
+  ease: [0.32, 0.72, 0, 1] as [number,number,number,number],
+  duration: 0.22,
+};
+
+const AnimatedRoutes = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+        style={{ willChange: "transform, opacity", backfaceVisibility: "hidden" as const }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const App = () => {
   
 
@@ -246,6 +278,7 @@ const App = () => {
                   <BrowserInstallBanner />
                   <ProfileCompletionModal />
                 <Suspense fallback={<LazyFallback />}>
+                <AnimatedRoutes>
                 <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
@@ -405,6 +438,7 @@ const App = () => {
             
               <Route path="*" element={<NotFound />} />
               </Routes>
+              </AnimatedRoutes>
               </Suspense>
                           </RealtimeProvider>
                         </UnifiedLiveProvider>
