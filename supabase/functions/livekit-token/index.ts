@@ -159,8 +159,20 @@ serve(async (req) => {
         .single();
       isHost = stream?.user_id === userId;
     } else {
-      // For calls or other room types, use client hint but it's less critical
-      isHost = body.isHost === true;
+      // For call rooms (call-{callId}), verify host server-side via call_logs.
+      // For all other room types, default to non-host. Never trust client-supplied isHost.
+      const callMatch = roomName.match(/^call-(.+)$/);
+      if (callMatch) {
+        const callId = callMatch[1];
+        const { data: callLog } = await supabase
+          .from('call_logs')
+          .select('caller_id')
+          .eq('id', callId)
+          .maybeSingle();
+        isHost = callLog?.caller_id === userId;
+      } else {
+        isHost = false;
+      }
     }
 
     // Ensure URL has wss:// prefix

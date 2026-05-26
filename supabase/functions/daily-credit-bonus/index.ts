@@ -12,11 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    // Secret-based authentication for scheduled jobs
+    // Secret-based authentication for scheduled jobs (no insecure fallback)
     const secret = req.headers.get("x-function-secret");
-    const expectedSecret = Deno.env.get("DAILY_BONUS_SECRET") || "default-secret-change-me";
-    
-    if (secret !== expectedSecret) {
+    const expectedSecret = Deno.env.get("DAILY_BONUS_SECRET");
+
+    if (!expectedSecret) {
+      console.error("DAILY_BONUS_SECRET is not configured");
+      return new Response(
+        JSON.stringify({ error: "Service not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!secret || secret !== expectedSecret) {
       console.error("Unauthorized access attempt to daily-credit-bonus");
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
