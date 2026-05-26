@@ -158,18 +158,26 @@ serve(async (req) => {
     // High risk = block, medium = warn but allow, low = allow
     const allowed = riskLevel !== 'high';
 
-    const response: FraudCheckResponse = {
+    // Log detailed reasons server-side only — never expose to client to prevent
+    // phone number / IP / device enumeration via the anon-callable endpoint.
+    if (reasons.length > 0) {
+      console.log(`[fraud-detection] risk=${riskLevel} ip=${clientIP} reasons=${reasons.join('; ')}`);
+    }
+
+    // Return minimal information to the client
+    const response = {
       allowed,
       riskLevel,
-      reasons,
-      linkedAccounts,
+      // Generic message only — no enumeration of phone/IP/device counts
+      reasons: allowed ? [] : ['Signup blocked. Please contact support if you believe this is an error.'],
+      linkedAccounts: 0,
     };
 
     return new Response(
       JSON.stringify(response),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
 
