@@ -136,7 +136,7 @@ class NativeStore {
       }
     }
 
-    await indexedDBCache.remove(key);
+    await indexedDBCache.delete(key);
   }
 
   /** Delete every cached key matching a prefix (e.g. "feed:"). */
