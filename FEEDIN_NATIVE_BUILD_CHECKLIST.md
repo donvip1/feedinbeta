@@ -55,21 +55,66 @@ Flutter is now the better fit because FEEDIN needs Android, iOS, and later deskt
 - Added device storage budget screen
 - Added Flutter widget test for opening the demo shell
 - Android debug APK builds successfully from Flutter
+- Added Supabase Flutter dependency
+- Added Flutter secure storage dependency
+- Added safe Supabase config loading through `--dart-define`
+- Added Supabase bootstrap that initializes only when config exists
+- Added auth repository with real Supabase sign-in path and demo fallback
+- Added secure session storage wrapper
+- Added Supabase session restore on app startup
+- Added sign-up flow
+- Added password reset request flow
+- Added auth loading, success, and error states
+- Added Hive local storage bootstrap
+- Added local profile repository
+- Added local feed cache repository
+- Added remote feed data source contract for Supabase `posts`
+- Added feed refresh path that falls back to cached feed
+- Added pending offline action queue
+- Added offline like/save/comment action buttons
+- Added profile completion screen after login/demo entry
+- Added profile tab backed by locally stored profile data
+- Feed tab now loads cached posts from local storage
+- Added local conversations/messages storage
+- Added Messages tab with inbox and conversation view
+- Added offline message send queue with pending delivery state
+- Added sync service for replaying queued feed actions and messages
+- Added manual Sync now control in Settings
+- Added retry/failure handling for queued feed actions and messages
+- Confirmed core Supabase schema from local migrations: `posts`, `profiles`, `post_likes`, `post_comments`, `saved_posts`, `conversations`, `conversation_participants`, and `messages`
+- Updated Flutter feed remote query to read `posts.content` and author data from `profiles`
+- Updated offline action replay to use Supabase-compatible fields: `post_id`, `content`, and authenticated `user_id`
+- Updated comment replay to use `post_comments` instead of placeholder `comments`
+- Updated message replay to use `messages.content`, `sender_id`, `message_type`, and `status`
+- Added local-to-server conversation ID mapping for message sync
+- Added first-sync server conversation creation and current-user participant insertion before replaying queued messages
+- Added remote profile fetch/upsert data source for Supabase `profiles`
+- Wired login/session restore to load the matching local profile or fetch the Supabase profile
+- Wired profile completion to save locally first and upsert `display_name`, `username`, and `bio` to Supabase when configured
+- Added Android deep-link handling for `feedin://auth-callback`
+- Wired Supabase password reset emails to use the mobile callback URL
+- Added native password recovery screen that updates the password after Supabase emits `passwordRecovery`
+- Added local storage maintenance service for feed cache, pending actions, conversations, and messages
+- Added Settings storage snapshot showing local profile/feed/queue/chat/message record counts
+- Added Settings cleanup controls for feed cache, queued actions, and local messages
+- Added ignored local Flutter run helper that maps existing root `.env` Supabase values to `--dart-define`
+- Verified Android debug build with local development Supabase URL and publishable key
+- Added media cache directory service under app cache storage
+- Added media cache file/size tracking and Settings cleanup control
 - Kotlin Android reference project exists in `native/android`
 - Kotlin reference includes Room/WorkManager concepts that can be ported into Flutter equivalents
 - Added device storage budget plan
 
 ## Not Done Yet / Backlog
 
-- Real Supabase auth
-- Encrypted session/token storage
-- Real feed API sync
-- Server replay of queued offline actions
-- Flutter local database implementation
-- Flutter media cache/video playback implementation
+- Stronger typed local storage adapters/migrations for feed/messages/actions
+- Flutter media download/cache integration for feed images/videos
+- Flutter video playback implementation
 - Firebase Cloud Messaging setup
 - Push notification handling
-- Real messages inbox/conversation screens
+- Realtime message sync
+- Test sync replay against the live Supabase project with real user sessions
+- Add real recipient selection and multi-user conversation participant management
 - Upload queue and draft storage
 - App icon/brand assets
 - Release signing config
@@ -127,7 +172,8 @@ Flutter is now the better fit because FEEDIN needs Android, iOS, and later deskt
 ## User Needs To Provide
 
 - Supabase project URL
-- Supabase publishable key or legacy anon key
+- Supabase publishable key or legacy anon public key
+- Supabase Auth redirect allow-list entry for `feedin://auth-callback`
 - Firebase Android app config file: `google-services.json`
 - Later, Firebase iOS app config file: `GoogleService-Info.plist`
 - Final app icon/brand assets
@@ -140,6 +186,14 @@ From the Flutter project:
 ```bash
 cd native/flutter
 flutter build apk --debug
+```
+
+Build with Supabase config:
+
+```bash
+flutter build apk --debug \
+  --dart-define=FEEDIN_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co \
+  --dart-define=FEEDIN_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_KEY
 ```
 
 Debug APK:
@@ -177,7 +231,7 @@ For iOS later:
 
 ## Current Next Step
 
-1. Add Flutter dependencies for Supabase, secure storage, local database, media cache, and Firebase.
-2. Add real auth repository and secure token storage.
-3. Replace demo auth gate with real Supabase login/signup.
-4. Keep service-role keys and private secrets out of the Android app.
+1. Test auth, feed refresh, action replay, and message replay against the real Supabase project.
+2. Add real recipient selection and multi-user conversation participant management.
+3. Add background sync scheduling.
+4. Keep service-role keys and private secrets out of the app.

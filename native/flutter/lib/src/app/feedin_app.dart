@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../core/config/feedin_config.dart';
 import '../features/auth/auth_gate.dart';
+import 'feedin_services.dart';
 
 class FeedinApp extends StatelessWidget {
-  const FeedinApp({super.key});
+  const FeedinApp({super.key, required this.config, this.servicesOverride});
+
+  final FeedinConfig config;
+  final FeedinServices? servicesOverride;
 
   @override
   Widget build(BuildContext context) {
     const seed = Color(0xFF22C55E);
+    final services = servicesOverride ?? FeedinServices.create(config);
 
     return MaterialApp(
       title: 'FEEDIN',
@@ -33,7 +39,7 @@ class FeedinApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: AuthGate(services: services),
     );
   }
 }

@@ -19,12 +19,31 @@ The older Kotlin/Jetpack Compose scaffold in `native/android` is now reference-o
 - Demo feed and device storage budget views
 - Widget test passing
 - Android debug APK build passing
+- Supabase config bootstrap
+- Secure session storage wrapper
+- Auth repository with Supabase sign-in and demo fallback
+- Session restore, sign-up, and password reset request support
+- Hive local storage bootstrap
+- Local profile completion and cached feed storage
+- Feed refresh contract with cached fallback
+- Offline like/save/comment queue
+- Local inbox/conversation message storage
+- Offline message send queue
+- Manual sync service for queued feed actions and messages
 
 ## Build
 
 ```bash
 cd native/flutter
 flutter build apk --debug
+```
+
+With Supabase config:
+
+```bash
+flutter build apk --debug \
+  --dart-define=FEEDIN_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co \
+  --dart-define=FEEDIN_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_KEY
 ```
 
 APK output:
@@ -45,8 +64,6 @@ Note: `flutter analyze` currently crashes on this machine because the local Flut
 
 ## Next Build Steps
 
-- Add Flutter dependencies for Supabase, secure storage, local database, media cache, and push notifications.
-- Add safe local config loading.
-- Replace demo auth with real Supabase auth.
-- Add local-first feed database and sync queue.
-
+- Confirm real Supabase feed table/column names.
+- Confirm real Supabase message/action table names.
+- Test sync replay against Supabase and add background scheduling.
