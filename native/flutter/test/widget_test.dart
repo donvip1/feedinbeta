@@ -1,16 +1,29 @@
 import 'package:feedin/src/app/feedin_app.dart';
 import 'package:feedin/src/app/feedin_services.dart';
 import 'package:feedin/src/core/config/feedin_config.dart';
+import 'package:feedin/src/core/realtime/feedin_realtime_service.dart';
 import 'package:feedin/src/core/storage/local_storage_maintenance.dart';
+import 'package:feedin/src/core/storage/storage_diagnostics_service.dart';
+import 'package:feedin/src/core/sync/conversation_starter.dart';
+import 'package:feedin/src/core/sync/foreground_sync_coordinator.dart';
 import 'package:feedin/src/core/sync/sync_service.dart';
+import 'package:feedin/src/core/sync/upload_queue_service.dart';
 import 'package:feedin/src/data/local/local_feed_repository_contract.dart';
 import 'package:feedin/src/data/local/local_messages_repository_contract.dart';
+import 'package:feedin/src/data/local/notification_repository_contract.dart';
+import 'package:feedin/src/data/local/preferences_repository_contract.dart';
+import 'package:feedin/src/data/local/post_draft_repository.dart';
 import 'package:feedin/src/data/local/profile_repository_contract.dart';
+import 'package:feedin/src/data/local/upload_queue_repository.dart';
 import 'package:feedin/src/features/auth/data/auth_repository.dart';
 import 'package:feedin/src/features/auth/data/auth_repository_contract.dart';
+import 'package:feedin/src/features/create/post_draft.dart';
 import 'package:feedin/src/features/feed/feed_post.dart';
 import 'package:feedin/src/features/messages/message_models.dart';
+import 'package:feedin/src/features/messages/message_recipient.dart';
+import 'package:feedin/src/features/notifications/notification_item.dart';
 import 'package:feedin/src/features/profile/user_profile.dart';
+import 'package:feedin/src/features/settings/app_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -21,7 +34,20 @@ void main() {
       profileRepository: _MemoryProfileRepository(),
       feedRepository: _MemoryFeedRepository(),
       messagesRepository: _MemoryMessagesRepository(),
+      notificationRepository: _FakeNotificationRepository(),
+      preferencesRepository: _FakePreferencesRepository(),
+      conversationStarter: const _FakeConversationStarter(),
+      postDraftRepository: _FakePostDraftRepository(),
+      uploadQueueRepository: _FakeUploadQueueRepository(),
       syncService: const _FakeSyncService(),
+      uploadQueueService: const _FakeUploadQueueService(),
+      foregroundSyncCoordinator: ForegroundSyncCoordinator(
+        syncService: const _FakeSyncService(),
+        uploadQueueService: const _FakeUploadQueueService(),
+        interval: const Duration(hours: 1),
+      ),
+      storageDiagnosticsService: const _FakeStorageDiagnosticsService(),
+      realtimeService: FeedinRealtimeService(isConfigured: false),
       storageMaintenance: const _FakeStorageMaintenance(),
     );
 
@@ -42,9 +68,70 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Local-first'), findsWidgets);
-    expect(find.text('Cross-platform'), findsWidgets);
+    expect(find.text('Videos'), findsOneWidget);
+    expect(find.text('Photos & Text'), findsOneWidget);
+    expect(find.text('Create'), findsOneWidget);
   });
+}
+
+class _FakePostDraftRepository implements PostDraftRepository {
+  @override
+  Future<void> deleteDraft(String draftId) async {}
+
+  @override
+  Future<List<PostDraft>> loadDrafts() async => const [];
+
+  @override
+  Future<void> markState({
+    required String draftId,
+    required DraftUploadState uploadState,
+  }) async {}
+
+  @override
+  Future<PostDraft> saveDraft({
+    required String content,
+    String? mediaPath,
+    String? mediaType,
+  }) async {
+    return PostDraft(
+      id: 'draft',
+      content: content,
+      createdAtMillis: 1,
+      mediaPath: mediaPath,
+      mediaType: mediaType,
+    );
+  }
+}
+
+class _FakeUploadQueueRepository implements UploadQueueRepository {
+  @override
+  Future<int> count() async => 0;
+
+  @override
+  Future<void> enqueueDraft(String draftId) async {}
+
+  @override
+  Future<List<UploadQueueItem>> loadQueuedItems() async => const [];
+
+  @override
+  Future<void> remove(String draftId) async {}
+}
+
+class _FakeStorageDiagnosticsService implements StorageDiagnosticsService {
+  const _FakeStorageDiagnosticsService();
+
+  @override
+  bool get isConfigured => false;
+
+  @override
+  Future<StorageDiagnosticsSummary> checkPostMedia() async {
+    return const StorageDiagnosticsSummary(
+      attempted: false,
+      canListOwnPrefix: false,
+      publicUrlGenerated: false,
+      message: 'Test storage check skipped.',
+    );
+  }
 }
 
 class _FakeSyncService implements SyncServiceContract {
@@ -72,6 +159,7 @@ class _FakeStorageMaintenance implements LocalStorageMaintenance {
       pendingActions: 0,
       conversations: 0,
       messages: 0,
+      notifications: 0,
       mediaFiles: 0,
       mediaBytes: 0,
     );
@@ -87,7 +175,108 @@ class _FakeStorageMaintenance implements LocalStorageMaintenance {
   Future<void> clearMediaCache() async {}
 
   @override
+  Future<void> clearNotifications() async {}
+
+  @override
   Future<void> clearPendingActions() async {}
+}
+
+class _FakeNotificationRepository implements NotificationRepositoryContract {
+  final List<NotificationItem> _notifications = [
+    const NotificationItem(
+      id: 'message-notification',
+      title: 'New message',
+      body: 'Open chat',
+      createdAtMillis: 1,
+      isRead: false,
+      route: 'conversation:demo-conversation',
+    ),
+  ];
+
+  @override
+  Future<void> addNotification({
+    required String title,
+    required String body,
+    String? route,
+  }) async {
+    _notifications.add(
+      NotificationItem(
+        id: title,
+        title: title,
+        body: body,
+        createdAtMillis: 2,
+        isRead: false,
+        route: route,
+      ),
+    );
+  }
+
+  @override
+  Future<void> clear() async {}
+
+  @override
+  Future<List<NotificationItem>> loadNotifications() async => _notifications;
+
+  @override
+  Future<void> markAllRead() async {}
+
+  @override
+  Future<void> markRead(String notificationId) async {}
+
+  @override
+  Future<int> unreadCount() async => 0;
+}
+
+class _FakePreferencesRepository implements PreferencesRepositoryContract {
+  AppPreferences _preferences = AppPreferences.defaults;
+
+  @override
+  Future<void> clear() async {
+    _preferences = AppPreferences.defaults;
+  }
+
+  @override
+  Future<AppPreferences> load() async => _preferences;
+
+  @override
+  Future<void> save(AppPreferences preferences) async {
+    _preferences = preferences;
+  }
+}
+
+class _FakeConversationStarter implements ConversationStarter {
+  const _FakeConversationStarter();
+
+  @override
+  Future<List<MessageRecipient>> searchRecipients(String query) async =>
+      const [];
+
+  @override
+  Future<ConversationSummary> startConversation({
+    required MessageRecipient recipient,
+  }) async {
+    return ConversationSummary(
+      id: 'starter-conversation',
+      title: recipient.displayName,
+      lastMessagePreview: 'Tap to send your first message.',
+      updatedAtMillis: 1,
+      pendingCount: 0,
+    );
+  }
+}
+
+class _FakeUploadQueueService implements UploadQueueService {
+  const _FakeUploadQueueService();
+
+  @override
+  Future<UploadQueueSummary> processQueue() async {
+    return const UploadQueueSummary(
+      attempted: false,
+      uploaded: 0,
+      failed: 0,
+      message: 'Test upload skipped.',
+    );
+  }
 }
 
 class _FakeAuthRepository implements AuthRepositoryContract {
@@ -175,6 +364,11 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<FeedPaginationResult> loadMorePosts() async {
+    return FeedPaginationResult(posts: await loadPosts(), hasMore: false);
+  }
+
+  @override
   Future<void> queueLike(String postId) async {
     _pendingActions++;
   }
@@ -219,6 +413,29 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
   }
 
   @override
+  Future<ConversationSummary?> loadConversationByServerId(
+    String serverConversationId,
+  ) async {
+    return null;
+  }
+
+  @override
+  Future<ConversationSummary> createConversation({
+    required String title,
+  }) async {
+    return ConversationSummary(
+      id: 'new-conversation',
+      title: title,
+      lastMessagePreview: 'Tap to send your first message.',
+      updatedAtMillis: 1,
+      pendingCount: 0,
+    );
+  }
+
+  @override
+  Future<void> upsertConversation(ConversationSummary conversation) async {}
+
+  @override
   Future<List<LocalMessage>> loadMessages(String conversationId) async {
     return const [
       LocalMessage(
@@ -234,6 +451,9 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
 
   @override
   Future<List<LocalMessage>> loadPendingMessages() async => const [];
+
+  @override
+  Future<void> upsertMessage(LocalMessage message) async {}
 
   @override
   Future<void> markMessageState({

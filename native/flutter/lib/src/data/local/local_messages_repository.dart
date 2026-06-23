@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../features/messages/message_models.dart';
 import 'local_messages_repository_contract.dart';
+import 'local_record_decoder.dart';
 
 class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   LocalMessagesRepository({
@@ -19,11 +20,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     await _seedDemoConversationIfEmpty();
     final conversations =
         _conversationsBox.values
-            .map(
-              (value) => ConversationSummary.fromJson(
-                Map<String, Object?>.from(value),
-              ),
-            )
+            .map((value) => decodeLocalRecord(value, ConversationSummary.fromJson))
+            .whereType<ConversationSummary>()
             .toList()
           ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     return conversations;
@@ -38,14 +36,47 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   }
 
   @override
+  Future<ConversationSummary?> loadConversationByServerId(
+    String serverConversationId,
+  ) async {
+    await _seedDemoConversationIfEmpty();
+    for (final raw in _conversationsBox.values) {
+      final conversation = ConversationSummary.fromJson(
+        Map<String, Object?>.from(raw),
+      );
+      if (conversation.serverConversationId == serverConversationId) {
+        return conversation;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<ConversationSummary> createConversation({required String title}) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final conversation = ConversationSummary(
+      id: const Uuid().v4(),
+      title: title.trim().isEmpty ? 'New chat' : title.trim(),
+      lastMessagePreview: 'Tap to send your first message.',
+      updatedAtMillis: now,
+      pendingCount: 0,
+    );
+    await _conversationsBox.put(conversation.id, conversation.toJson());
+    return conversation;
+  }
+
+  @override
+  Future<void> upsertConversation(ConversationSummary conversation) async {
+    await _conversationsBox.put(conversation.id, conversation.toJson());
+  }
+
+  @override
   Future<List<LocalMessage>> loadMessages(String conversationId) async {
     await _seedDemoConversationIfEmpty();
     final messages =
         _messagesBox.values
-            .map(
-              (value) =>
-                  LocalMessage.fromJson(Map<String, Object?>.from(value)),
-            )
+            .map((value) => decodeLocalRecord(value, LocalMessage.fromJson))
+            .whereType<LocalMessage>()
             .where((message) => message.conversationId == conversationId)
             .toList()
           ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
@@ -56,10 +87,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   Future<List<LocalMessage>> loadPendingMessages() async {
     final messages =
         _messagesBox.values
-            .map(
-              (value) =>
-                  LocalMessage.fromJson(Map<String, Object?>.from(value)),
-            )
+            .map((value) => decodeLocalRecord(value, LocalMessage.fromJson))
+            .whereType<LocalMessage>()
             .where(
               (message) =>
                   message.deliveryState == MessageDeliveryState.pending ||
@@ -68,6 +97,29 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
             .toList()
           ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
     return messages;
+  }
+
+  @override
+  Future<void> upsertMessage(LocalMessage message) async {
+    await _messagesBox.put(message.id, message.toJson());
+
+    final raw = _conversationsBox.get(message.conversationId);
+    if (raw == null) return;
+
+    final conversation = ConversationSummary.fromJson(
+      Map<String, Object?>.from(raw),
+    );
+    if (message.createdAtMillis < conversation.updatedAtMillis) return;
+
+    await _conversationsBox.put(
+      conversation.id,
+      conversation
+          .copyWith(
+            lastMessagePreview: message.body,
+            updatedAtMillis: message.createdAtMillis,
+          )
+          .toJson(),
+    );
   }
 
   @override

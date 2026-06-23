@@ -1,0 +1,4 @@
+storePassword=replace-with-local-store-password
+keyPassword=replace-with-local-key-password
+keyAlias=feedin
+storeFile=feedin-release.jks

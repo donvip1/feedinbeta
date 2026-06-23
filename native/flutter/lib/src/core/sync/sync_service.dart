@@ -4,6 +4,7 @@ import '../../data/local/local_messages_repository_contract.dart';
 import '../../data/local/pending_action.dart';
 import '../../data/local/pending_action_repository.dart';
 import '../../features/messages/message_models.dart';
+import 'message_materializer.dart';
 
 abstract interface class SyncServiceContract {
   Future<SyncSummary> syncNow();
@@ -14,13 +15,16 @@ class SyncService implements SyncServiceContract {
     required bool isConfigured,
     required PendingActionRepository pendingActionRepository,
     required LocalMessagesRepositoryContract messagesRepository,
+    required MessageMaterializer messageMaterializer,
   }) : _isConfigured = isConfigured,
        _pendingActionRepository = pendingActionRepository,
-       _messagesRepository = messagesRepository;
+       _messagesRepository = messagesRepository,
+       _messageMaterializer = messageMaterializer;
 
   final bool _isConfigured;
   final PendingActionRepository _pendingActionRepository;
   final LocalMessagesRepositoryContract _messagesRepository;
+  final MessageMaterializer _messageMaterializer;
 
   @override
   Future<SyncSummary> syncNow() async {
@@ -35,6 +39,8 @@ class SyncService implements SyncServiceContract {
 
     var feedActionsSynced = 0;
     var messagesSynced = 0;
+    var remoteConversationsPulled = 0;
+    var remoteMessagesPulled = 0;
 
     final actions = await _pendingActionRepository.loadPendingActions();
     for (final action in actions) {
@@ -64,10 +70,20 @@ class SyncService implements SyncServiceContract {
       }
     }
 
+    try {
+      final materializeSummary = await _messageMaterializer.refreshAll();
+      remoteConversationsPulled = materializeSummary.conversationsSaved;
+      remoteMessagesPulled = materializeSummary.messagesSaved;
+    } catch (_) {
+      // Remote pull should never block replaying already queued local actions.
+    }
+
     return SyncSummary(
       attempted: true,
       feedActionsSynced: feedActionsSynced,
       messagesSynced: messagesSynced,
+      remoteConversationsPulled: remoteConversationsPulled,
+      remoteMessagesPulled: remoteMessagesPulled,
       message: 'Sync complete.',
     );
   }
@@ -162,11 +178,15 @@ class SyncSummary {
     required this.attempted,
     required this.feedActionsSynced,
     required this.messagesSynced,
+    this.remoteConversationsPulled = 0,
+    this.remoteMessagesPulled = 0,
     required this.message,
   });
 
   final bool attempted;
   final int feedActionsSynced;
   final int messagesSynced;
+  final int remoteConversationsPulled;
+  final int remoteMessagesPulled;
   final String message;
 }

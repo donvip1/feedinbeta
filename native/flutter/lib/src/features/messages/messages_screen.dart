@@ -1,25 +1,111 @@
 import 'package:flutter/material.dart';
 
+import '../../core/sync/conversation_starter.dart';
 import '../../data/local/local_messages_repository_contract.dart';
 import '../profile/user_profile.dart';
 import 'message_models.dart';
+import 'message_recipient.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
     super.key,
     required this.messagesRepository,
+    required this.conversationStarter,
     required this.profile,
+    required this.realtimeVersion,
+    this.initialConversationId,
   });
 
   final LocalMessagesRepositoryContract messagesRepository;
+  final ConversationStarter conversationStarter;
   final UserProfile profile;
+  final int realtimeVersion;
+  final String? initialConversationId;
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
 
 class _MessagesScreenState extends State<MessagesScreen> {
+  final _recipientSearchController = TextEditingController();
   String? _selectedConversationId;
+  late Future<List<ConversationSummary>> _conversationsFuture;
+  Future<List<MessageRecipient>>? _recipientsFuture;
+  bool _isStartingConversation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedConversationId = widget.initialConversationId;
+    _conversationsFuture = widget.messagesRepository.loadConversations();
+  }
+
+  @override
+  void didUpdateWidget(covariant MessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.realtimeVersion != widget.realtimeVersion) {
+      setState(() {
+        _conversationsFuture = widget.messagesRepository.loadConversations();
+      });
+    }
+    if (oldWidget.initialConversationId != widget.initialConversationId &&
+        widget.initialConversationId != null) {
+      setState(() {
+        _selectedConversationId = widget.initialConversationId;
+        _conversationsFuture = widget.messagesRepository.loadConversations();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _recipientSearchController.dispose();
+    super.dispose();
+  }
+
+  void _searchRecipients(String query) {
+    if (query.trim().length < 2) {
+      setState(() => _recipientsFuture = null);
+      return;
+    }
+
+    setState(() {
+      _recipientsFuture = widget.conversationStarter.searchRecipients(query);
+    });
+  }
+
+  Future<void> _startConversation(MessageRecipient recipient) async {
+    if (_isStartingConversation) return;
+
+    setState(() => _isStartingConversation = true);
+    final conversation = await widget.conversationStarter.startConversation(
+      recipient: recipient,
+    );
+    _recipientSearchController.clear();
+    if (!mounted) return;
+    setState(() {
+      _isStartingConversation = false;
+      _selectedConversationId = conversation.id;
+      _recipientsFuture = null;
+      _conversationsFuture = widget.messagesRepository.loadConversations();
+    });
+  }
+
+  Future<void> _createLocalFallbackConversation() async {
+    final title = _recipientSearchController.text.trim();
+    if (title.isEmpty) return;
+
+    final conversation = await widget.messagesRepository.createConversation(
+      title: title,
+    );
+    _recipientSearchController.clear();
+    if (!mounted) return;
+    setState(() {
+      _selectedConversationId = conversation.id;
+      _recipientsFuture = null;
+      _conversationsFuture = widget.messagesRepository.loadConversations();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +114,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
         conversationId: _selectedConversationId!,
         messagesRepository: widget.messagesRepository,
         profile: widget.profile,
+        realtimeVersion: widget.realtimeVersion,
         onBack: () => setState(() => _selectedConversationId = null),
       );
     }
 
     return FutureBuilder<List<ConversationSummary>>(
-      future: widget.messagesRepository.loadConversations(),
+      future: _conversationsFuture,
       builder: (context, snapshot) {
         final conversations = snapshot.data;
         if (conversations == null) {
@@ -42,10 +129,94 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: conversations.length,
+          itemCount: conversations.length + 1,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final conversation = conversations[index];
+            if (index == 0) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _recipientSearchController,
+                              textInputAction: TextInputAction.search,
+                              onChanged: _searchRecipients,
+                              onSubmitted: _searchRecipients,
+                              decoration: const InputDecoration(
+                                labelText: 'New chat',
+                                hintText: 'Search name or @handle',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            tooltip: 'Create local chat',
+                            onPressed: _createLocalFallbackConversation,
+                            icon: const Icon(Icons.add_comment_outlined),
+                          ),
+                        ],
+                      ),
+                      if (_recipientsFuture != null) ...[
+                        const SizedBox(height: 8),
+                        FutureBuilder<List<MessageRecipient>>(
+                          future: _recipientsFuture,
+                          builder: (context, snapshot) {
+                            final recipients = snapshot.data;
+                            if (recipients == null) {
+                              return const LinearProgressIndicator();
+                            }
+                            if (recipients.isEmpty) {
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'No matching FEEDIN users yet.',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              );
+                            }
+
+                            return Column(
+                              children: recipients.map((recipient) {
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    child: Text(
+                                      recipient.displayName.characters.first
+                                          .toUpperCase(),
+                                    ),
+                                  ),
+                                  title: Text(recipient.displayName),
+                                  subtitle: Text('@${recipient.username}'),
+                                  trailing: IconButton(
+                                    tooltip: 'Start chat',
+                                    onPressed: _isStartingConversation
+                                        ? null
+                                        : () => _startConversation(recipient),
+                                    icon: const Icon(Icons.chat_outlined),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final conversation = conversations[index - 1];
             return Card(
               child: ListTile(
                 title: Text(conversation.title),
@@ -70,12 +241,14 @@ class ConversationScreen extends StatefulWidget {
     required this.conversationId,
     required this.messagesRepository,
     required this.profile,
+    required this.realtimeVersion,
     required this.onBack,
   });
 
   final String conversationId;
   final LocalMessagesRepositoryContract messagesRepository;
   final UserProfile profile;
+  final int realtimeVersion;
   final VoidCallback onBack;
 
   @override
@@ -92,6 +265,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _messagesFuture = widget.messagesRepository.loadMessages(
       widget.conversationId,
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant ConversationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.realtimeVersion != widget.realtimeVersion ||
+        oldWidget.conversationId != widget.conversationId) {
+      setState(() {
+        _messagesFuture = widget.messagesRepository.loadMessages(
+          widget.conversationId,
+        );
+      });
+    }
   }
 
   @override

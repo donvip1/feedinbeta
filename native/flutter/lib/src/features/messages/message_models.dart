@@ -18,14 +18,17 @@ class ConversationSummary {
   final String? serverConversationId;
 
   ConversationSummary copyWith({
+    String? title,
+    String? lastMessagePreview,
+    int? updatedAtMillis,
     String? serverConversationId,
     int? pendingCount,
   }) {
     return ConversationSummary(
       id: id,
-      title: title,
-      lastMessagePreview: lastMessagePreview,
-      updatedAtMillis: updatedAtMillis,
+      title: title ?? this.title,
+      lastMessagePreview: lastMessagePreview ?? this.lastMessagePreview,
+      updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
       pendingCount: pendingCount ?? this.pendingCount,
       serverConversationId: serverConversationId ?? this.serverConversationId,
     );

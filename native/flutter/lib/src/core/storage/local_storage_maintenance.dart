@@ -9,12 +9,14 @@ class LocalStorageMaintenance {
     required Box<Map> pendingActionsBox,
     required Box<Map> conversationsBox,
     required Box<Map> messagesBox,
+    required Box<Map> notificationsBox,
     required MediaCacheService mediaCacheService,
   }) : _profileBox = profileBox,
        _feedBox = feedBox,
        _pendingActionsBox = pendingActionsBox,
        _conversationsBox = conversationsBox,
        _messagesBox = messagesBox,
+       _notificationsBox = notificationsBox,
        _mediaCacheService = mediaCacheService;
 
   final Box<Map> _profileBox;
@@ -22,6 +24,7 @@ class LocalStorageMaintenance {
   final Box<Map> _pendingActionsBox;
   final Box<Map> _conversationsBox;
   final Box<Map> _messagesBox;
+  final Box<Map> _notificationsBox;
   final MediaCacheService _mediaCacheService;
 
   Future<LocalStorageSnapshot> snapshot() async {
@@ -32,6 +35,7 @@ class LocalStorageMaintenance {
       pendingActions: _pendingActionsBox.length,
       conversations: _conversationsBox.length,
       messages: _messagesBox.length,
+      notifications: _notificationsBox.length,
       mediaFiles: mediaCache.fileCount,
       mediaBytes: mediaCache.totalBytes,
     );
@@ -50,6 +54,10 @@ class LocalStorageMaintenance {
     await _conversationsBox.clear();
   }
 
+  Future<void> clearNotifications() async {
+    await _notificationsBox.clear();
+  }
+
   Future<void> clearMediaCache() async {
     await _mediaCacheService.clear();
   }
@@ -62,6 +70,7 @@ class LocalStorageSnapshot {
     required this.pendingActions,
     required this.conversations,
     required this.messages,
+    required this.notifications,
     required this.mediaFiles,
     required this.mediaBytes,
   });
@@ -71,6 +80,7 @@ class LocalStorageSnapshot {
   final int pendingActions;
   final int conversations;
   final int messages;
+  final int notifications;
   final int mediaFiles;
   final int mediaBytes;
 

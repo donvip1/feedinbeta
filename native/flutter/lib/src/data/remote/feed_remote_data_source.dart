@@ -7,14 +7,27 @@ class FeedRemoteDataSource {
 
   final bool isConfigured;
 
-  Future<List<FeedPost>> fetchFeed() async {
+  Future<List<FeedPost>> fetchFeed({
+    int limit = 30,
+    int? beforeCreatedAtMillis,
+  }) async {
     if (!isConfigured) return const [];
 
-    final response = await Supabase.instance.client
-        .from('posts')
-        .select('id, content, created_at, user_id, profiles(display_name, username)')
+    const fields =
+        'id, content, media_url, media_type, created_at, user_id, profiles(display_name, username)';
+    final query = Supabase.instance.client.from('posts').select(fields);
+    final filteredQuery = beforeCreatedAtMillis == null
+        ? query
+        : query.lt(
+            'created_at',
+            DateTime.fromMillisecondsSinceEpoch(
+              beforeCreatedAtMillis,
+              isUtc: true,
+            ).toIso8601String(),
+          );
+    final response = await filteredQuery
         .order('created_at', ascending: false)
-        .limit(30);
+        .limit(limit);
 
     return response.map(_mapPost).toList();
   }
@@ -23,8 +36,8 @@ class FeedRemoteDataSource {
     final profile = row['profiles'];
     final authorName = profile is Map
         ? (profile['display_name'] as String?) ??
-            (profile['username'] as String?) ??
-            'FEEDIN User'
+              (profile['username'] as String?) ??
+              'FEEDIN User'
         : 'FEEDIN User';
 
     return FeedPost(
@@ -32,6 +45,8 @@ class FeedRemoteDataSource {
       authorName: authorName,
       body: row['content']?.toString() ?? '',
       meta: 'Synced from server',
+      mediaUrl: row['media_url']?.toString(),
+      mediaType: row['media_type']?.toString(),
       createdAtMillis:
           DateTime.tryParse(
             row['created_at']?.toString() ?? '',

@@ -13,6 +13,20 @@ class UserProfile {
   final String bio;
   final int completedAtMillis;
 
+  UserProfile copyWith({
+    String? displayName,
+    String? handle,
+    String? bio,
+  }) {
+    return UserProfile(
+      userId: userId,
+      displayName: displayName ?? this.displayName,
+      handle: handle ?? this.handle,
+      bio: bio ?? this.bio,
+      completedAtMillis: completedAtMillis,
+    );
+  }
+
   factory UserProfile.fromJson(Map<String, Object?> json) {
     return UserProfile(
       userId: json['userId'] as String,

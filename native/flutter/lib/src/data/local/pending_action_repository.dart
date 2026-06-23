@@ -1,6 +1,7 @@
 import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';
 
+import 'local_record_decoder.dart';
 import 'pending_action.dart';
 
 class PendingActionRepository {
@@ -11,10 +12,8 @@ class PendingActionRepository {
   Future<List<PendingAction>> loadPendingActions() async {
     final actions =
         _box.values
-            .map(
-              (value) =>
-                  PendingAction.fromJson(Map<String, Object?>.from(value)),
-            )
+            .map((value) => decodeLocalRecord(value, PendingAction.fromJson))
+            .whereType<PendingAction>()
             .toList()
           ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
 
