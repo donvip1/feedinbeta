@@ -174,7 +174,8 @@ class PostComposerView {
   /// A post can publish with caption text, selected media, or both. Story mode
   /// sets [requiresMedia] because the `stories` row needs a media URL.
   bool get canSubmit =>
-      !isSubmitting && (hasMedia || (!requiresMedia && caption.trim().isNotEmpty));
+      !isSubmitting &&
+      (hasMedia || (!requiresMedia && caption.trim().isNotEmpty));
 
   PostComposerView copyWith({
     String? caption,

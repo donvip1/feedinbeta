@@ -73,11 +73,23 @@ class UploadQueueService {
 
         switch (draft.draftKind) {
           case 'story':
-            await _publishStoryDraft(client, userId, draft, mediaUrls, mediaTypes);
+            await _publishStoryDraft(
+              client,
+              userId,
+              draft,
+              mediaUrls,
+              mediaTypes,
+            );
             storiesPublished++;
             break;
           case 'post':
-            await _publishPostDraft(client, userId, draft, mediaUrls, mediaTypes);
+            await _publishPostDraft(
+              client,
+              userId,
+              draft,
+              mediaUrls,
+              mediaTypes,
+            );
             postsPublished++;
             break;
         }

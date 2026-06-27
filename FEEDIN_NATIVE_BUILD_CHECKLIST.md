@@ -140,7 +140,10 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Added Live tab behavior backed by real `live_streams` and `live_spaces`.
 - [x] Complete Feed as a TikTok-style media-first experience matching the web app. (Vertical full-screen PageView, full-bleed cached video/photo, right action rail, expandable captions, double-tap-to-like, autoplay on active page, immersive overlay tabs.)
 - [x] Reworked Create into a stronger native creator surface with mode controls, media tools, camera capture, privacy toggle, and upload queue panel.
-- [ ] Complete Create parity: multi-media posts, final story publishing, photo-plus flow, captions, final privacy persistence, and upload progress.
+- [x] Added Create multi-media post drafts and upload publishing through `media_urls`/`media_types`.
+- [x] Added Create story draft publishing through native `stories`, `story_views`, and `story_reactions` schema.
+- [x] Added Create photo-plus flow with camera capture, video capture, mixed media picking, captions, hashtags, and privacy persistence.
+- [ ] Add real Create upload progress percentages if Supabase Storage exposes progress callbacks or a custom upload client is added.
 - [ ] Complete Profile parity.
 - [ ] Rebuild Messages to full chat parity: online presence, real attachments, real call entry points, and backend read receipts.
 - [ ] Rebuild Notifications to full web parity after final remote notification table, FCM payload shape, and typed action schema are confirmed.

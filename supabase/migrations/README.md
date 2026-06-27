@@ -26,5 +26,6 @@ Current active migrations:
 6. `20260624000600_native_advanced_live_calls_schema.sql` - advanced live streams/spaces, gifts, calls, and group calls.
 7. `20260624000700_native_extended_rls_policies.sql` - RLS policies for monetization, P2P, live, gifts, and calls.
 8. `20260624000800_posts_privacy_rls.sql` - `posts.privacy` with conservative privacy-aware post read RLS.
+9. `20260624000900_native_stories_schema.sql` - 24-hour stories, story views, story reactions, RLS, active view, and realtime.
 
 FeedAI and FeedIn Learn schemas are intentionally not part of this active baseline for the first native release.
