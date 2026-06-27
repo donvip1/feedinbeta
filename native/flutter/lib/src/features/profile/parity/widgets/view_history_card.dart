@@ -64,7 +64,8 @@ class _ViewHistoryCardState extends State<ViewHistoryCard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(
-              showClear: view.canClear && !view.isEmpty && widget.onClear != null,
+              showClear:
+                  view.canClear && !view.isEmpty && widget.onClear != null,
               onClear: widget.onClear,
             ),
             if (view.isLoading)
@@ -76,8 +77,7 @@ class _ViewHistoryCardState extends State<ViewHistoryCard> {
                 items: view.items,
                 expanded: _expanded,
                 onOpenPost: widget.onOpenPost,
-                onToggleExpanded: () =>
-                    setState(() => _expanded = !_expanded),
+                onToggleExpanded: () => setState(() => _expanded = !_expanded),
               ),
           ],
         ),

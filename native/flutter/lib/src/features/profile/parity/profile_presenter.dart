@@ -54,8 +54,7 @@ class ProfilePresenter {
   /// image/video/text from the available media metadata.
   static PostTileView tile(FeedPost post) {
     final mediaUrl = post.mediaUrl ?? _firstNonEmpty(post.mediaUrls);
-    final mediaType =
-        post.mediaType ?? _firstNonEmpty(post.mediaTypes);
+    final mediaType = post.mediaType ?? _firstNonEmpty(post.mediaTypes);
     final mediaCount = post.mediaUrls.isNotEmpty ? post.mediaUrls.length : 1;
 
     final PostTileMedia kind;

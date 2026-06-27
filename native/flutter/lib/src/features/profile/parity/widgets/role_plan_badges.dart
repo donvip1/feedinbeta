@@ -20,11 +20,7 @@ import '../profile_view_models.dart';
 /// Horizontal wrap of up to two brand-gradient chips: an optional admin role
 /// chip followed by an optional subscription plan chip.
 class RolePlanBadges extends StatelessWidget {
-  const RolePlanBadges({
-    super.key,
-    required this.badges,
-    this.compact = false,
-  });
+  const RolePlanBadges({super.key, required this.badges, this.compact = false});
 
   /// Resolved badge bundle; role visibility already gated upstream.
   final ProfileBadgeSet badges;

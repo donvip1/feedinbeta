@@ -106,7 +106,8 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       if (!mounted) return;
       setState(() {
         _message = null;
-        _errorMessage = 'Profile saved locally, but Supabase sync failed: '
+        _errorMessage =
+            'Profile saved locally, but Supabase sync failed: '
             '${_formatError(error)}';
       });
     } finally {
@@ -257,10 +258,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                 onOpenPost: (_) {},
               ),
               const SizedBox(height: 24),
-              _ProfilePostsGrid(
-                postsFuture: _postsFuture,
-                isOwnProfile: true,
-              ),
+              _ProfilePostsGrid(postsFuture: _postsFuture, isOwnProfile: true),
             ],
           ),
         ),
@@ -271,9 +269,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   Future<void> _copyLink(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Link copied to clipboard')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
   }
 }
 
@@ -443,18 +441,14 @@ class _ProfileHero extends StatelessWidget {
                   _ProfileStat(
                     value: profile.followersCount,
                     label: 'Followers',
-                    onTap: () => _openConnections(
-                      context,
-                      ConnectionsTab.followers,
-                    ),
+                    onTap: () =>
+                        _openConnections(context, ConnectionsTab.followers),
                   ),
                   _ProfileStat(
                     value: profile.followingCount,
                     label: 'Following',
-                    onTap: () => _openConnections(
-                      context,
-                      ConnectionsTab.following,
-                    ),
+                    onTap: () =>
+                        _openConnections(context, ConnectionsTab.following),
                   ),
                   _ProfileStat(value: profile.totalViews, label: 'Views'),
                 ],

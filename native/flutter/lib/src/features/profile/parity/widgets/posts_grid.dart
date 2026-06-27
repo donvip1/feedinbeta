@@ -194,7 +194,9 @@ class _TileMedia extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tile.media == PostTileMedia.text) {
       return DecoratedBox(
-        decoration: const BoxDecoration(gradient: ProfileGradients.textPostTile),
+        decoration: const BoxDecoration(
+          gradient: ProfileGradients.textPostTile,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(ProfileSpacing.md),
           child: Center(
