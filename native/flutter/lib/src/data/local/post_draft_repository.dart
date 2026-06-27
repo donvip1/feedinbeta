@@ -23,12 +23,33 @@ class PostDraftRepository {
     required String content,
     String? mediaPath,
     String? mediaType,
+    List<String> mediaPaths = const [],
+    List<String> mediaTypes = const [],
+    String privacy = 'everyone',
+    String draftKind = 'post',
   }) async {
+    final normalizedMediaPaths =
+        mediaPaths.isNotEmpty
+            ? List<String>.unmodifiable(mediaPaths)
+            : mediaPath == null
+            ? const <String>[]
+            : <String>[mediaPath];
+    final normalizedMediaTypes =
+        mediaTypes.isNotEmpty
+            ? List<String>.unmodifiable(mediaTypes)
+            : mediaType == null
+            ? const <String>[]
+            : <String>[mediaType];
+
     final draft = PostDraft(
       id: const Uuid().v4(),
       content: content.trim(),
-      mediaPath: mediaPath,
-      mediaType: mediaType,
+      mediaPath: mediaPath ?? normalizedMediaPaths.firstOrNull,
+      mediaType: mediaType ?? normalizedMediaTypes.firstOrNull,
+      mediaPaths: normalizedMediaPaths,
+      mediaTypes: normalizedMediaTypes,
+      privacy: privacy,
+      draftKind: draftKind,
       createdAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
     await _box.put(draft.id, draft.toJson());

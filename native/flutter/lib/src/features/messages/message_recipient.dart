@@ -17,7 +17,7 @@ class MessageRecipient {
     return MessageRecipient(
       userId: json['id'].toString(),
       displayName: displayName == null || displayName.isEmpty
-          ? (username.isEmpty ? 'FEEDIN user' : username)
+          ? (username.isEmpty ? 'feedIn user' : username)
           : displayName,
       username: username,
       avatarUrl: json['avatar_url']?.toString(),

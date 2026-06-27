@@ -117,9 +117,8 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
 
-      final profile = await widget.services.profileRepository.loadProfileForUser(
-        user.id,
-      );
+      final profile = await widget.services.profileRepository
+          .loadProfileForUser(user.id);
 
       setState(() {
         _user = user;
@@ -239,15 +238,20 @@ class _AuthGateState extends State<AuthGate> {
       if (profile == null) {
         return ProfileCompletionScreen(
           user: user,
+          requireRemoteSync: widget.services.authRepository.isConfigured,
           onComplete: (completedProfile) async {
             try {
               await widget.services.profileRepository.syncProfile(
                 completedProfile,
               );
-            } catch (_) {
-              await widget.services.profileRepository.saveCurrentProfile(
-                completedProfile,
-              );
+            } catch (error) {
+              if (widget.services.authRepository.isConfigured) {
+                rethrow;
+              } else {
+                await widget.services.profileRepository.saveCurrentProfile(
+                  completedProfile,
+                );
+              }
             }
             if (!mounted) return;
             setState(() => _profile = completedProfile);
@@ -281,143 +285,304 @@ class _AuthGateState extends State<AuthGate> {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'FEEDIN',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Flutter cross-platform rebuild',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SegmentedButton<AuthMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: AuthMode.signIn,
-                        label: Text('Sign in'),
-                        icon: Icon(Icons.login),
-                      ),
-                      ButtonSegment(
-                        value: AuthMode.signUp,
-                        label: Text('Sign up'),
-                        icon: Icon(Icons.person_add),
-                      ),
-                    ],
-                    selected: {_mode},
-                    onSelectionChanged: _isSubmitting
-                        ? null
-                        : (selection) {
-                            setState(() {
-                              _mode = selection.first;
-                              _message = null;
-                              _errorMessage = null;
-                            });
-                          },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) {
-                      if (isConfigured && !_isSubmitting) _submit();
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: isConfigured && !_isSubmitting ? _submit : null,
-                    child: Text(
-                      _isSubmitting
-                          ? 'Please wait...'
-                          : isSignIn
-                          ? 'Sign in'
-                          : 'Create account',
-                    ),
-                  ),
-                  if (isSignIn) ...[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => _sendPasswordReset(),
-                      child: const Text('Reset password'),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  OutlinedButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => setState(() {
-                            _user = const AuthUser.demo();
-                            _profile = null;
-                          }),
-                    child: const Text('Enter demo shell'),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_errorMessage != null) ...[
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (_message != null) ...[
-                    Text(
-                      _message!,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Text(
-                    isConfigured
-                        ? 'Supabase is configured. Use a FEEDIN account or enter the demo shell.'
-                        : 'Supabase is not configured yet. Demo shell remains available while keys are added.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 760;
+            final content = [
+              const _OnboardingBrandPanel(),
+              _AuthFormPanel(
+                isConfigured: isConfigured,
+                isSignIn: isSignIn,
+                mode: _mode,
+                emailController: _emailController,
+                passwordController: _passwordController,
+                isSubmitting: _isSubmitting,
+                message: _message,
+                errorMessage: _errorMessage,
+                onModeChanged: (mode) {
+                  setState(() {
+                    _mode = mode;
+                    _message = null;
+                    _errorMessage = null;
+                  });
+                },
+                onSubmit: _submit,
+                onPasswordReset: _sendPasswordReset,
+                onLocalEntry: isConfigured
+                    ? null
+                    : () => setState(() {
+                        _user = const AuthUser.demo();
+                        _profile = null;
+                      }),
               ),
-            ),
-          ),
+            ];
+
+            return Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 980),
+                  child: isWide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(child: content[0]),
+                            const SizedBox(width: 28),
+                            Expanded(child: content[1]),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            content[0],
+                            const SizedBox(height: 18),
+                            content[1],
+                          ],
+                        ),
+                ),
+              ),
+            );
+          },
         ),
       ),
+    );
+  }
+}
+
+class _OnboardingBrandPanel extends StatelessWidget {
+  const _OnboardingBrandPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'feedIn',
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Create, connect, and share without losing your flow.',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: const [
+            _OnboardingChip(icon: Icons.play_circle_outline, label: 'Video'),
+            _OnboardingChip(icon: Icons.chat_bubble_outline, label: 'Chats'),
+            _OnboardingChip(icon: Icons.cloud_done_outlined, label: 'Sync'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _OnboardingChip extends StatelessWidget {
+  const _OnboardingChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _AuthFormPanel extends StatelessWidget {
+  const _AuthFormPanel({
+    required this.isConfigured,
+    required this.isSignIn,
+    required this.mode,
+    required this.emailController,
+    required this.passwordController,
+    required this.isSubmitting,
+    required this.message,
+    required this.errorMessage,
+    required this.onModeChanged,
+    required this.onSubmit,
+    required this.onPasswordReset,
+    required this.onLocalEntry,
+  });
+
+  final bool isConfigured;
+  final bool isSignIn;
+  final AuthMode mode;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final bool isSubmitting;
+  final String? message;
+  final String? errorMessage;
+  final ValueChanged<AuthMode> onModeChanged;
+  final VoidCallback onSubmit;
+  final VoidCallback onPasswordReset;
+  final VoidCallback? onLocalEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              isSignIn ? 'Welcome back' : 'Create your account',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isSignIn
+                  ? 'Sign in to continue your feed, messages, and profile.'
+                  : 'Start with your email and finish your profile next.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            SegmentedButton<AuthMode>(
+              segments: const [
+                ButtonSegment(
+                  value: AuthMode.signIn,
+                  label: Text('Sign in'),
+                  icon: Icon(Icons.login),
+                ),
+                ButtonSegment(
+                  value: AuthMode.signUp,
+                  label: Text('Sign up'),
+                  icon: Icon(Icons.person_add),
+                ),
+              ],
+              selected: {mode},
+              onSelectionChanged: isSubmitting
+                  ? null
+                  : (selection) => onModeChanged(selection.first),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.alternate_email),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (isConfigured && !isSubmitting) onSubmit();
+              },
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                prefixIcon: Icon(Icons.lock_outline),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: isConfigured && !isSubmitting ? onSubmit : null,
+              child: Text(
+                isSubmitting
+                    ? 'Please wait...'
+                    : isSignIn
+                    ? 'Sign in'
+                    : 'Create account',
+              ),
+            ),
+            if (isSignIn) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: isSubmitting ? null : onPasswordReset,
+                child: const Text('Reset password'),
+              ),
+            ],
+            if (onLocalEntry != null) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: isSubmitting ? null : onLocalEntry,
+                icon: const Icon(Icons.phone_android),
+                label: const Text('Open local mode'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (errorMessage != null) ...[
+              _AuthNotice(
+                message: errorMessage!,
+                color: Theme.of(context).colorScheme.error,
+                icon: Icons.error_outline,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (message != null) ...[
+              _AuthNotice(
+                message: message!,
+                color: Theme.of(context).colorScheme.primary,
+                icon: Icons.check_circle_outline,
+              ),
+              const SizedBox(height: 12),
+            ],
+            _AuthNotice(
+              message: isConfigured
+                  ? 'Secure login is connected.'
+                  : 'Add mobile credentials to enable secure login.',
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              icon: isConfigured ? Icons.verified_user : Icons.key_off,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthNotice extends StatelessWidget {
+  const _AuthNotice({
+    required this.message,
+    required this.color,
+    required this.icon,
+  });
+
+  final String message;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: color),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -452,8 +617,9 @@ class _PasswordRecoveryScaffold extends StatelessWidget {
                   Text(
                     'Reset password',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   TextField(

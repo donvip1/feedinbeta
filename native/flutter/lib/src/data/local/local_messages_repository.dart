@@ -9,18 +9,27 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   LocalMessagesRepository({
     required Box<Map> conversationsBox,
     required Box<Map> messagesBox,
+    required bool seedDemoContent,
   }) : _conversationsBox = conversationsBox,
-       _messagesBox = messagesBox;
+       _messagesBox = messagesBox,
+       _seedDemoContent = seedDemoContent;
 
   final Box<Map> _conversationsBox;
   final Box<Map> _messagesBox;
+  final bool _seedDemoContent;
 
   @override
   Future<List<ConversationSummary>> loadConversations() async {
-    await _seedDemoConversationIfEmpty();
+    if (_seedDemoContent) {
+      await _seedDemoConversationIfEmpty();
+    } else {
+      await _removeDemoConversation();
+    }
     final conversations =
         _conversationsBox.values
-            .map((value) => decodeLocalRecord(value, ConversationSummary.fromJson))
+            .map(
+              (value) => decodeLocalRecord(value, ConversationSummary.fromJson),
+            )
             .whereType<ConversationSummary>()
             .toList()
           ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
@@ -29,7 +38,9 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
 
   @override
   Future<ConversationSummary?> loadConversation(String conversationId) async {
-    await _seedDemoConversationIfEmpty();
+    if (_seedDemoContent) {
+      await _seedDemoConversationIfEmpty();
+    }
     final raw = _conversationsBox.get(conversationId);
     if (raw == null) return null;
     return ConversationSummary.fromJson(Map<String, Object?>.from(raw));
@@ -39,7 +50,9 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   Future<ConversationSummary?> loadConversationByServerId(
     String serverConversationId,
   ) async {
-    await _seedDemoConversationIfEmpty();
+    if (_seedDemoContent) {
+      await _seedDemoConversationIfEmpty();
+    }
     for (final raw in _conversationsBox.values) {
       final conversation = ConversationSummary.fromJson(
         Map<String, Object?>.from(raw),
@@ -52,7 +65,9 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   }
 
   @override
-  Future<ConversationSummary> createConversation({required String title}) async {
+  Future<ConversationSummary> createConversation({
+    required String title,
+  }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final conversation = ConversationSummary(
       id: const Uuid().v4(),
@@ -72,7 +87,9 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
 
   @override
   Future<List<LocalMessage>> loadMessages(String conversationId) async {
-    await _seedDemoConversationIfEmpty();
+    if (_seedDemoContent) {
+      await _seedDemoConversationIfEmpty();
+    }
     final messages =
         _messagesBox.values
             .map((value) => decodeLocalRecord(value, LocalMessage.fromJson))
@@ -200,7 +217,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     final now = DateTime.now().millisecondsSinceEpoch;
     const conversation = ConversationSummary(
       id: 'demo-conversation',
-      title: 'FEEDIN Support',
+      title: 'feedIn Support',
       lastMessagePreview: 'Messages are now stored locally first.',
       updatedAtMillis: 0,
       pendingCount: 0,
@@ -217,7 +234,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     final message = LocalMessage(
       id: 'demo-message',
       conversationId: conversation.id,
-      senderName: 'FEEDIN Support',
+      senderName: 'feedIn Support',
       body: conversation.lastMessagePreview,
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.delivered,
@@ -225,5 +242,10 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
 
     await _conversationsBox.put(conversation.id, seededConversation.toJson());
     await _messagesBox.put(message.id, message.toJson());
+  }
+
+  Future<void> _removeDemoConversation() async {
+    await _conversationsBox.delete('demo-conversation');
+    await _messagesBox.delete('demo-message');
   }
 }

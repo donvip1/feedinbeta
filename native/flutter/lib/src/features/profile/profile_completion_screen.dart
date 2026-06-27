@@ -8,10 +8,12 @@ class ProfileCompletionScreen extends StatefulWidget {
     super.key,
     required this.user,
     required this.onComplete,
+    this.requireRemoteSync = false,
   });
 
   final AuthUser user;
   final Future<void> Function(UserProfile profile) onComplete;
+  final bool requireRemoteSync;
 
   @override
   State<ProfileCompletionScreen> createState() =>
@@ -30,7 +32,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     super.initState();
     final emailName = widget.user.email?.split('@').first;
     _displayNameController = TextEditingController(
-      text: widget.user.isDemo ? 'FEEDIN Tester' : emailName ?? '',
+      text: widget.user.isDemo ? 'feedIn Tester' : emailName ?? '',
     );
     _handleController = TextEditingController(
       text: widget.user.isDemo ? 'feedin_tester' : _safeHandle(emailName ?? ''),
@@ -70,11 +72,30 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       completedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
 
-    await widget.onComplete(profile);
-
-    if (mounted) {
-      setState(() => _isSaving = false);
+    try {
+      await widget.onComplete(profile);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = widget.requireRemoteSync
+            ? 'Profile could not sync to Supabase: ${_formatError(error)}'
+            : 'Profile saved locally, but sync failed: ${_formatError(error)}';
+      });
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
+  }
+
+  static String _formatError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('PostgrestException(message: ', '')
+        .replaceFirst('StorageException(message: ', '')
+        .replaceFirst(RegExp(r', code: .*'), '')
+        .replaceFirst(RegExp(r', statusCode: .*'), '');
   }
 
   static String _safeHandle(String value) {
@@ -107,7 +128,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your profile is saved locally first and synced to FEEDIN when available.',
+                    'Your profile is saved locally first and synced to feedIn when available.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,

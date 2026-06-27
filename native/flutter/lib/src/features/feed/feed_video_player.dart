@@ -30,7 +30,8 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
   @override
   void didUpdateWidget(covariant FeedVideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url || oldWidget.localPath != widget.localPath) {
+    if (oldWidget.url != widget.url ||
+        oldWidget.localPath != widget.localPath) {
       _controller?.dispose();
       _controller = null;
       _initialize();
@@ -105,7 +106,9 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
                       });
                     },
                     icon: Icon(
-                      controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      controller.value.isPlaying
+                          ? Icons.pause
+                          : Icons.play_arrow,
                     ),
                   ),
                   const SizedBox(width: 6),

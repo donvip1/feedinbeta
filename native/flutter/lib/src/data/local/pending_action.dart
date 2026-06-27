@@ -1,4 +1,10 @@
-enum PendingActionType { likePost, savePost, commentOnPost }
+enum PendingActionType {
+  likePost,
+  savePost,
+  commentOnPost,
+  refeedPost,
+  sharePost,
+}
 
 class PendingAction {
   const PendingAction({

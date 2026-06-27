@@ -19,7 +19,9 @@ class MessagesRemoteDataSource {
 
     return rows
         .whereType<Map>()
-        .map((row) => RemoteConversation.fromJson(Map<String, Object?>.from(row)))
+        .map(
+          (row) => RemoteConversation.fromJson(Map<String, Object?>.from(row)),
+        )
         .toList();
   }
 
@@ -67,7 +69,7 @@ class RemoteConversation {
           ? displayName
           : (username != null && username.isNotEmpty)
           ? '@$username'
-          : 'FEEDIN chat',
+          : 'feedIn chat',
       lastMessagePreview:
           json['last_message_content']?.toString() ??
           'Tap to send your first message.',
@@ -98,7 +100,9 @@ class RemoteMessage {
 
   factory RemoteMessage.fromJson(Map<String, Object?> json) {
     final profile = json['profiles'];
-    final profileMap = profile is Map ? Map<String, Object?>.from(profile) : null;
+    final profileMap = profile is Map
+        ? Map<String, Object?>.from(profile)
+        : null;
     final displayName = profileMap?['display_name']?.toString();
     final username = profileMap?['username']?.toString();
 
@@ -110,7 +114,7 @@ class RemoteMessage {
           ? displayName
           : (username != null && username.isNotEmpty)
           ? '@$username'
-          : 'FEEDIN user',
+          : 'feedIn user',
       body: json['content']?.toString() ?? '',
       createdAtMillis: _parseMillis(json['created_at']),
       deliveryStateName: json['status']?.toString() ?? 'delivered',
@@ -121,5 +125,6 @@ class RemoteMessage {
 int _parseMillis(Object? value) {
   if (value is DateTime) return value.millisecondsSinceEpoch;
   final parsed = DateTime.tryParse(value?.toString() ?? '');
-  return parsed?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch;
+  return parsed?.millisecondsSinceEpoch ??
+      DateTime.now().millisecondsSinceEpoch;
 }

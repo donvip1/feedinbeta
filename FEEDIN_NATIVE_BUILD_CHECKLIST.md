@@ -1,12 +1,12 @@
-# FEEDIN Native Build Checklist
+# feedIn Native Build Checklist
 
-Status date: 2026-06-23
+Status date: 2026-06-24
 
-This is the single source of truth for the FEEDIN Flutter native rebuild. Keep this file updated as phases are completed.
+This is the single source of truth for the feedIn Flutter native rebuild. Keep this file updated as phases are completed.
 
 ## Confirmed Decisions
 
-- [x] App display name is `FEEDIN`.
+- [x] App display name is `feedIn`.
 - [x] Android package name is `com.feedin.app`.
 - [x] Active rebuild path is Flutter in `native/flutter`.
 - [x] Kotlin project in `native/android` is reference-only.
@@ -14,19 +14,31 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [x] Do not commit or push unless explicitly instructed.
 - [x] Keep private secrets out of Git and out of the mobile app.
 
+## Excluded From This Version
+
+- [x] FeedIn Learn / feedin lern is not included in this native app version.
+- [x] FeedAI is not included in this native app version.
+- [x] Any future learning, AI assistant, AI provider, or admin AI work must stay server-owned and be planned as a later expansion.
+
 ## Current App State
 
 - Active app: `native/flutter`
 - Debug APK: `native/flutter/build/app/outputs/flutter-apk/app-debug.apk`
 - Public Supabase config is passed at build/run time with `--dart-define`.
 - Root `.env` is local development only. Do not print it, share it, or commit it.
+- The native app is still below web-app UI/product parity. Backend wiring exists for core areas, but several Flutter screens are simplified first-pass implementations.
+- Active Supabase migrations are now compact native baseline files in `supabase/migrations`.
+- Active schema includes core social, payments, monetization, P2P, credits, advanced live, and calls.
+- Old Lovable-generated migrations are archived in `supabase/migrations_archive_lovable`.
+- New Supabase project ref is `jnegupfltkfybhwpodrr`.
+- Supabase CLI is available through `npx supabase`, but migration push is waiting for a private Supabase access token or database password.
 
 ## Phase 1: Flutter Foundation
 
 - [x] Created Flutter project.
 - [x] Set Android application ID to `com.feedin.app`.
-- [x] Set Android app label to `FEEDIN`.
-- [x] Added FEEDIN app shell and bottom tabs.
+- [x] Set Android app label to `feedIn`.
+- [x] Added feedIn app shell and bottom tabs.
 - [x] Added safe Supabase config loading through `--dart-define`.
 - [x] Added Supabase bootstrap that only initializes when public config exists.
 - [x] Added Supabase sign in, sign up, session restore, sign out, and password reset.
@@ -34,6 +46,7 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [x] Added Android deep link callback for `feedin://auth-callback`.
 - [x] Added native password recovery screen.
 - [x] Added widget test coverage for the demo shell.
+- [x] Removed demo/offline preview entry from Supabase-configured builds.
 - [ ] Add production crash/error logging after Firebase project is connected.
 
 ## Phase 2: Offline-First Feed
@@ -50,7 +63,15 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [x] Added local storage schema metadata, migration pass, and safe record decoding.
 - [ ] Test feed refresh and queued action replay against live Supabase with real user sessions.
 - [x] Added app-side older-post pagination using `posts.created_at` ordering.
-- [ ] Add repost/share queue after the backend table or RPC is confirmed.
+- [x] Removed old demo feed rows from Supabase-configured builds.
+- [x] Updated Flutter feed query toward the web app `posts` schema: `status`, `media_urls`, `media_types`, and `profiles:user_id`.
+- [x] Added repost/share queue using existing post share backend tables.
+- [x] Replace simplified feed cards with immersive native feed UI matching the Lovable web experience.
+- [x] Added real feed engagement counts and richer metadata to native feed cards.
+- [x] Added native comment sheet with typed comment queueing.
+- [x] Added real comments sheet, like counts, refeed queue, and share queue.
+- [x] Added local save state display, copied-share action, backend share queue, and post detail view.
+- [x] Added live tab content from `live_streams` and `live_spaces`.
 
 ## Phase 3: Media Pipeline
 
@@ -84,6 +105,7 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [x] Added recipient search against safe public profile fields.
 - [x] Added server conversation creation through `create_conversation` RPC with local fallback.
 - [x] Added local notification route handling so notification taps can open a chat.
+- [x] Added native chat UI polish: avatars, timestamps, delivery-state icons, empty states, and attachment/call entry points.
 - [ ] Test recipient search with real Supabase users.
 - [ ] Test `create_conversation` RPC with real Supabase users.
 - [ ] Test full message replay with secure session restoration on a real device.
@@ -97,6 +119,7 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [x] Added local notification inbox.
 - [x] Added notification counts and cleanup in Settings.
 - [x] Added notification-to-chat route handling for stored notification payloads.
+- [x] Added typed notification cards with message/feed/system icons, timestamps, empty state, and deep-link tap handling.
 - [x] Added privacy and media preference toggles.
 - [x] Persisted settings locally.
 - [x] Added storage snapshot for profile/feed/queue/chat/message/notification/media counts.
@@ -106,21 +129,38 @@ This is the single source of truth for the FEEDIN Flutter native rebuild. Keep t
 - [ ] Store FCM tokens server-side after the final notification table/RPC is confirmed.
 - [ ] Add production push notification payload handling.
 - [ ] Add friends/follow social graph after backend schema is confirmed.
+- [x] Expanded native profile with cover/banner, avatar, counts, premium indicator, location, website, and richer edit fields.
+- [x] Added native profile posts grid backed by the real feed repository.
+- [ ] Complete profile parity: posts grid, followers/following modals, view history, verification/role badges, and social links.
 
-## Phase 6: Release, Background Work, Store Prep
+## Phase 6: Native UI/Product Parity
+
+- [x] Replaced scaffold-style auth screen with production feedIn onboarding.
+- [ ] Match the Lovable web visual language in native Flutter: immersive feed, stronger motion, polished spacing, and premium social-app density.
+- [x] Added Live tab behavior backed by real `live_streams` and `live_spaces`.
+- [x] Complete Feed as a TikTok-style media-first experience matching the web app. (Vertical full-screen PageView, full-bleed cached video/photo, right action rail, expandable captions, double-tap-to-like, autoplay on active page, immersive overlay tabs.)
+- [x] Reworked Create into a stronger native creator surface with mode controls, media tools, camera capture, privacy toggle, and upload queue panel.
+- [ ] Complete Create parity: multi-media posts, final story publishing, photo-plus flow, captions, final privacy persistence, and upload progress.
+- [ ] Complete Profile parity.
+- [ ] Rebuild Messages to full chat parity: online presence, real attachments, real call entry points, and backend read receipts.
+- [ ] Rebuild Notifications to full web parity after final remote notification table, FCM payload shape, and typed action schema are confirmed.
+- [x] Added production empty states for feed tabs, live, chats, conversations, notifications, and create drafts.
+- [x] Removed remaining visible demo/offline-preview/scaffold text from Supabase-configured builds.
+
+## Phase 7: Release, Background Work, Store Prep
 
 - [x] Added foreground auto-sync coordinator.
 - [x] Added Workmanager-based OS background sync scheduling scaffold.
 - [x] Added Android release signing scaffold.
 - [x] Added ignored `key.properties`/keystore rules and tracked `key.properties.example`.
-- [x] Added FEEDIN adaptive launcher icon resources.
+- [x] Added feedIn adaptive launcher icon resources.
 - [ ] Test background sync on a real Android phone after Supabase auth is active.
 - [ ] Create release keystore locally.
 - [ ] Build release app bundle.
 - [ ] Set up Play Console internal testing.
 - [ ] Add iOS Firebase config and iOS release setup later.
 
-## Phase 7: Later Product Expansion
+## Phase 8: Later Product Expansion
 
 - [ ] Calls.
 - [ ] Live rooms.
@@ -135,13 +175,13 @@ These are the items that need your account access or private files. Do not send 
 ### Supabase Public Mobile Config
 
 - [x] Current development Supabase URL and publishable key are available locally through the root `.env`.
-- [ ] For final production, create or choose the final Supabase project.
+- [x] New Supabase project created: `jnegupfltkfybhwpodrr`.
 - [ ] Replace local build/run values with the final project URL and publishable key.
 
 Steps:
 
 1. Open Supabase Dashboard.
-2. Open the FEEDIN project.
+2. Open the feedIn project.
 3. Go to Project Settings.
 4. Open API or API Keys.
 5. Copy the Project URL.
@@ -149,6 +189,43 @@ Steps:
 7. Use those values only as `--dart-define` values or local ignored `.env` values.
 
 Never put a service-role key, database password, payment secret, AI key, or admin key into Flutter.
+
+### Supabase Migration Credential
+
+- [x] Supabase CLI checked locally through `npx supabase`.
+- [x] `supabase/config.toml` points to project ref `jnegupfltkfybhwpodrr`.
+- [x] Added local `SUPABASE_DB_PASSWORD`.
+- [x] Added local IPv4 Transaction Pooler connection string as `SUPABASE_DB_URL`.
+- [x] Ran migration push with the encoded pooler DB URL.
+- [x] Ran `supabase db push`; all active migrations applied successfully.
+
+Option A, Supabase access token:
+
+1. Open Supabase Dashboard.
+2. Open Account or Profile settings.
+3. Open Access Tokens.
+4. Create a token for local CLI use.
+5. Add it only to local `.env` as `SUPABASE_ACCESS_TOKEN=...`.
+6. Do not send the token in chat and do not commit `.env`.
+
+Option B, database password:
+
+1. Open the new Supabase project.
+2. Open Project Settings.
+3. Open Database.
+4. Find or reset the database password.
+5. Add it only to local `.env` as `SUPABASE_DB_PASSWORD=...`.
+6. Do not send the password in chat and do not commit `.env`.
+
+Option B also needs the IPv4 pooler URL on this network:
+
+1. Open the new Supabase project.
+2. Click Connect.
+3. Choose Transaction Pooler.
+4. Copy the URI / connection string.
+5. Replace `[YOUR-PASSWORD]` in that URI with the local database password.
+6. Add the full URI only to local `.env` as `SUPABASE_DB_URL=...`.
+7. Do not send the URI in chat and do not commit `.env`.
 
 ### Supabase Auth Redirect
 
@@ -180,10 +257,17 @@ Steps:
 
 ### Supabase Database/RLS Checks
 
-- [ ] Confirm tables exist: `posts`, `profiles`, `post_likes`, `post_comments`, `saved_posts`, `conversations`, `conversation_participants`, `messages`.
-- [ ] Confirm public-safe profile search source exists: `public_profiles`.
-- [ ] Confirm RPC exists: `create_conversation`.
-- [ ] Confirm RLS policies allow normal signed-in user actions and block unauthorized access.
+- [x] Consolidated active migrations into a compact native baseline.
+- [x] Active migrations exclude FeedAI and FeedIn Learn.
+- [x] Active migrations include payments, monetization, P2P, credits, advanced live rooms, gifts, and calls.
+- [x] Pushed active migrations to project `jnegupfltkfybhwpodrr`.
+- [x] Confirmed core tables exist: `posts`, `profiles`, `post_likes`, `post_comments`, `saved_posts`, `conversations`, `conversation_participants`, `messages`.
+- [x] Confirmed product tables exist for credits, P2P, advanced live, and calls.
+- [x] Confirmed public-safe profile search source exists: `public_profiles`.
+- [x] Confirmed RPC exists: `create_conversation`.
+- [x] Confirmed `post-media` storage bucket exists.
+- [x] Confirmed realtime publication includes `posts` and `messages`.
+- [ ] Test RLS policies with normal signed-in users from the Flutter app.
 
 Steps:
 
@@ -204,7 +288,7 @@ Steps:
 Steps:
 
 1. Open Firebase Console.
-2. Create or open the FEEDIN Firebase project.
+2. Create or open the feedIn Firebase project.
 3. Add Android app.
 4. Enter package name `com.feedin.app`.
 5. Download `google-services.json`.
@@ -220,7 +304,7 @@ Steps:
 
 ### Play Console
 
-- [ ] Create FEEDIN app listing.
+- [ ] Create feedIn app listing.
 - [ ] Set up internal testing.
 - [ ] Upload release `.aab` after release signing is ready.
 - [ ] Add testers.
@@ -278,4 +362,4 @@ native/flutter/build/app/outputs/bundle/release/app-release.aab
 2. Test live Supabase auth/feed/messages/uploads on a real device.
 3. Wait for `google-services.json`, then add Firebase Cloud Messaging.
 4. Confirm Supabase tables, RLS policies, `post-media`, `public_profiles`, and `create_conversation`.
-5. Continue UI polish toward the original Lovable FEEDIN look while preserving native Flutter performance.
+5. Continue UI polish toward the original Lovable feedIn look while preserving native Flutter performance.

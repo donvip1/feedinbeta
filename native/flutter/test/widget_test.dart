@@ -27,7 +27,7 @@ import 'package:feedin/src/features/settings/app_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('FEEDIN demo shell opens from auth gate', (tester) async {
+  testWidgets('feedIn offline preview opens from auth gate', (tester) async {
     final services = FeedinServices(
       config: const FeedinConfig(supabaseUrl: '', supabasePublishableKey: ''),
       authRepository: _FakeAuthRepository(),
@@ -56,10 +56,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('FEEDIN'), findsOneWidget);
-    expect(find.text('Enter demo shell'), findsOneWidget);
+    expect(find.text('feedIn'), findsOneWidget);
+    expect(find.text('Open local mode'), findsOneWidget);
 
-    await tester.tap(find.text('Enter demo shell'));
+    await tester.tap(find.text('Open local mode'));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Complete profile'), findsOneWidget);
@@ -69,7 +69,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Videos'), findsOneWidget);
-    expect(find.text('Photos & Text'), findsOneWidget);
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('Live'), findsOneWidget);
     expect(find.text('Create'), findsOneWidget);
   });
 }
@@ -92,13 +93,21 @@ class _FakePostDraftRepository implements PostDraftRepository {
     required String content,
     String? mediaPath,
     String? mediaType,
+    List<String> mediaPaths = const [],
+    List<String> mediaTypes = const [],
+    String privacy = 'everyone',
+    String draftKind = 'post',
   }) async {
     return PostDraft(
       id: 'draft',
       content: content,
       createdAtMillis: 1,
-      mediaPath: mediaPath,
-      mediaType: mediaType,
+      mediaPath: mediaPath ?? mediaPaths.firstOrNull,
+      mediaType: mediaType ?? mediaTypes.firstOrNull,
+      mediaPaths: mediaPaths,
+      mediaTypes: mediaTypes,
+      privacy: privacy,
+      draftKind: draftKind,
     );
   }
 }
@@ -343,13 +352,15 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
     return const [
       FeedPost(
         id: 'test-1',
-        authorName: 'FEEDIN System',
+        userId: 'test-user',
+        authorName: 'feedIn System',
         body: 'Cached test post',
         meta: 'Local-first',
         createdAtMillis: 1,
       ),
       FeedPost(
         id: 'test-2',
+        userId: 'test-user',
         authorName: 'Platform',
         body: 'Cross-platform test post',
         meta: 'Cross-platform',
@@ -369,6 +380,15 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<List<FeedPost>> loadPostsByUser(String userId) async {
+    final posts = await loadPosts();
+    return posts.where((post) => post.userId == userId).toList();
+  }
+
+  @override
+  Future<List<LiveFeedItem>> loadLiveItems() async => const [];
+
+  @override
   Future<void> queueLike(String postId) async {
     _pendingActions++;
   }
@@ -384,6 +404,16 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<void> queueRefeed(String postId) async {
+    _pendingActions++;
+  }
+
+  @override
+  Future<void> queueShare(String postId) async {
+    _pendingActions++;
+  }
+
+  @override
   Future<int> pendingActionCount() async => _pendingActions;
 }
 
@@ -393,7 +423,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     return const [
       ConversationSummary(
         id: 'test-conversation',
-        title: 'FEEDIN Support',
+        title: 'feedIn Support',
         lastMessagePreview: 'Local messages ready',
         updatedAtMillis: 1,
         pendingCount: 0,
@@ -405,7 +435,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
   Future<ConversationSummary?> loadConversation(String conversationId) async {
     return const ConversationSummary(
       id: 'test-conversation',
-      title: 'FEEDIN Support',
+      title: 'feedIn Support',
       lastMessagePreview: 'Local messages ready',
       updatedAtMillis: 1,
       pendingCount: 0,
@@ -441,7 +471,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
       LocalMessage(
         id: 'test-message',
         conversationId: 'test-conversation',
-        senderName: 'FEEDIN Support',
+        senderName: 'feedIn Support',
         body: 'Local messages ready',
         createdAtMillis: 1,
         deliveryState: MessageDeliveryState.delivered,

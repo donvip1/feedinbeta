@@ -5,7 +5,8 @@ import '../../features/notifications/notification_item.dart';
 import 'local_record_decoder.dart';
 import 'notification_repository_contract.dart';
 
-class NotificationRepository implements NotificationRepositoryContract {
+class NotificationRepository
+    implements NotificationRepositoryContract, NotificationDeletionContract {
   NotificationRepository({required Box<Map> box}) : _box = box;
 
   final Box<Map> _box;
@@ -27,6 +28,9 @@ class NotificationRepository implements NotificationRepositoryContract {
     required String title,
     required String body,
     String? route,
+    String? rawType,
+    String? displayName,
+    String? avatarUrl,
   }) async {
     final notification = NotificationItem(
       id: const Uuid().v4(),
@@ -35,6 +39,9 @@ class NotificationRepository implements NotificationRepositoryContract {
       createdAtMillis: DateTime.now().millisecondsSinceEpoch,
       isRead: false,
       route: route,
+      rawType: rawType,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
     );
     await _box.put(notification.id, notification.toJson());
   }
@@ -47,7 +54,10 @@ class NotificationRepository implements NotificationRepositoryContract {
     final notification = NotificationItem.fromJson(
       Map<String, Object?>.from(raw),
     );
-    await _box.put(notificationId, notification.copyWith(isRead: true).toJson());
+    await _box.put(
+      notificationId,
+      notification.copyWith(isRead: true).toJson(),
+    );
   }
 
   @override
@@ -60,6 +70,11 @@ class NotificationRepository implements NotificationRepositoryContract {
       );
       await _box.put(key, notification.copyWith(isRead: true).toJson());
     }
+  }
+
+  @override
+  Future<void> deleteNotification(String notificationId) async {
+    await _box.delete(notificationId);
   }
 
   @override
@@ -76,7 +91,7 @@ class NotificationRepository implements NotificationRepositoryContract {
   Future<void> _seedIfEmpty() async {
     if (_box.isNotEmpty) return;
     await addNotification(
-      title: 'FEEDIN notifications ready',
+      title: 'feedIn notifications ready',
       body: 'Push notifications will appear here after Firebase is connected.',
     );
   }

@@ -16,7 +16,7 @@ class FeedinApp extends StatelessWidget {
     final services = servicesOverride ?? FeedinServices.create(config);
 
     return MaterialApp(
-      title: 'FEEDIN',
+      title: 'feedIn',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(

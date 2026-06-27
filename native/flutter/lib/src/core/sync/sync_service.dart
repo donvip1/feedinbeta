@@ -111,6 +111,19 @@ class SyncService implements SyncServiceContract {
           ...action.payload,
           'user_id': userId,
         });
+      case PendingActionType.refeedPost:
+        await client.from('posts').insert({
+          'user_id': userId,
+          'original_post_id': action.payload['post_id'],
+          'content': '',
+          'post_type': 'refeed',
+          'status': 'active',
+        });
+      case PendingActionType.sharePost:
+        await client.from('post_shares').insert({
+          ...action.payload,
+          'user_id': userId,
+        });
     }
   }
 

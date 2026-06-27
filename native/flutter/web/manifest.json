@@ -1,11 +1,11 @@
 {
-    "name": "FEEDIN",
-    "short_name": "FEEDIN",
+    "name": "feedIn",
+    "short_name": "feedIn",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#050505",
     "theme_color": "#22C55E",
-    "description": "FEEDIN cross-platform app.",
+    "description": "feedIn cross-platform app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

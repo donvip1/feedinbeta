@@ -15,19 +15,26 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
     required FeedRemoteDataSource remoteDataSource,
     required MediaCacheService mediaCacheService,
     required PendingActionRepository pendingActionRepository,
+    required bool seedDemoContent,
   }) : _box = box,
        _remoteDataSource = remoteDataSource,
        _mediaCacheService = mediaCacheService,
-       _pendingActionRepository = pendingActionRepository;
+       _pendingActionRepository = pendingActionRepository,
+       _seedDemoContent = seedDemoContent;
 
   final Box<Map> _box;
   final FeedRemoteDataSource _remoteDataSource;
   final MediaCacheService _mediaCacheService;
   final PendingActionRepository _pendingActionRepository;
+  final bool _seedDemoContent;
 
   @override
   Future<List<FeedPost>> loadPosts() async {
-    await seedDemoPostsIfEmpty();
+    if (_seedDemoContent) {
+      await seedDemoPostsIfEmpty();
+    } else {
+      await _removeDemoPosts();
+    }
     final posts =
         _box.values
             .map((value) => decodeLocalRecord(value, FeedPost.fromJson))
@@ -46,7 +53,7 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
         return FeedRefreshResult(
           posts: await loadPosts(),
           usedRemote: false,
-          message: 'Showing cached feed.',
+          message: 'No active posts returned from Supabase.',
         );
       }
 
@@ -57,11 +64,11 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
       }
 
       return FeedRefreshResult(posts: await loadPosts(), usedRemote: true);
-    } catch (_) {
+    } catch (error) {
       return FeedRefreshResult(
         posts: await loadPosts(),
         usedRemote: false,
-        message: 'Refresh failed. Showing cached feed.',
+        message: 'Feed refresh failed: ${_friendlyError(error)}',
       );
     }
   }
@@ -105,8 +112,27 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
     }
   }
 
+  @override
+  Future<List<FeedPost>> loadPostsByUser(String userId) async {
+    try {
+      final remotePosts = await _remoteDataSource.fetchFeed(
+        userId: userId,
+        limit: 60,
+      );
+      return remotePosts;
+    } catch (_) {
+      final posts = await loadPosts();
+      return posts.where((post) => post.userId == userId).toList();
+    }
+  }
+
+  @override
+  Future<List<LiveFeedItem>> loadLiveItems() {
+    return _remoteDataSource.fetchLiveItems();
+  }
+
   Future<FeedPost> _cacheMediaForPost(FeedPost post) async {
-    final mediaUrl = post.mediaUrl;
+    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
     if (mediaUrl == null || mediaUrl.isEmpty) return post;
 
     final localPath = await _mediaCacheService.cacheRemoteMedia(mediaUrl);
@@ -140,6 +166,22 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<void> queueRefeed(String postId) {
+    return _pendingActionRepository.queueAction(
+      type: PendingActionType.refeedPost,
+      payload: {'post_id': postId},
+    );
+  }
+
+  @override
+  Future<void> queueShare(String postId) {
+    return _pendingActionRepository.queueAction(
+      type: PendingActionType.sharePost,
+      payload: {'post_id': postId},
+    );
+  }
+
+  @override
   Future<int> pendingActionCount() {
     return _pendingActionRepository.count();
   }
@@ -151,12 +193,37 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
     for (final (index, post) in demoPosts.indexed) {
       final feedPost = FeedPost(
         id: 'demo-${index + 1}',
+        userId: 'local-demo',
         authorName: post.authorName,
         body: post.body,
         meta: post.meta,
         createdAtMillis: now - (index * 1000),
+        mediaUrl: post.mediaUrl,
+        mediaType: post.mediaType,
+        mediaUrls: post.mediaUrls,
+        mediaTypes: post.mediaTypes,
+        location: post.location,
+        likesCount: post.likesCount,
+        commentsCount: post.commentsCount,
+        viewsCount: post.viewsCount,
+        refeedsCount: post.refeedsCount,
       );
       await _box.put(feedPost.id, feedPost.toJson());
     }
+  }
+
+  Future<void> _removeDemoPosts() async {
+    final demoKeys = _box.keys
+        .where((key) => key.toString().startsWith('demo-'))
+        .toList();
+    for (final key in demoKeys) {
+      await _box.delete(key);
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    if (message.length <= 180) return message;
+    return '${message.substring(0, 180)}...';
   }
 }

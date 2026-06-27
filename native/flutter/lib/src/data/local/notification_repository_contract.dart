@@ -12,3 +12,7 @@ abstract interface class NotificationRepositoryContract {
   Future<int> unreadCount();
   Future<void> clear();
 }
+
+abstract interface class NotificationDeletionContract {
+  Future<void> deleteNotification(String notificationId);
+}

@@ -5,6 +5,10 @@ class PostDraft {
     required this.createdAtMillis,
     this.mediaPath,
     this.mediaType,
+    this.mediaPaths = const [],
+    this.mediaTypes = const [],
+    this.privacy = 'everyone',
+    this.draftKind = 'post',
     this.uploadState = DraftUploadState.local,
   });
 
@@ -12,6 +16,10 @@ class PostDraft {
   final String content;
   final String? mediaPath;
   final String? mediaType;
+  final List<String> mediaPaths;
+  final List<String> mediaTypes;
+  final String privacy;
+  final String draftKind;
   final int createdAtMillis;
   final DraftUploadState uploadState;
 
@@ -21,17 +29,34 @@ class PostDraft {
       content: content,
       mediaPath: mediaPath,
       mediaType: mediaType,
+      mediaPaths: mediaPaths,
+      mediaTypes: mediaTypes,
+      privacy: privacy,
+      draftKind: draftKind,
       createdAtMillis: createdAtMillis,
       uploadState: uploadState ?? this.uploadState,
     );
   }
 
   factory PostDraft.fromJson(Map<String, Object?> json) {
+    final legacyMediaPath = json['mediaPath'] as String?;
+    final legacyMediaType = json['mediaType'] as String?;
+    final mediaPaths =
+        (json['mediaPaths'] as List?)?.whereType<String>().toList() ??
+        (legacyMediaPath == null ? const <String>[] : <String>[legacyMediaPath]);
+    final mediaTypes =
+        (json['mediaTypes'] as List?)?.whereType<String>().toList() ??
+        (legacyMediaType == null ? const <String>[] : <String>[legacyMediaType]);
+
     return PostDraft(
       id: json['id'] as String,
       content: json['content'] as String? ?? '',
-      mediaPath: json['mediaPath'] as String?,
-      mediaType: json['mediaType'] as String?,
+      mediaPath: legacyMediaPath ?? mediaPaths.firstOrNull,
+      mediaType: legacyMediaType ?? mediaTypes.firstOrNull,
+      mediaPaths: mediaPaths,
+      mediaTypes: mediaTypes,
+      privacy: json['privacy'] as String? ?? 'everyone',
+      draftKind: json['draftKind'] as String? ?? 'post',
       createdAtMillis: json['createdAtMillis'] as int,
       uploadState: DraftUploadState.values.byName(
         json['uploadState'] as String? ?? DraftUploadState.local.name,
@@ -45,6 +70,10 @@ class PostDraft {
       'content': content,
       'mediaPath': mediaPath,
       'mediaType': mediaType,
+      'mediaPaths': mediaPaths,
+      'mediaTypes': mediaTypes,
+      'privacy': privacy,
+      'draftKind': draftKind,
       'createdAtMillis': createdAtMillis,
       'uploadState': uploadState.name,
     };

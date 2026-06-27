@@ -99,6 +99,7 @@ class FeedinServices {
     final messagesRepository = LocalMessagesRepository(
       conversationsBox: conversationsBox,
       messagesBox: messagesBox,
+      seedDemoContent: !config.hasSupabaseConfig,
     );
     final notificationRepository = NotificationRepository(
       box: notificationsBox,
@@ -152,6 +153,7 @@ class FeedinServices {
         ),
         mediaCacheService: mediaCacheService,
         pendingActionRepository: pendingActionRepository,
+        seedDemoContent: !config.hasSupabaseConfig,
       ),
       messagesRepository: messagesRepository,
       notificationRepository: notificationRepository,

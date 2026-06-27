@@ -78,11 +78,13 @@ class AuthRepository implements AuthRepositoryContract {
     final session = response.session;
     final user = response.user;
 
-    if (session != null) {
-      await _saveSession(session);
+    if (session == null || user == null) {
+      return null;
     }
 
-    return user == null ? null : AuthUser.fromSupabaseUser(user);
+    await _saveSession(session);
+
+    return AuthUser.fromSupabaseUser(user);
   }
 
   @override
@@ -133,14 +135,14 @@ class AuthUser {
 
   const AuthUser.demo()
     : id = 'local-demo',
-      displayName = 'FEEDIN Tester',
+      displayName = 'feedIn Tester',
       email = null,
       isDemo = true;
 
   factory AuthUser.fromSupabaseUser(User user) {
     return AuthUser(
       id: user.id,
-      displayName: user.email ?? 'FEEDIN User',
+      displayName: user.email ?? 'feedIn User',
       email: user.email,
       isDemo: false,
     );

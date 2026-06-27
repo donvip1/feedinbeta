@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/realtime/feedin_realtime_service.dart';
 import '../../core/storage/local_storage_maintenance.dart';
@@ -19,12 +20,16 @@ import '../../data/local/profile_repository_contract.dart';
 import '../../data/local/upload_queue_repository.dart';
 import '../create/create_post_screen.dart';
 import '../messages/messages_screen.dart';
+import '../notifications/parity/notifications_view_models.dart';
+import '../notifications/parity/widgets/notification_bell_badge.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_editor_screen.dart';
 import '../profile/user_profile.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
 import 'feed_video_player.dart';
+import 'immersive/feed_immersive_theme.dart';
+import 'immersive/immersive_post_card.dart';
 
 class FeedShell extends StatefulWidget {
   const FeedShell({
@@ -79,11 +84,14 @@ class _FeedShellState extends State<FeedShell> {
   int _messagesRealtimeVersion = 0;
   String? _initialConversationId;
   late UserProfile _profile;
+  late Future<int> _notificationUnreadCountFuture;
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
+    _notificationUnreadCountFuture = widget.notificationRepository
+        .unreadCount();
     _realtimeSubscription = widget.realtimeService.events.listen(
       _handleRealtimeEvent,
     );
@@ -123,6 +131,30 @@ class _FeedShellState extends State<FeedShell> {
     setState(() => _messagesRealtimeVersion++);
   }
 
+  void _refreshNotificationBadge() {
+    if (!mounted) return;
+    setState(() {
+      _notificationUnreadCountFuture = widget.notificationRepository
+          .unreadCount();
+    });
+  }
+
+  void _toggleNotifications() {
+    setState(() {
+      _showNotifications = !_showNotifications;
+      _notificationUnreadCountFuture = widget.notificationRepository
+          .unreadCount();
+    });
+  }
+
+  void _showNotificationsScreen() {
+    setState(() {
+      _showNotifications = true;
+      _notificationUnreadCountFuture = widget.notificationRepository
+          .unreadCount();
+    });
+  }
+
   void _openNotificationRoute(String route) {
     final conversationId = _conversationIdFromRoute(route);
     if (conversationId != null) {
@@ -155,10 +187,14 @@ class _FeedShellState extends State<FeedShell> {
       FeedScreen(
         feedRepository: widget.feedRepository,
         realtimeVersion: _feedRealtimeVersion,
+        onOpenNotifications: _showNotificationsScreen,
+        notificationUnreadCountFuture: _notificationUnreadCountFuture,
       ),
       CreatePostScreen(
         draftRepository: widget.postDraftRepository,
         uploadQueueRepository: widget.uploadQueueRepository,
+        uploadQueueService: widget.uploadQueueService,
+        onPostUploaded: () => setState(() => _feedRealtimeVersion++),
       ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
@@ -170,6 +206,7 @@ class _FeedShellState extends State<FeedShell> {
       ProfileEditorScreen(
         profile: _profile,
         profileRepository: widget.profileRepository,
+        feedRepository: widget.feedRepository,
         onSaved: (profile) => setState(() => _profile = profile),
       ),
       SettingsScreen(
@@ -183,43 +220,51 @@ class _FeedShellState extends State<FeedShell> {
       ),
     ];
 
+    // The feed tab is an immersive, full-bleed experience that draws its own
+    // top overlay, so the shared AppBar is hidden while it is on screen.
+    final immersiveFeed = _index == 0 && !_showNotifications;
+
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 64,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'FEEDIN',
-              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0),
-            ),
-            Text(
-              _profile.displayName,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+      backgroundColor: immersiveFeed ? Colors.black : null,
+      appBar: immersiveFeed
+          ? null
+          : AppBar(
+              toolbarHeight: 64,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'feedIn',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  Text(
+                    _profile.displayName,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
+              actions: [
+                IconButton(
+                  tooltip: 'Search',
+                  onPressed: () {},
+                  icon: const Icon(Icons.search),
+                ),
+                _NotificationBellAction(
+                  unreadCountFuture: _notificationUnreadCountFuture,
+                  onTap: _toggleNotifications,
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Search',
-            onPressed: () {},
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () {
-              setState(() => _showNotifications = !_showNotifications);
-            },
-            icon: const Icon(Icons.notifications_none),
-          ),
-        ],
-      ),
       body: _showNotifications
           ? NotificationsScreen(
               notificationRepository: widget.notificationRepository,
               onOpenRoute: _openNotificationRoute,
+              onChanged: _refreshNotificationBadge,
             )
           : pages[_index],
       bottomNavigationBar: NavigationBar(
@@ -261,15 +306,49 @@ class _FeedShellState extends State<FeedShell> {
   }
 }
 
+class _NotificationBellAction extends StatelessWidget {
+  const _NotificationBellAction({
+    required this.unreadCountFuture,
+    required this.onTap,
+    this.foregroundColor,
+  });
+
+  final Future<int> unreadCountFuture;
+  final VoidCallback onTap;
+  final Color? foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<int>(
+      future: unreadCountFuture,
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        final bell = NotificationBellBadge(
+          viewModel: NotificationBellViewModel(unreadCount: count),
+          onTap: onTap,
+          pulse: count > 0,
+          foregroundColor: foregroundColor,
+        );
+
+        return bell;
+      },
+    );
+  }
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
     required this.feedRepository,
     required this.realtimeVersion,
+    required this.onOpenNotifications,
+    required this.notificationUnreadCountFuture,
   });
 
   final LocalFeedRepositoryContract feedRepository;
   final int realtimeVersion;
+  final VoidCallback onOpenNotifications;
+  final Future<int> notificationUnreadCountFuture;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -277,17 +356,29 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   late Future<List<FeedPost>> _postsFuture;
+  late Future<List<LiveFeedItem>> _liveFuture;
+  final PageController _pageController = PageController();
   int _pendingActionCount = 0;
   String? _message;
   int _tabIndex = 0;
+  int _activePage = 0;
   bool _isLoadingMore = false;
   bool _hasMorePosts = true;
+  final Set<String> _savedPostIds = {};
+  final Set<String> _likedPostIds = {};
 
   @override
   void initState() {
     super.initState();
-    _postsFuture = widget.feedRepository.loadPosts();
+    _postsFuture = _initialLoad();
+    _liveFuture = widget.feedRepository.loadLiveItems();
     _loadPendingActionCount();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -303,6 +394,7 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
+      _liveFuture = widget.feedRepository.loadLiveItems();
       _message = 'New feed activity synced.';
     });
     await _loadPendingActionCount();
@@ -314,11 +406,25 @@ class _FeedScreenState extends State<FeedScreen> {
     setState(() => _pendingActionCount = count);
   }
 
+  Future<List<FeedPost>> _initialLoad() async {
+    final cachedPosts = await widget.feedRepository.loadPosts();
+    final result = await widget.feedRepository.refresh();
+    if (!mounted) return result.posts.isNotEmpty ? result.posts : cachedPosts;
+
+    setState(() {
+      _message = result.message;
+      _hasMorePosts = result.usedRemote;
+    });
+
+    return result.posts.isNotEmpty ? result.posts : cachedPosts;
+  }
+
   Future<void> _refresh() async {
     final result = await widget.feedRepository.refresh();
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
+      _liveFuture = widget.feedRepository.loadLiveItems();
       _message = result.message ?? 'Feed refreshed.';
       _hasMorePosts = result.usedRemote;
     });
@@ -349,307 +455,677 @@ class _FeedScreenState extends State<FeedScreen> {
     setState(() => _message = 'Saved offline. It will sync later.');
   }
 
+  Future<void> _likePost(FeedPost post) async {
+    if (!_likedPostIds.contains(post.id)) {
+      setState(() => _likedPostIds.add(post.id));
+    }
+    await widget.feedRepository.queueLike(post.id);
+    await _loadPendingActionCount();
+  }
+
+  /// Pull the next page in once the viewer nears the end of the loaded feed.
+  void _maybeLoadMore(int index, int loadedCount) {
+    if (index >= loadedCount - 2) {
+      _loadMore();
+    }
+  }
+
+  void _onTabChanged(int value) {
+    if (value == _tabIndex) return;
+    setState(() {
+      _tabIndex = value;
+      _activePage = 0;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    });
+  }
+
+  Future<void> _savePost(FeedPost post) async {
+    await widget.feedRepository.queueSave(post.id);
+    await _loadPendingActionCount();
+    if (!mounted) return;
+    setState(() {
+      _savedPostIds.add(post.id);
+      _message = 'Post saved. It will sync when connected.';
+    });
+  }
+
+  Future<void> _sharePost(FeedPost post) async {
+    final text = _shareTextForPost(post);
+    await Clipboard.setData(ClipboardData(text: text));
+    await widget.feedRepository.queueShare(post.id);
+    await _loadPendingActionCount();
+    if (!mounted) return;
+    setState(() => _message = 'Share text copied. Share event queued.');
+  }
+
+  String _shareTextForPost(FeedPost post) {
+    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
+    return [
+      '${post.authorName} on feedIn',
+      if (post.body.trim().isNotEmpty) post.body.trim(),
+      if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
+    ].join('\n\n');
+  }
+
+  Future<void> _openComments(FeedPost post) async {
+    final comment = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _CommentSheet(post: post),
+    );
+    if (comment == null || comment.trim().isEmpty) return;
+    await _queueAction(
+      () => widget.feedRepository.queueComment(post.id, comment),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<FeedPost>>(
       future: _postsFuture,
       builder: (context, snapshot) {
         final posts = snapshot.data;
+        final topInset = MediaQuery.of(context).padding.top;
+        final overlayHeight = topInset + 104;
 
+        Widget content;
         if (posts == null) {
-          return const Center(child: CircularProgressIndicator());
+          content = const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        } else if (_tabIndex == 2) {
+          content = _LiveFeedList(
+            liveFuture: _liveFuture,
+            topPadding: overlayHeight,
+          );
+        } else {
+          final filteredPosts = _filterPosts(posts);
+          content = filteredPosts.isEmpty
+              ? _ImmersiveEmptyState(
+                  tabIndex: _tabIndex,
+                  topPadding: overlayHeight,
+                  onRefresh: _refresh,
+                )
+              : _buildImmersivePager(filteredPosts);
         }
 
-        final filteredPosts = _filterPosts(posts);
-
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredPosts.length + 2,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return FeedHeader(
-                  message: _message,
-                  pendingActionCount: _pendingActionCount,
-                  selectedIndex: _tabIndex,
-                  onTabChanged: (value) => setState(() => _tabIndex = value),
-                );
-              }
-
-              if (index == filteredPosts.length + 1) {
-                return LoadMoreFeedButton(
-                  enabled: _tabIndex != 2 && _hasMorePosts,
-                  isLoading: _isLoadingMore,
-                  onPressed: _loadMore,
-                );
-              }
-
-              final post = filteredPosts[index - 1];
-              return FeedPostCard(
-                post: post,
-                onLike: () => _queueAction(
-                  () => widget.feedRepository.queueLike(post.id),
-                ),
-                onSave: () => _queueAction(
-                  () => widget.feedRepository.queueSave(post.id),
-                ),
-                onComment: () => _queueAction(
-                  () => widget.feedRepository.queueComment(
-                    post.id,
-                    'Queued comment',
+        return ColoredBox(
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(child: content),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _buildTopOverlay(context),
+              ),
+              if (_message != null || _pendingActionCount > 0)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: _FeedStatusBanner(
+                    message: _message,
+                    pendingActionCount: _pendingActionCount,
                   ),
                 ),
-              );
-            },
+            ],
           ),
         );
       },
     );
   }
 
+  Widget _buildImmersivePager(List<FeedPost> posts) {
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      itemCount: posts.length,
+      onPageChanged: (index) {
+        setState(() => _activePage = index);
+        _maybeLoadMore(index, posts.length);
+      },
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        final card = ImmersivePostCard(
+          post: post,
+          isActive: index == _activePage,
+          isLiked: _likedPostIds.contains(post.id),
+          isSaved: _savedPostIds.contains(post.id),
+          onLike: () => _likePost(post),
+          onComment: () => _openComments(post),
+          onRefeed: () =>
+              _queueAction(() => widget.feedRepository.queueRefeed(post.id)),
+          onSave: () => _savePost(post),
+          onShare: () => _sharePost(post),
+          onOpenDetail: () => _openPostDetail(post),
+        );
+        return _PageTransition(
+          controller: _pageController,
+          index: index,
+          child: card,
+        );
+      },
+    );
+  }
+
+  Widget _buildTopOverlay(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: FeedImmersiveTheme.topScrim),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'feedIn',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                      shadows: FeedImmersiveTheme.textShadow,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Search',
+                    onPressed: () {},
+                    icon: const Icon(Icons.search, color: Colors.white),
+                  ),
+                  _NotificationBellAction(
+                    unreadCountFuture: widget.notificationUnreadCountFuture,
+                    onTap: widget.onOpenNotifications,
+                    foregroundColor: Colors.white,
+                  ),
+                ],
+              ),
+              _ImmersiveFeedTabs(
+                selectedIndex: _tabIndex,
+                onChanged: _onTabChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   List<FeedPost> _filterPosts(List<FeedPost> posts) {
-    final filtered = switch (_tabIndex) {
+    return switch (_tabIndex) {
       0 => posts.where((post) => post.mediaType == 'video').toList(),
       1 => posts.where((post) => post.mediaType != 'video').toList(),
       2 => const <FeedPost>[],
       _ => posts,
     };
-    return filtered.isEmpty && _tabIndex != 2 ? posts : filtered;
   }
-}
 
-class LoadMoreFeedButton extends StatelessWidget {
-  const LoadMoreFeedButton({
-    super.key,
-    required this.enabled,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  final bool enabled;
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: OutlinedButton.icon(
-        onPressed: enabled && !isLoading ? onPressed : null,
-        icon: isLoading
-            ? const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.expand_more),
-        label: Text(
-          isLoading
-              ? 'Loading'
-              : enabled
-              ? 'Load more'
-              : 'No more posts',
+  Future<void> _openPostDetail(FeedPost post) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => PostDetailScreen(
+          post: post,
+          isSaved: _savedPostIds.contains(post.id),
+          onLike: () =>
+              _queueAction(() => widget.feedRepository.queueLike(post.id)),
+          onSave: () => _savePost(post),
+          onComment: () => _openComments(post),
+          onRefeed: () =>
+              _queueAction(() => widget.feedRepository.queueRefeed(post.id)),
+          onShare: () => _sharePost(post),
         ),
       ),
     );
   }
 }
 
-class FeedHeader extends StatelessWidget {
-  const FeedHeader({
-    super.key,
-    required this.message,
-    required this.pendingActionCount,
-    required this.selectedIndex,
-    required this.onTabChanged,
+/// Applies a subtle depth transition to immersive feed pages as they scroll:
+/// the page settling into view scales up to full size and brightens while the
+/// neighbouring pages sit slightly back and dimmed. Driven directly by the
+/// shared [PageController] so it stays in sync with the user's drag without
+/// triggering setState rebuilds.
+class _PageTransition extends StatelessWidget {
+  const _PageTransition({
+    required this.controller,
+    required this.index,
+    required this.child,
   });
 
-  final String? message;
-  final int pendingActionCount;
-  final int selectedIndex;
-  final ValueChanged<int> onTabChanged;
+  final PageController controller;
+  final int index;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        // Distance (in pages) of this page from the current scroll position.
+        double delta = 0;
+        if (controller.hasClients && controller.position.hasContentDimensions) {
+          final page = controller.page ?? controller.initialPage.toDouble();
+          delta = (page - index).abs().clamp(0.0, 1.0);
+        }
+        // Active page -> scale 1.0 / full opacity; neighbour -> 0.92 / 0.55.
+        final scale = 1.0 - (0.08 * delta);
+        final opacity = 1.0 - (0.45 * delta);
+        return Opacity(
+          opacity: opacity,
+          child: Transform.scale(scale: scale, child: child),
+        );
+      },
+    );
+  }
+}
+
+class _ImmersiveFeedTabs extends StatelessWidget {
+  const _ImmersiveFeedTabs({
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  static const _labels = ['Videos', 'Photos', 'Live'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: SegmentedButton<int>(
-                selected: {selectedIndex},
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 0, label: Text('Videos')),
-                  ButtonSegment(value: 1, label: Text('Photos & Text')),
-                  ButtonSegment(value: 2, label: Text('Live')),
-                ],
-                onSelectionChanged: (selection) =>
-                    onTabChanged(selection.first),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0x33FF3D9A), Color(0x222563EB)],
-            ),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0x33FF3D9A)),
+        for (var i = 0; i < _labels.length; i++)
+          _ImmersiveTab(
+            label: _labels[i],
+            selected: i == selectedIndex,
+            onTap: () => onChanged(i),
           ),
-          child: const Padding(
-            padding: EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, color: Color(0xFFFF3D9A)),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Local-first FEEDIN preview with cached media and queued actions.',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (pendingActionCount > 0 || message != null) ...[
-          const SizedBox(height: 10),
-          Text(
-            [
-              if (pendingActionCount > 0)
-                '$pendingActionCount offline action${pendingActionCount == 1 ? '' : 's'} queued',
-              if (message != null) message!,
-            ].join(' · '),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
       ],
     );
   }
 }
 
-class FeedPostCard extends StatelessWidget {
-  const FeedPostCard({
-    super.key,
-    required this.post,
-    required this.onLike,
-    required this.onSave,
-    required this.onComment,
+class _ImmersiveTab extends StatefulWidget {
+  const _ImmersiveTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
   });
 
-  final FeedPost post;
-  final VoidCallback onLike;
-  final VoidCallback onSave;
-  final VoidCallback onComment;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_ImmersiveTab> createState() => _ImmersiveTabState();
+}
+
+class _ImmersiveTabState extends State<_ImmersiveTab> {
+  bool _held = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+    return GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _held = true),
+      onTapUp: (_) => setState(() => _held = false),
+      onTapCancel: () => setState(() => _held = false),
+      child: AnimatedScale(
+        scale: _held ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedDefaultTextStyle(
+                duration: FeedImmersiveTheme.motionFast,
+                curve: FeedImmersiveTheme.settleCurve,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.white60,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 16,
+                  letterSpacing: selected ? 0.0 : 0.1,
+                  shadows: FeedImmersiveTheme.textShadow,
+                ),
+                child: Text(widget.label),
+              ),
+              const SizedBox(height: 5),
+              AnimatedContainer(
+                duration: FeedImmersiveTheme.motionFast,
+                curve: FeedImmersiveTheme.settleCurve,
+                height: 3,
+                width: selected ? 24 : 0,
+                decoration: const BoxDecoration(
+                  gradient: FeedImmersiveTheme.brandGradient,
+                  borderRadius: BorderRadius.all(Radius.circular(2)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImmersiveEmptyState extends StatelessWidget {
+  const _ImmersiveEmptyState({
+    required this.tabIndex,
+    required this.topPadding,
+    required this.onRefresh,
+  });
+
+  final int tabIndex;
+  final double topPadding;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final isVideo = tabIndex == 0;
+    final title = isVideo ? 'No videos yet' : 'No posts yet';
+    final body = isVideo
+        ? 'Pull down to refresh or create a video post.'
+        : 'Pull down to refresh or create the first post.';
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isVideo ? Icons.play_circle_outline : Icons.dynamic_feed_outlined,
+              color: Colors.white70,
+              size: 56,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                body,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedStatusBanner extends StatelessWidget {
+  const _FeedStatusBanner({
+    required this.message,
+    required this.pendingActionCount,
+  });
+
+  final String? message;
+  final int pendingActionCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = [
+      if (pendingActionCount > 0)
+        '$pendingActionCount offline action${pendingActionCount == 1 ? '' : 's'} queued',
+      if (message != null) message!,
+    ].join(' · ');
+    if (text.isEmpty) return const SizedBox.shrink();
+    return IgnorePointer(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFeedList extends StatelessWidget {
+  const _LiveFeedList({required this.liveFuture, required this.topPadding});
+
+  final Future<List<LiveFeedItem>> liveFuture;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<LiveFeedItem>>(
+      future: liveFuture,
+      builder: (context, snapshot) {
+        final items = snapshot.data;
+        if (items == null) {
+          return Padding(
+            padding: EdgeInsets.only(top: topPadding + 40),
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+        if (items.isEmpty) {
+          return ListView(
+            padding: EdgeInsets.fromLTRB(16, topPadding, 16, 24),
+            children: const [_EmptyLiveState()],
+          );
+        }
+        return ListView.separated(
+          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 24),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) => _LiveFeedCard(item: items[index]),
+        );
+      },
+    );
+  }
+}
+
+class _LiveFeedCard extends StatelessWidget {
+  const _LiveFeedCard({required this.item});
+
+  final LiveFeedItem item;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF3D9A), Color(0xFFFF7A45)],
-                    ),
-                    border: Border.all(color: Colors.white12, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      post.authorName.characters.first.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+            if (item.thumbnailUrl != null && item.thumbnailUrl!.isNotEmpty)
+              Image.network(item.thumbnailUrl!, fit: BoxFit.cover)
+            else
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF111827), Color(0xFFBE185D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.authorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        post.meta,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
+              ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.82),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'More',
-                  onPressed: () {},
-                  icon: const Icon(Icons.more_vert),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              post.body,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            if (post.mediaUrl != null) ...[
-              const SizedBox(height: 12),
-              FeedMediaPreview(post: post),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _FeedActionButton(
-                  icon: Icons.favorite_border,
-                  label: 'Like',
-                  onPressed: onLike,
-                ),
-                _FeedActionButton(
-                  icon: Icons.mode_comment_outlined,
-                  label: 'Comment',
-                  onPressed: onComment,
-                ),
-                _FeedActionButton(
-                  icon: Icons.repeat,
-                  label: 'Refeed',
-                  onPressed: () {},
-                ),
-                _FeedActionButton(
-                  icon: Icons.bookmark_border,
-                  label: 'Save',
-                  onPressed: onSave,
-                ),
-                _FeedActionButton(
-                  icon: Icons.ios_share,
-                  label: 'Share',
-                  onPressed: () {},
-                ),
-              ],
+            Positioned(
+              left: 12,
+              top: 12,
+              child: Chip(
+                avatar: const Icon(Icons.circle, color: Colors.red, size: 14),
+                label: Text(item.type == 'space' ? 'LIVE SPACE' : 'LIVE'),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 14,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${item.hostName} · ${item.viewerCount} watching${item.topic == null ? '' : ' · ${item.topic}'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyLiveState extends StatelessWidget {
+  const _EmptyLiveState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Icon(Icons.sensors, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('No live streams or spaces are active right now.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentSheet extends StatefulWidget {
+  const _CommentSheet({required this.post});
+
+  final FeedPost post;
+
+  @override
+  State<_CommentSheet> createState() => _CommentSheetState();
+}
+
+class _CommentSheetState extends State<_CommentSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Comments',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.post.body,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            minLines: 2,
+            maxLines: 5,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Add a comment',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(_controller.text),
+              icon: const Icon(Icons.send),
+              label: const Text('Comment'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -668,13 +1144,146 @@ class _FeedActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: label,
+    return TextButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 22),
-      style: IconButton.styleFrom(
+      icon: Icon(icon, size: 20),
+      label: Text(label),
+      style: TextButton.styleFrom(
         foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        minimumSize: const Size(0, 40),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
+    );
+  }
+}
+
+class PostDetailScreen extends StatelessWidget {
+  const PostDetailScreen({
+    super.key,
+    required this.post,
+    required this.isSaved,
+    required this.onLike,
+    required this.onSave,
+    required this.onComment,
+    required this.onRefeed,
+    required this.onShare,
+  });
+
+  final FeedPost post;
+  final bool isSaved;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final VoidCallback onComment;
+  final VoidCallback onRefeed;
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Post')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                child: Text(post.authorName.characters.first.toUpperCase()),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      [
+                        post.meta,
+                        if (post.location?.isNotEmpty ?? false) post.location!,
+                      ].join(' · '),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (post.body.trim().isNotEmpty)
+            Text(post.body, style: Theme.of(context).textTheme.titleMedium),
+          if ((post.mediaUrl ?? post.mediaUrls.firstOrNull) != null) ...[
+            const SizedBox(height: 16),
+            FeedMediaPreview(post: post),
+          ],
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _PostMetric(label: 'Likes', value: post.likesCount),
+              _PostMetric(label: 'Comments', value: post.commentsCount),
+              _PostMetric(label: 'Views', value: post.viewsCount),
+              _PostMetric(label: 'Refeeds', value: post.refeedsCount),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            children: [
+              _FeedActionButton(
+                icon: Icons.favorite_border,
+                label: 'Like',
+                onPressed: onLike,
+              ),
+              _FeedActionButton(
+                icon: Icons.mode_comment_outlined,
+                label: 'Comment',
+                onPressed: onComment,
+              ),
+              _FeedActionButton(
+                icon: Icons.repeat,
+                label: 'Refeed',
+                onPressed: onRefeed,
+              ),
+              _FeedActionButton(
+                icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
+                label: isSaved ? 'Saved' : 'Save',
+                onPressed: onSave,
+              ),
+              _FeedActionButton(
+                icon: Icons.ios_share,
+                label: 'Share',
+                onPressed: onShare,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PostMetric extends StatelessWidget {
+  const _PostMetric({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text('$value $label'),
+      avatar: const Icon(Icons.trending_up, size: 16),
     );
   }
 }
@@ -686,7 +1295,10 @@ class FeedMediaPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaType = post.mediaType;
+    final mediaType =
+        post.mediaType ??
+        (post.mediaTypes.isNotEmpty ? post.mediaTypes.first : null);
+    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
     if (mediaType == 'video') {
       return AspectRatio(
         aspectRatio: 16 / 9,
@@ -697,7 +1309,7 @@ class FeedMediaPreview extends StatelessWidget {
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
             child: FeedVideoPlayer(
-              url: post.mediaUrl,
+              url: mediaUrl,
               localPath: post.localMediaPath,
             ),
           ),
@@ -710,9 +1322,9 @@ class FeedMediaPreview extends StatelessWidget {
         ? Image.file(
             File(localPath),
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _RemoteImageFallback(url: post.mediaUrl),
+            errorBuilder: (_, _, _) => _RemoteImageFallback(url: mediaUrl),
           )
-        : _RemoteImageFallback(url: post.mediaUrl);
+        : _RemoteImageFallback(url: mediaUrl);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
