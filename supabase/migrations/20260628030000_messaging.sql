@@ -7,6 +7,43 @@
 -- message_read_receipts, and messages.is_read/read_at/status; it calls the RPCs
 -- mark_conversation_read() and update_presence(). This migration guarantees
 -- those contracts without exposing direct client UPDATE access to messages.
+--
+-- IMPORTANT: the live core `messages` table has no read columns and there is no
+-- message_read_receipts table, so this migration ADDS them with `if not exists`
+-- guards. That keeps mark_conversation_read() below valid on a core-only
+-- backend AND makes it a no-op overlap if the parity migration already ran.
+
+-- 0. Read-state columns + receipts the read-receipt RPC depends on (additive,
+-- idempotent). These exactly match the parity migration so applying both is safe.
+alter table public.messages
+  add column if not exists is_read boolean not null default false,
+  add column if not exists read_at timestamptz;
+
+create table if not exists public.message_read_receipts (
+  message_id uuid not null references public.messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create index if not exists message_read_receipts_conversation_idx
+  on public.message_read_receipts(conversation_id, read_at desc);
+
+alter table public.message_read_receipts enable row level security;
+
+drop policy if exists "Participants can read message receipts" on public.message_read_receipts;
+create policy "Participants can read message receipts"
+on public.message_read_receipts for select
+using (public.is_conversation_participant(conversation_id));
+
+drop policy if exists "Participants can write own message receipts" on public.message_read_receipts;
+create policy "Participants can write own message receipts"
+on public.message_read_receipts for insert
+with check (
+  auth.uid() = user_id
+  and public.is_conversation_participant(conversation_id)
+);
 
 -- 1. Presence backing table (idempotent). update_presence() upserts into this.
 create table if not exists public.user_presence (
