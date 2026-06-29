@@ -12,6 +12,7 @@
 /// call — matching the project's offline-first first-pass parity goal.
 library;
 
+import '../../../data/remote/social_graph_remote_data_source.dart';
 import '../../feed/feed_post.dart';
 import '../user_profile.dart';
 import 'profile_view_models.dart';
@@ -96,21 +97,77 @@ class ProfilePresenter {
     );
   }
 
-  /// Build a Connections modal state from counts only.
+  /// Build the initial (pre-load) Connections modal state from counts only.
   ///
-  /// The active native schema/contract exposes follower/following counts, but
-  /// not the row-level follow graph. Mark non-zero count lists unavailable so
-  /// the sheet does not claim there are no followers when only rows are absent.
+  /// Used as the loading/seed view before the social-graph rows arrive. The
+  /// host swaps in [connectionsLoaded] once [SocialGraphRemoteDataSource]
+  /// resolves the follower/following lists.
   static ConnectionsModalView connections(
     UserProfile profile, {
     ConnectionsTab defaultTab = ConnectionsTab.followers,
+    bool isLoading = false,
   }) {
     return ConnectionsModalView(
       followersCount: profile.followersCount,
       followingCount: profile.followingCount,
       defaultTab: defaultTab,
-      listsUnavailable:
-          profile.followersCount > 0 || profile.followingCount > 0,
+      isLoading: isLoading,
+    );
+  }
+
+  /// Map a single social-graph [SocialConnection] into a modal row. [ownUserId]
+  /// hides the toggle on the viewer's own row.
+  static FollowRowView followRow(
+    SocialConnection connection, {
+    String? ownUserId,
+    bool isProcessing = false,
+  }) {
+    return FollowRowView(
+      user: ProfileUserRef(
+        id: connection.userId,
+        displayName: connection.displayName,
+        username: connection.username,
+        avatarUrl: connection.avatarUrl,
+        bio: connection.bio,
+      ),
+      isFollowedByMe: connection.isFollowedByMe,
+      isOwnRow: ownUserId != null && connection.userId == ownUserId,
+      isProcessing: isProcessing,
+    );
+  }
+
+  /// Build the fully-loaded Connections modal state from resolved follower and
+  /// following lists. Counts default to the list lengths but can be overridden
+  /// with the profile's stored counts via [followersCount]/[followingCount].
+  static ConnectionsModalView connectionsLoaded({
+    required List<SocialConnection> followers,
+    required List<SocialConnection> following,
+    String? ownUserId,
+    int? followersCount,
+    int? followingCount,
+    ConnectionsTab defaultTab = ConnectionsTab.followers,
+    Set<String> processingUserIds = const {},
+  }) {
+    return ConnectionsModalView(
+      followers: [
+        for (final c in followers)
+          followRow(
+            c,
+            ownUserId: ownUserId,
+            isProcessing: processingUserIds.contains(c.userId),
+          ),
+      ],
+      following: [
+        for (final c in following)
+          followRow(
+            c,
+            ownUserId: ownUserId,
+            isProcessing: processingUserIds.contains(c.userId),
+          ),
+      ],
+      followersCount: followersCount ?? followers.length,
+      followingCount: followingCount ?? following.length,
+      defaultTab: defaultTab,
     );
   }
 

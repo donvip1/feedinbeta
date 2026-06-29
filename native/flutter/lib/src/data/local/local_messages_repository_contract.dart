@@ -15,6 +15,17 @@ abstract interface class LocalMessagesRepositoryContract {
     required String conversationId,
     required String senderName,
     required String body,
+    String? senderId,
+    String? senderAvatarUrl,
+  });
+  Future<void> queueAttachment({
+    required String conversationId,
+    required String senderName,
+    required String localPath,
+    required String mediaType,
+    String? mimeType,
+    String? fileName,
+    int? fileSizeBytes,
   });
   Future<void> markMessageState({
     required String messageId,

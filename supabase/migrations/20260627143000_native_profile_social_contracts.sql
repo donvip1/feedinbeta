@@ -127,6 +127,44 @@ begin
     raise exception 'not authenticated';
   end if;
 
+  if not exists (
+    select 1
+    from public.posts p
+    where p.id = p_post_id
+      and (
+        p.user_id = viewer_id
+        or (
+          p.status = 'active'
+          and (
+            coalesce(p.privacy, 'everyone') = 'everyone'
+            or (
+              coalesce(p.privacy, 'everyone') = 'followers'
+              and exists (
+                select 1
+                from public.follows f
+                where f.follower_id = viewer_id
+                  and f.following_id = p.user_id
+              )
+            )
+            or (
+              coalesce(p.privacy, 'everyone') = 'friends'
+              and exists (
+                select 1
+                from public.follows f1
+                join public.follows f2
+                  on f2.follower_id = p.user_id
+                 and f2.following_id = viewer_id
+                where f1.follower_id = viewer_id
+                  and f1.following_id = p.user_id
+              )
+            )
+          )
+        )
+      )
+  ) then
+    raise exception 'post is not visible';
+  end if;
+
   insert into public.post_view_history (user_id, post_id, viewed_at, view_count)
   values (viewer_id, p_post_id, now(), 1)
   on conflict (user_id, post_id)
@@ -179,6 +217,36 @@ as $$
   join public.profiles prof on prof.id = p.user_id
   where pvh.user_id = auth.uid()
     and pvh.viewed_at >= now() - interval '48 hours'
+    and (
+      p.user_id = auth.uid()
+      or (
+        p.status = 'active'
+        and (
+          coalesce(p.privacy, 'everyone') = 'everyone'
+          or (
+            coalesce(p.privacy, 'everyone') = 'followers'
+            and exists (
+              select 1
+              from public.follows f
+              where f.follower_id = auth.uid()
+                and f.following_id = p.user_id
+            )
+          )
+          or (
+            coalesce(p.privacy, 'everyone') = 'friends'
+            and exists (
+              select 1
+              from public.follows f1
+              join public.follows f2
+                on f2.follower_id = p.user_id
+               and f2.following_id = auth.uid()
+              where f1.follower_id = auth.uid()
+                and f1.following_id = p.user_id
+            )
+          )
+        )
+      )
+    )
   order by pvh.viewed_at desc
   limit greatest(1, least(coalesce(p_limit, 50), 100));
 $$;
@@ -254,4 +322,5 @@ begin
       alter publication supabase_realtime add table public.follows;
     end if;
   end if;
-end $$;
+end;
+$$;

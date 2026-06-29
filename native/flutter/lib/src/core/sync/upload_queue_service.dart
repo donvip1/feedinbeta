@@ -184,6 +184,12 @@ class UploadQueueService {
         : <String>[draft.mediaPath!];
     if (mediaPaths.isEmpty) return const [];
 
+    final rawTypes = draft.mediaTypes.isNotEmpty
+        ? draft.mediaTypes
+        : draft.mediaType == null
+        ? const <String>[]
+        : <String>[draft.mediaType!];
+
     final urls = <String>[];
     final total = mediaPaths.where((path) => path.isNotEmpty).length;
     for (final (index, mediaPath) in mediaPaths.indexed) {
@@ -194,9 +200,22 @@ class UploadQueueService {
       final extension = mediaPath.contains('.')
           ? mediaPath.split('.').last
           : 'bin';
+      final mediaKind = index < rawTypes.length ? rawTypes[index] : 'image';
       final storagePath =
           '$userId/${draft.id}/${DateTime.now().millisecondsSinceEpoch}_$index.$extension';
-      await client.storage.from('post-media').upload(storagePath, file);
+      // Set an explicit content-type so uploads pass the `post-media` bucket's
+      // allowed_mime_types whitelist even when the file has no/unknown
+      // extension; upsert guards against a storage-path collision on retry.
+      await client.storage
+          .from('post-media')
+          .upload(
+            storagePath,
+            file,
+            fileOptions: FileOptions(
+              contentType: _contentTypeFor(extension, mediaKind),
+              upsert: true,
+            ),
+          );
       urls.add(client.storage.from('post-media').getPublicUrl(storagePath));
       final completed = urls.length;
       final progress = total <= 0
@@ -205,6 +224,32 @@ class UploadQueueService {
       await _uploadQueueRepository.updateProgress(draft.id, progress);
     }
     return urls;
+  }
+
+  /// Best-effort MIME type matching the `post-media` bucket whitelist. Falls
+  /// back to a generic image/video type when the extension is unknown so the
+  /// upload still satisfies the bucket's allowed_mime_types constraint.
+  String _contentTypeFor(String extension, String mediaKind) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+      case 'qt':
+        return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      default:
+        return mediaKind == 'video' ? 'video/mp4' : 'image/jpeg';
+    }
   }
 
   List<String> _mediaTypesFor(PostDraft draft, int mediaCount) {

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/local/local_messages_repository_contract.dart';
@@ -139,17 +141,114 @@ class SyncService implements SyncServiceContract {
       userId: userId,
     );
 
-    await client.from('messages').insert({
-      'id': message.id,
+    final hasAttachment =
+        message.localMediaPath != null && message.localMediaPath!.isNotEmpty;
+    final inserted = await client
+        .from('messages')
+        .insert({
+          'id': message.id,
+          'conversation_id': serverConversationId,
+          'sender_id': userId,
+          'content': hasAttachment ? null : message.body,
+          'message_type': hasAttachment ? message.messageType : 'text',
+          'status': 'sent',
+          'created_at': DateTime.fromMillisecondsSinceEpoch(
+            message.createdAtMillis,
+          ).toIso8601String(),
+        })
+        .select('id')
+        .single();
+
+    if (hasAttachment) {
+      await _uploadMessageAttachment(
+        client: client,
+        userId: userId,
+        serverConversationId: serverConversationId,
+        messageId: inserted['id'].toString(),
+        message: message,
+      );
+    }
+  }
+
+  Future<void> _uploadMessageAttachment({
+    required SupabaseClient client,
+    required String userId,
+    required String serverConversationId,
+    required String messageId,
+    required LocalMessage message,
+  }) async {
+    final localPath = message.localMediaPath;
+    if (localPath == null || localPath.isEmpty) return;
+
+    final file = File(localPath);
+    if (!file.existsSync()) {
+      throw StateError('Message attachment file no longer exists.');
+    }
+
+    final extension = localPath.contains('.')
+        ? localPath.split('.').last
+        : 'bin';
+    final storagePath =
+        '$serverConversationId/$userId/${DateTime.now().millisecondsSinceEpoch}_${message.id}.$extension';
+    await client.storage
+        .from('message-media')
+        .upload(
+          storagePath,
+          file,
+          fileOptions: FileOptions(
+            contentType:
+                message.mimeType ??
+                _messageContentType(extension, message.messageType),
+            upsert: true,
+          ),
+        );
+
+    await client.from('message_attachments').insert({
+      'message_id': messageId,
       'conversation_id': serverConversationId,
       'sender_id': userId,
-      'content': message.body,
-      'message_type': 'text',
-      'status': 'sent',
-      'created_at': DateTime.fromMillisecondsSinceEpoch(
-        message.createdAtMillis,
-      ).toIso8601String(),
+      'storage_bucket': 'message-media',
+      'storage_path': storagePath,
+      'public_url': client.storage
+          .from('message-media')
+          .getPublicUrl(storagePath),
+      'file_name': message.fileName,
+      'file_size_bytes': message.fileSizeBytes,
+      'mime_type': message.mimeType,
+      'media_type': message.messageType,
     });
+  }
+
+  String _messageContentType(String extension, String mediaType) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      case 'aac':
+        return 'audio/aac';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'm4a':
+        return 'audio/mp4';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return mediaType == 'video' ? 'video/mp4' : 'image/jpeg';
+    }
   }
 
   Future<String> _ensureServerConversation({

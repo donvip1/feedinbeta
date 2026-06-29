@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/local/profile_repository_contract.dart';
+import '../../data/remote/social_graph_remote_data_source.dart';
 import '../feed/feed_post.dart';
 import 'parity/profile_presenter.dart';
+import 'parity/profile_tokens.dart';
 import 'parity/profile_view_models.dart';
 import 'parity/widgets/connections_modal.dart';
 import 'parity/widgets/posts_grid.dart';
@@ -21,12 +24,18 @@ class ProfileEditorScreen extends StatefulWidget {
     required this.profileRepository,
     required this.feedRepository,
     required this.onSaved,
+    this.socialGraphDataSource,
   });
 
   final UserProfile profile;
   final ProfileRepositoryContract profileRepository;
   final LocalFeedRepositoryContract feedRepository;
   final ValueChanged<UserProfile> onSaved;
+
+  /// Live follow-graph access for the connections modal. Optional so existing
+  /// hosts that do not inject it still build; falls back to an auto-detecting
+  /// instance that reads the Supabase singleton.
+  final SocialGraphRemoteDataSource? socialGraphDataSource;
 
   @override
   State<ProfileEditorScreen> createState() => _ProfileEditorScreenState();
@@ -45,6 +54,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   late final TextEditingController _tiktokController;
   late final TextEditingController _youtubeController;
   late Future<List<FeedPost>> _postsFuture;
+  late final SocialGraphRemoteDataSource _socialGraph;
   bool _isSaving = false;
   String? _message;
   String? _errorMessage;
@@ -84,6 +94,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       text: widget.profile.youtubeUrl ?? '',
     );
     _postsFuture = widget.feedRepository.loadPostsByUser(widget.profile.userId);
+    _socialGraph =
+        widget.socialGraphDataSource ??
+        SocialGraphRemoteDataSource.autoDetect();
   }
 
   @override
@@ -203,7 +216,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        _ProfileHero(profile: _profile),
+        _ProfileHero(profile: _profile, socialGraph: _socialGraph),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -298,7 +311,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
               const SizedBox(height: 24),
               SocialLinksCard(
                 links: ProfilePresenter.socialLinks(_profile),
-                onOpen: _copyLink,
+                onOpen: _openLink,
               ),
               const SizedBox(height: 16),
               ViewHistoryCard(
@@ -314,12 +327,38 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     );
   }
 
-  Future<void> _copyLink(String url) async {
+  /// Opens a social link in the platform browser. Normalises bare hosts to
+  /// https and falls back to copying the URL to the clipboard if the platform
+  /// cannot launch it (no handler / launch failure).
+  Future<void> _openLink(String url) async {
+    final uri = _normaliseUrl(url);
+    if (uri != null) {
+      try {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      } catch (_) {
+        // fall through to clipboard fallback below
+      }
+    }
+
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open link; copied to clipboard')),
+    );
+  }
+
+  static Uri? _normaliseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : 'https://$trimmed';
+    return Uri.tryParse(withScheme);
   }
 }
 
@@ -373,9 +412,10 @@ class _ProfilePostsGrid extends StatelessWidget {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.profile});
+  const _ProfileHero({required this.profile, required this.socialGraph});
 
   final UserProfile profile;
+  final SocialGraphRemoteDataSource socialGraph;
 
   @override
   Widget build(BuildContext context) {
@@ -508,15 +548,148 @@ class _ProfileHero extends StatelessWidget {
     );
   }
 
-  /// Opens the Followers/Following connections sheet. Local user lists are not
-  /// available yet, so the modal shows just the counts with graceful empty
-  /// lists until a social-graph repository is wired upstream.
+  /// Opens the Followers/Following connections sheet backed by the live follow
+  /// graph. The sheet loads follower/following rows from [socialGraph] and
+  /// supports follow/unfollow toggles inline.
   void _openConnections(BuildContext context, ConnectionsTab tab) {
-    showConnectionsModal(
-      context,
-      view: ProfilePresenter.connections(profile, defaultTab: tab),
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ProfileColors.card,
+      barrierColor: ProfileColors.barrier,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: ProfileRadii.sheetTop),
+      builder: (_) => _ConnectionsSheet(
+        profile: profile,
+        socialGraph: socialGraph,
+        defaultTab: tab,
+      ),
+    );
+  }
+}
+
+/// Stateful host for the connections modal: loads follower/following rows from
+/// the live follow graph and drives inline follow/unfollow toggles. Renders the
+/// presentational [ConnectionsModalBody] with a freshly-built view-model.
+class _ConnectionsSheet extends StatefulWidget {
+  const _ConnectionsSheet({
+    required this.profile,
+    required this.socialGraph,
+    required this.defaultTab,
+  });
+
+  final UserProfile profile;
+  final SocialGraphRemoteDataSource socialGraph;
+  final ConnectionsTab defaultTab;
+
+  @override
+  State<_ConnectionsSheet> createState() => _ConnectionsSheetState();
+}
+
+class _ConnectionsSheetState extends State<_ConnectionsSheet> {
+  List<SocialConnection> _followers = const [];
+  List<SocialConnection> _following = const [];
+  final Set<String> _processing = <String>{};
+  bool _isLoading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // Initial state is already loading; no pre-await setState (would fire
+    // during initState). Await the two list reads, then publish results.
+    try {
+      final results = await Future.wait([
+        widget.socialGraph.fetchFollowers(widget.profile.userId),
+        widget.socialGraph.fetchFollowing(widget.profile.userId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _followers = results[0];
+        _following = results[1];
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _failed = true;
+      });
+    }
+  }
+
+  Future<void> _toggleFollow(ProfileUserRef user) async {
+    if (_processing.contains(user.id)) return;
+    setState(() => _processing.add(user.id));
+    try {
+      final nowFollowing = await widget.socialGraph.toggleFollow(user.id);
+      if (!mounted) return;
+      setState(() {
+        _followers = _applyFollowState(_followers, user.id, nowFollowing);
+        _following = _applyFollowState(_following, user.id, nowFollowing);
+      });
+    } catch (_) {
+      // Leave state unchanged on failure; the row simply stops processing.
+    } finally {
+      if (mounted) {
+        setState(() => _processing.remove(user.id));
+      }
+    }
+  }
+
+  static List<SocialConnection> _applyFollowState(
+    List<SocialConnection> list,
+    String userId,
+    bool isFollowedByMe,
+  ) {
+    return [
+      for (final c in list)
+        if (c.userId == userId)
+          SocialConnection(
+            userId: c.userId,
+            displayName: c.displayName,
+            username: c.username,
+            avatarUrl: c.avatarUrl,
+            bio: c.bio,
+            isFollowedByMe: isFollowedByMe,
+          )
+        else
+          c,
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = _isLoading
+        ? ProfilePresenter.connections(
+            widget.profile,
+            defaultTab: widget.defaultTab,
+            isLoading: true,
+          )
+        : _failed
+        ? ConnectionsModalView(
+            followersCount: widget.profile.followersCount,
+            followingCount: widget.profile.followingCount,
+            defaultTab: widget.defaultTab,
+            listsUnavailable: true,
+          )
+        : ProfilePresenter.connectionsLoaded(
+            followers: _followers,
+            following: _following,
+            ownUserId: widget.profile.userId,
+            followersCount: widget.profile.followersCount,
+            followingCount: widget.profile.followingCount,
+            defaultTab: widget.defaultTab,
+            processingUserIds: _processing,
+          );
+
+    return ConnectionsModalBody(
+      view: view,
       onOpenUser: (_) {},
-      onToggleFollow: (_) {},
+      onToggleFollow: _toggleFollow,
     );
   }
 }

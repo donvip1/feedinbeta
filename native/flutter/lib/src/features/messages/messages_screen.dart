@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/sync/conversation_starter.dart';
+import '../../core/sync/sync_service.dart';
 import '../../data/local/local_messages_repository_contract.dart';
 import '../profile/user_profile.dart';
 import 'chat/chat_mappers.dart';
@@ -11,6 +18,7 @@ import 'chat/widgets/attachment_options_sheet.dart';
 import 'chat/widgets/chat_composer.dart';
 import 'chat/widgets/chat_message_bubble.dart';
 import 'chat/widgets/conversation_list_tile.dart';
+import 'chat/widgets/media_message_content.dart';
 import 'chat/widgets/message_action_sheet.dart';
 import 'chat/widgets/new_conversation_sheet.dart';
 import 'message_models.dart';
@@ -21,6 +29,7 @@ class MessagesScreen extends StatefulWidget {
     super.key,
     required this.messagesRepository,
     required this.conversationStarter,
+    required this.syncService,
     required this.profile,
     required this.realtimeVersion,
     this.initialConversationId,
@@ -28,6 +37,7 @@ class MessagesScreen extends StatefulWidget {
 
   final LocalMessagesRepositoryContract messagesRepository;
   final ConversationStarter conversationStarter;
+  final SyncServiceContract syncService;
   final UserProfile profile;
   final int realtimeVersion;
   final String? initialConversationId;
@@ -115,6 +125,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         conversationId: _selectedConversationId!,
         initialTitle: _selectedConversationTitle,
         messagesRepository: widget.messagesRepository,
+        syncService: widget.syncService,
         profile: widget.profile,
         realtimeVersion: widget.realtimeVersion,
         onBack: _closeConversation,
@@ -150,7 +161,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             final summary = conversations[index];
                             return ConversationListTile(
                               conversation: conversationSummaryToView(summary),
-                              currentUserId: widget.profile.displayName,
+                              currentUserId: widget.profile.userId,
                               onTap: () => _openConversation(summary),
                             );
                           },
@@ -299,6 +310,7 @@ class ConversationScreen extends StatefulWidget {
     super.key,
     required this.conversationId,
     required this.messagesRepository,
+    required this.syncService,
     required this.profile,
     required this.realtimeVersion,
     required this.onBack,
@@ -308,6 +320,7 @@ class ConversationScreen extends StatefulWidget {
   final String conversationId;
   final String? initialTitle;
   final LocalMessagesRepositoryContract messagesRepository;
+  final SyncServiceContract syncService;
   final UserProfile profile;
   final int realtimeVersion;
   final VoidCallback onBack;
@@ -318,6 +331,7 @@ class ConversationScreen extends StatefulWidget {
 
 class _ConversationScreenState extends State<ConversationScreen> {
   final _messageController = TextEditingController();
+  final _picker = ImagePicker();
   late Future<List<LocalMessage>> _messagesFuture;
   String? _title;
   ReplyPreview? _replyTarget;
@@ -325,7 +339,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   static const ChatActivity _otherActivity = ChatActivity.none;
   int? _otherLastSeenMillis;
 
-  String get _currentUserKey => widget.profile.displayName;
+  /// Identity-based key for "isMine" — the local profile's user id, which
+  /// matches `messages.sender_id` from the server. Falls back to the display
+  /// name only when the id is somehow empty so grouping still works offline.
+  String get _currentUserKey => widget.profile.userId.isNotEmpty
+      ? widget.profile.userId
+      : widget.profile.displayName;
 
   /// Header model built from local state. The other-user identity is derived
   /// from the resolved conversation title (no profile in the local store yet);
@@ -367,12 +386,30 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   Future<void> _markReadLocally() async {
     await widget.messagesRepository.markConversationRead(widget.conversationId);
+    await _markReadRemotely();
     if (!mounted) return;
     setState(() {
       _messagesFuture = widget.messagesRepository.loadMessages(
         widget.conversationId,
       );
     });
+  }
+
+  Future<void> _markReadRemotely() async {
+    final conversation = await widget.messagesRepository.loadConversation(
+      widget.conversationId,
+    );
+    final serverConversationId = conversation?.serverConversationId;
+    if (serverConversationId == null || serverConversationId.isEmpty) return;
+    try {
+      await Supabase.instance.client.rpc<void>(
+        'mark_conversation_read',
+        params: {'p_conversation_id': serverConversationId},
+      );
+    } catch (_) {
+      // Offline-first: local unread clearing should not fail because the remote
+      // receipt RPC is temporarily unavailable.
+    }
   }
 
   @override
@@ -401,12 +438,25 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await widget.messagesRepository.queueMessage(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
+      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+      senderAvatarUrl: widget.profile.avatarUrl,
       body: _messageController.text,
     );
     _messageController.clear();
     if (!mounted) return;
     setState(() {
       _replyTarget = null;
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    await _syncMessages();
+  }
+
+  Future<void> _syncMessages() async {
+    await widget.syncService.syncNow();
+    if (!mounted) return;
+    setState(() {
       _messagesFuture = widget.messagesRepository.loadMessages(
         widget.conversationId,
       );
@@ -487,14 +537,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
       shape: const RoundedRectangleBorder(borderRadius: ChatRadii.sheetTop),
       builder: (sheetContext) {
         return AttachmentOptionsSheet(
-          onSelect: (option) {
+          onSelect: (option) async {
             switch (option) {
               case AttachmentOption.photo:
-                _pendingBackend('Photo attachments');
+                await _pickAttachment(
+                  source: ImageSource.gallery,
+                  mediaType: 'image',
+                );
               case AttachmentOption.camera:
-                _pendingBackend('Camera capture');
+                await _pickAttachment(
+                  source: ImageSource.camera,
+                  mediaType: 'image',
+                );
               case AttachmentOption.video:
-                _pendingBackend('Video attachments');
+                await _pickAttachment(
+                  source: ImageSource.gallery,
+                  mediaType: 'video',
+                );
               case AttachmentOption.file:
                 _pendingBackend('File attachments');
               case AttachmentOption.voiceNote:
@@ -504,6 +563,52 @@ class _ConversationScreenState extends State<ConversationScreen> {
         );
       },
     );
+  }
+
+  Future<void> _pickAttachment({
+    required ImageSource source,
+    required String mediaType,
+  }) async {
+    final XFile? picked = mediaType == 'video'
+        ? await _picker.pickVideo(source: source)
+        : await _picker.pickImage(source: source);
+    if (picked == null) return;
+
+    final localPath = await _persistPickedAttachment(picked);
+    await widget.messagesRepository.queueAttachment(
+      conversationId: widget.conversationId,
+      senderName: widget.profile.displayName,
+      localPath: localPath,
+      mediaType: mediaType,
+      mimeType: picked.mimeType,
+      fileName: picked.name,
+      fileSizeBytes: await File(localPath).length(),
+    );
+    if (!mounted) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    await _syncMessages();
+  }
+
+  Future<String> _persistPickedAttachment(XFile picked) async {
+    final source = File(picked.path);
+    if (!source.existsSync()) return picked.path;
+
+    final directory = await getApplicationCacheDirectory();
+    final mediaDirectory = Directory('${directory.path}/feedin_message_media');
+    if (!mediaDirectory.existsSync()) {
+      mediaDirectory.createSync(recursive: true);
+    }
+
+    final extension = picked.path.contains('.')
+        ? picked.path.split('.').last
+        : 'bin';
+    final targetPath =
+        '${mediaDirectory.path}/${DateTime.now().millisecondsSinceEpoch}_${const Uuid().v4()}.$extension';
+    return source.copy(targetPath).then((file) => file.path);
   }
 
   void _toast(String message) {
@@ -563,6 +668,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         ),
                         child: ChatMessageBubble(
                           message: view,
+                          mediaSlot: view.hasMedia
+                              ? MediaMessageContent(message: view)
+                              : null,
                           onLongPress: () => _openMessageActions(view),
                           onSwipeReply: () => _setReply(view),
                         ),

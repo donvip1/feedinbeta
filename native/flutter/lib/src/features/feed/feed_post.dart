@@ -17,6 +17,8 @@ class FeedPost {
     this.refeedsCount = 0,
     this.location,
     this.postType,
+    this.avatarUrl,
+    this.authorHandle,
   });
 
   final String id;
@@ -37,6 +39,13 @@ class FeedPost {
   final String? location;
   final String? postType;
 
+  /// Author avatar image URL from the `profiles` join. Null when the author
+  /// has no avatar set (the UI falls back to a brand-gradient initial).
+  final String? avatarUrl;
+
+  /// Author handle (e.g. `@username`) from the `profiles` join, if available.
+  final String? authorHandle;
+
   FeedPost copyWith({String? localMediaPath}) {
     return FeedPost(
       id: id,
@@ -56,6 +65,8 @@ class FeedPost {
       refeedsCount: refeedsCount,
       location: location,
       postType: postType,
+      avatarUrl: avatarUrl,
+      authorHandle: authorHandle,
     );
   }
 
@@ -82,6 +93,8 @@ class FeedPost {
       refeedsCount: json['refeedsCount'] as int? ?? 0,
       location: json['location'] as String?,
       postType: json['postType'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      authorHandle: json['authorHandle'] as String?,
     );
   }
 
@@ -104,6 +117,8 @@ class FeedPost {
       'refeedsCount': refeedsCount,
       'location': location,
       'postType': postType,
+      'avatarUrl': avatarUrl,
+      'authorHandle': authorHandle,
     };
   }
 }

@@ -144,6 +144,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     required String conversationId,
     required String senderName,
     required String body,
+    String? senderId,
+    String? senderAvatarUrl,
   }) async {
     final trimmed = body.trim();
     if (trimmed.isEmpty) return;
@@ -153,6 +155,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       id: const Uuid().v4(),
       conversationId: conversationId,
       senderName: senderName,
+      senderId: senderId,
+      senderAvatarUrl: senderAvatarUrl,
       body: trimmed,
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.pending,
@@ -165,16 +169,74 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
         ? null
         : ConversationSummary.fromJson(Map<String, Object?>.from(current));
 
-    final updatedSummary = ConversationSummary(
-      id: conversationId,
-      title: currentSummary?.title ?? 'New chat',
-      lastMessagePreview: trimmed,
-      updatedAtMillis: now,
-      pendingCount: (currentSummary?.pendingCount ?? 0) + 1,
-      serverConversationId: currentSummary?.serverConversationId,
-    );
+    final updatedSummary =
+        (currentSummary ??
+                ConversationSummary(
+                  id: conversationId,
+                  title: 'New chat',
+                  lastMessagePreview: trimmed,
+                  updatedAtMillis: now,
+                  pendingCount: 0,
+                ))
+            .copyWith(lastMessagePreview: trimmed, updatedAtMillis: now);
 
     await _conversationsBox.put(conversationId, updatedSummary.toJson());
+  }
+
+  @override
+  Future<void> queueAttachment({
+    required String conversationId,
+    required String senderName,
+    required String localPath,
+    required String mediaType,
+    String? mimeType,
+    String? fileName,
+    int? fileSizeBytes,
+  }) async {
+    if (localPath.trim().isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final kind = mediaType.trim().isEmpty ? 'file' : mediaType.trim();
+    final message = LocalMessage(
+      id: const Uuid().v4(),
+      conversationId: conversationId,
+      senderName: senderName,
+      body: _attachmentPreview(kind),
+      createdAtMillis: now,
+      deliveryState: MessageDeliveryState.pending,
+      messageType: kind,
+      localMediaPath: localPath,
+      mimeType: mimeType,
+      fileName: fileName,
+      fileSizeBytes: fileSizeBytes,
+    );
+
+    await _messagesBox.put(message.id, message.toJson());
+
+    final current = _conversationsBox.get(conversationId);
+    final currentSummary = current == null
+        ? null
+        : ConversationSummary.fromJson(Map<String, Object?>.from(current));
+    final updatedSummary =
+        (currentSummary ??
+                ConversationSummary(
+                  id: conversationId,
+                  title: 'New chat',
+                  lastMessagePreview: message.body,
+                  updatedAtMillis: now,
+                  pendingCount: 0,
+                ))
+            .copyWith(lastMessagePreview: message.body, updatedAtMillis: now);
+    await _conversationsBox.put(conversationId, updatedSummary.toJson());
+  }
+
+  String _attachmentPreview(String mediaType) {
+    return switch (mediaType) {
+      'image' => 'Photo',
+      'video' => 'Video',
+      'audio' => 'Voice message',
+      _ => 'Attachment',
+    };
   }
 
   @override

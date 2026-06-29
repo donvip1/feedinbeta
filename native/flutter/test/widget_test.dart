@@ -514,5 +514,18 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String conversationId,
     required String senderName,
     required String body,
+    String? senderId,
+    String? senderAvatarUrl,
+  }) async {}
+
+  @override
+  Future<void> queueAttachment({
+    required String conversationId,
+    required String senderName,
+    required String localPath,
+    required String mediaType,
+    String? mimeType,
+    String? fileName,
+    int? fileSizeBytes,
   }) async {}
 }

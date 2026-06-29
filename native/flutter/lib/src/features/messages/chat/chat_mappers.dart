@@ -40,7 +40,7 @@ ConversationView conversationSummaryToView(ConversationSummary summary) {
     updatedAtMillis: summary.updatedAtMillis,
     lastMessageText: summary.lastMessagePreview,
     unreadCount: summary.pendingCount,
-    pendingCount: summary.pendingCount,
+    pendingCount: 0,
     isOnline: presenceShowsDot(presence),
   );
 }
@@ -95,6 +95,7 @@ List<ChatMessageView> localMessagesToViews(
             senderId == currentUserKey || message.senderName == currentUserKey,
         deliveryState: mapDeliveryState(message.deliveryState),
         body: message.body,
+        media: _messageMedia(message),
         readReceipts: [
           if (message.readAtMillis case final readAt?)
             ReadReceiptView(userId: senderId, readAtMillis: readAt),
@@ -105,6 +106,37 @@ List<ChatMessageView> localMessagesToViews(
     );
   }
   return views;
+}
+
+MessageMedia? _messageMedia(LocalMessage message) {
+  final localPath = message.localMediaPath;
+  final remoteUrl = message.mediaUrl;
+  if ((localPath == null || localPath.isEmpty) &&
+      (remoteUrl == null || remoteUrl.isEmpty)) {
+    return null;
+  }
+
+  final kind = switch (message.messageType) {
+    'image' => ChatMediaKind.image,
+    'photo' => ChatMediaKind.image,
+    'video' => ChatMediaKind.video,
+    'audio' => ChatMediaKind.audio,
+    'voice' => ChatMediaKind.audio,
+    _ => ChatMediaKind.file,
+  };
+
+  return MessageMedia(
+    kind: kind,
+    remoteUrl: remoteUrl,
+    localPath: localPath,
+    thumbnailUrl: message.thumbnailUrl,
+    mimeType: message.mimeType,
+    fileName: message.fileName,
+    fileSizeBytes: message.fileSizeBytes,
+    downloadState: localPath == null
+        ? MediaDownloadState.idle
+        : MediaDownloadState.downloaded,
+  );
 }
 
 PresenceState conversationPresence(ConversationSummary summary) {

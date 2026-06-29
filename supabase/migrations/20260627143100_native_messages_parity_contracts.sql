@@ -59,9 +59,9 @@ with check (
 );
 
 drop policy if exists "Participants can update message attachment download state" on public.message_attachments;
-create policy "Participants can update message attachment download state"
-on public.message_attachments for update
-using (public.is_conversation_participant(conversation_id));
+-- No direct client attachment updates. Download-state mutation can be exposed
+-- later through a scoped RPC; unrestricted row updates would allow participants
+-- to rewrite attachment metadata.
 
 create table if not exists public.message_read_receipts (
   message_id uuid not null references public.messages(id) on delete cascade,
@@ -151,16 +151,8 @@ using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
 drop policy if exists "Recipients can mark received messages read" on public.messages;
-create policy "Recipients can mark received messages read"
-on public.messages for update
-using (
-  public.is_conversation_participant(conversation_id)
-  and sender_id <> auth.uid()
-)
-with check (
-  public.is_conversation_participant(conversation_id)
-  and sender_id <> auth.uid()
-);
+-- No direct client updates to message rows. Read state is updated only through
+-- mark_conversation_read(), which is scoped to conversation participants.
 
 create or replace function public.mark_conversation_read(p_conversation_id uuid)
 returns void
@@ -207,14 +199,24 @@ create or replace function public.set_typing_indicator(
   p_activity text default 'typing'
 )
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  if not public.is_conversation_participant(p_conversation_id) then
+    raise exception 'not a conversation participant';
+  end if;
+
   insert into public.typing_indicators (conversation_id, user_id, activity, updated_at)
   values (p_conversation_id, auth.uid(), coalesce(nullif(p_activity, ''), 'typing'), now())
   on conflict (conversation_id, user_id)
   do update set activity = excluded.activity, updated_at = excluded.updated_at;
+end;
 $$;
 
 create or replace function public.update_presence(p_status text default 'online')
@@ -432,4 +434,5 @@ begin
       alter publication supabase_realtime add table public.user_presence;
     end if;
   end if;
-end $$;
+end;
+$$;

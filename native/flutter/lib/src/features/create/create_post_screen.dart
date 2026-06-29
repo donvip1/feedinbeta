@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/sync/upload_queue_service.dart';
@@ -198,12 +201,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (remaining == 1) {
       final picked = await _picker.pickMedia();
       if (picked == null) return;
+      final stored = await _persistPickedMedia(picked);
       setState(() {
         _media = [
           ..._media,
           ComposerMediaItem(
             id: _uuid.v4(),
-            path: picked.path,
+            path: stored,
             kind: _kindFor(picked),
           ),
         ];
@@ -214,15 +218,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final picked = await _picker.pickMultipleMedia(limit: remaining);
     if (picked.isEmpty) return;
     final accepted = picked.take(remaining).toList();
+    final persisted = <({XFile file, String path})>[];
+    for (final file in accepted) {
+      persisted.add((file: file, path: await _persistPickedMedia(file)));
+    }
     final overflow = picked.length - accepted.length;
     setState(() {
       _media = [
         ..._media,
-        for (final file in accepted)
+        for (final item in persisted)
           ComposerMediaItem(
             id: _uuid.v4(),
-            path: file.path,
-            kind: _kindFor(file),
+            path: item.path,
+            kind: _kindFor(item.file),
           ),
       ];
     });
@@ -269,12 +277,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _showSnack('You can add up to $_maxMedia items.');
       return;
     }
+    final stored = await _persistPickedMedia(picked);
     setState(() {
       _media = [
         ..._media,
-        ComposerMediaItem(id: _uuid.v4(), path: picked.path, kind: kind),
+        ComposerMediaItem(id: _uuid.v4(), path: stored, kind: kind),
       ];
     });
+  }
+
+  Future<String> _persistPickedMedia(XFile picked) async {
+    final source = File(picked.path);
+    if (!source.existsSync()) return picked.path;
+
+    final directory = await getApplicationCacheDirectory();
+    final mediaDirectory = Directory('${directory.path}/feedin_create_media');
+    if (!mediaDirectory.existsSync()) {
+      mediaDirectory.createSync(recursive: true);
+    }
+
+    final extension = picked.path.contains('.')
+        ? picked.path.split('.').last
+        : 'bin';
+    final targetPath =
+        '${mediaDirectory.path}/${DateTime.now().millisecondsSinceEpoch}_${_uuid.v4()}.$extension';
+    return source.copy(targetPath).then((file) => file.path);
   }
 
   // -------------------------------------------------------------------------

@@ -37,6 +37,11 @@ class MessageMaterializer {
             deliveryState: _deliveryState(remoteMessage.deliveryStateName),
             messageType: remoteMessage.messageType,
             readAtMillis: remoteMessage.readAtMillis,
+            mediaUrl: remoteMessage.mediaUrl,
+            thumbnailUrl: remoteMessage.thumbnailUrl,
+            mimeType: remoteMessage.mimeType,
+            fileName: remoteMessage.fileName,
+            fileSizeBytes: remoteMessage.fileSizeBytes,
           ),
         );
         messagesSaved++;

@@ -56,9 +56,9 @@ on public.notifications for delete
 using (auth.uid() = user_id);
 
 drop policy if exists "Authenticated users can create notifications" on public.notifications;
-create policy "Authenticated users can create notifications"
+create policy "Users can create notifications for self"
 on public.notifications for insert
-with check (auth.uid() is not null);
+with check (auth.uid() = user_id);
 
 create table if not exists public.notification_preferences (
   user_id uuid primary key references public.profiles(id) on delete cascade,
@@ -307,4 +307,5 @@ begin
       alter publication supabase_realtime add table public.push_subscriptions;
     end if;
   end if;
-end $$;
+end;
+$$;

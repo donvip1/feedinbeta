@@ -43,6 +43,19 @@ class FeedinRealtimeService {
               ),
             );
           },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notifications',
+          callback: (payload) {
+            _eventsController.add(
+              FeedinRealtimeEvent(
+                type: FeedinRealtimeEventType.notificationChanged,
+                recordId: _recordId(payload),
+              ),
+            );
+          },
         );
 
     _channel!.subscribe();
@@ -75,4 +88,8 @@ class FeedinRealtimeEvent {
   final String? recordId;
 }
 
-enum FeedinRealtimeEventType { postChanged, messageChanged }
+enum FeedinRealtimeEventType {
+  postChanged,
+  messageChanged,
+  notificationChanged,
+}

@@ -233,7 +233,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
                 isLiked: widget.isLiked,
                 isSaved: widget.isSaved,
                 avatarText: widget.post.authorName,
-                avatarUrl: null,
+                avatarUrl: widget.post.avatarUrl,
                 onLike: widget.onLike,
                 onComment: widget.onComment,
                 onRefeed: widget.onRefeed,

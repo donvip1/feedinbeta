@@ -91,6 +91,7 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [ ] Confirm bucket policies allow authenticated upload and public/signed read as intended.
 - [ ] Test draft upload queue with the live Supabase project on a real device.
 - [x] Added visible queue upload progress percentages using real queue processing stages.
+- [x] Persist picked Create media into app-owned cache paths before queuing uploads.
 
 ## Phase 4: Messaging
 
@@ -110,6 +111,7 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [ ] Test `create_conversation` RPC with real Supabase users.
 - [ ] Test full message replay with secure session restoration on a real device.
 - [x] Added native message read/delivery receipt contracts, local unread clearing, and remote presence/read metadata materialization.
+- [x] Wired remote `mark_conversation_read` calls and native `message_attachments` upload/materialization for photo/video chat media.
 - [ ] Test message attachments, receipts, and presence against live Supabase after migrations are pushed.
 
 ## Phase 5: Profile, Settings, Notifications
@@ -134,7 +136,8 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Expanded native profile with cover/banner, avatar, counts, premium indicator, location, website, and richer edit fields.
 - [x] Added native profile posts grid backed by the real feed repository.
 - [x] Completed profile parity scaffolding for posts grid, followers/following modal states, view-history contract, verification/role badges, and social links.
-- [ ] Wire live follower/following row fetch and view-history RPC into Flutter after migrations are pushed.
+- [x] Wired live follower/following row fetch into Flutter profile connections modal.
+- [ ] Wire view-history RPC into Flutter after migrations are pushed.
 
 ## Phase 6: Native UI/Product Parity
 
@@ -150,8 +153,10 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Completed Profile parity scaffolding with real social/role/plan fields and honest backend-dependent states.
 - [x] Rebuilt Messages backend contracts for online presence, attachments, call-ready schema, and read receipts.
 - [x] Rebuilt Notifications backend contract for remote notification table, FCM payload shape, and typed actions.
-- [ ] Wire Flutter message attachment upload and call navigation after media/call product flows are finalized.
-- [ ] Connect Flutter to remote Notifications fetch/FCM registration after Firebase config is provided.
+- [x] Wired Flutter message attachment upload/download materialization for native photo/video chat media.
+- [x] Connected Flutter to remote Notifications fetch/read/delete materialization.
+- [ ] Add FCM token registration/payload handling after Firebase config is provided.
+- [ ] Wire call navigation after call product flows are finalized.
 - [x] Added production empty states for feed tabs, live, chats, conversations, notifications, and create drafts.
 - [x] Removed remaining visible demo/offline-preview/scaffold text from Supabase-configured builds.
 

@@ -100,18 +100,33 @@ class FeedRemoteDataSource {
 
   FeedPost _mapPost(Map<String, dynamic> row) {
     final profile = row['profiles'];
-    final authorName = profile is Map
-        ? (profile['display_name'] as String?) ??
-              (profile['username'] as String?) ??
-              'feedIn User'
+    final username = profile is Map
+        ? (profile['username'] as String?)?.trim()
+        : null;
+    final displayName = profile is Map
+        ? (profile['display_name'] as String?)?.trim()
+        : null;
+    final avatarUrl = profile is Map
+        ? (profile['avatar_url'] as String?)?.trim()
+        : null;
+
+    final authorName = (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (username != null && username.isNotEmpty)
+        ? username
         : 'feedIn User';
+    final authorHandle = (username != null && username.isNotEmpty)
+        ? '@$username'
+        : null;
 
     return FeedPost(
       id: row['id'].toString(),
       userId: row['user_id']?.toString() ?? '',
       authorName: authorName,
       body: row['content']?.toString() ?? '',
-      meta: 'Synced from server',
+      meta: authorHandle ?? 'Synced from server',
+      avatarUrl: (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : null,
+      authorHandle: authorHandle,
       mediaUrl: row['media_url']?.toString(),
       mediaType: row['media_type']?.toString(),
       mediaUrls: _stringList(row['media_urls']),

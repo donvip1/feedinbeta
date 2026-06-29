@@ -1,3 +1,5 @@
+const Object _copyUnset = Object();
+
 class UserProfile {
   const UserProfile({
     required this.userId,
@@ -49,18 +51,18 @@ class UserProfile {
     String? displayName,
     String? handle,
     String? bio,
-    String? avatarUrl,
-    String? coverUrl,
-    String? location,
-    String? websiteUrl,
-    String? instagramUrl,
-    String? twitterUrl,
-    String? linkedinUrl,
-    String? facebookUrl,
-    String? tiktokUrl,
-    String? youtubeUrl,
-    String? role,
-    String? planTier,
+    Object? avatarUrl = _copyUnset,
+    Object? coverUrl = _copyUnset,
+    Object? location = _copyUnset,
+    Object? websiteUrl = _copyUnset,
+    Object? instagramUrl = _copyUnset,
+    Object? twitterUrl = _copyUnset,
+    Object? linkedinUrl = _copyUnset,
+    Object? facebookUrl = _copyUnset,
+    Object? tiktokUrl = _copyUnset,
+    Object? youtubeUrl = _copyUnset,
+    Object? role = _copyUnset,
+    Object? planTier = _copyUnset,
     int? followersCount,
     int? followingCount,
     int? totalViews,
@@ -72,18 +74,34 @@ class UserProfile {
       handle: handle ?? this.handle,
       bio: bio ?? this.bio,
       completedAtMillis: completedAtMillis,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-      coverUrl: coverUrl ?? this.coverUrl,
-      location: location ?? this.location,
-      websiteUrl: websiteUrl ?? this.websiteUrl,
-      instagramUrl: instagramUrl ?? this.instagramUrl,
-      twitterUrl: twitterUrl ?? this.twitterUrl,
-      linkedinUrl: linkedinUrl ?? this.linkedinUrl,
-      facebookUrl: facebookUrl ?? this.facebookUrl,
-      tiktokUrl: tiktokUrl ?? this.tiktokUrl,
-      youtubeUrl: youtubeUrl ?? this.youtubeUrl,
-      role: role ?? this.role,
-      planTier: planTier ?? this.planTier,
+      avatarUrl: avatarUrl == _copyUnset
+          ? this.avatarUrl
+          : avatarUrl as String?,
+      coverUrl: coverUrl == _copyUnset ? this.coverUrl : coverUrl as String?,
+      location: location == _copyUnset ? this.location : location as String?,
+      websiteUrl: websiteUrl == _copyUnset
+          ? this.websiteUrl
+          : websiteUrl as String?,
+      instagramUrl: instagramUrl == _copyUnset
+          ? this.instagramUrl
+          : instagramUrl as String?,
+      twitterUrl: twitterUrl == _copyUnset
+          ? this.twitterUrl
+          : twitterUrl as String?,
+      linkedinUrl: linkedinUrl == _copyUnset
+          ? this.linkedinUrl
+          : linkedinUrl as String?,
+      facebookUrl: facebookUrl == _copyUnset
+          ? this.facebookUrl
+          : facebookUrl as String?,
+      tiktokUrl: tiktokUrl == _copyUnset
+          ? this.tiktokUrl
+          : tiktokUrl as String?,
+      youtubeUrl: youtubeUrl == _copyUnset
+          ? this.youtubeUrl
+          : youtubeUrl as String?,
+      role: role == _copyUnset ? this.role : role as String?,
+      planTier: planTier == _copyUnset ? this.planTier : planTier as String?,
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount ?? this.followingCount,
       totalViews: totalViews ?? this.totalViews,

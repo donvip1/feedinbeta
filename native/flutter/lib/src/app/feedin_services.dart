@@ -28,6 +28,7 @@ import '../data/local/upload_queue_repository.dart';
 import '../data/remote/feed_remote_data_source.dart';
 import '../data/remote/message_recipient_remote_data_source.dart';
 import '../data/remote/messages_remote_data_source.dart';
+import '../data/remote/notifications_remote_data_source.dart';
 import '../data/remote/profile_remote_data_source.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/auth_repository_contract.dart';
@@ -103,6 +104,9 @@ class FeedinServices {
     );
     final notificationRepository = NotificationRepository(
       box: notificationsBox,
+      remoteDataSource: NotificationsRemoteDataSource(
+        isConfigured: config.hasSupabaseConfig,
+      ),
     );
     final preferencesRepository = PreferencesRepository(box: preferencesBox);
     final postDraftRepository = PostDraftRepository(box: postDraftsBox);

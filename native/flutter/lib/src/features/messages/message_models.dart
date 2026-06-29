@@ -94,6 +94,12 @@ class LocalMessage {
     this.senderAvatarUrl,
     this.messageType = 'text',
     this.readAtMillis,
+    this.mediaUrl,
+    this.localMediaPath,
+    this.thumbnailUrl,
+    this.mimeType,
+    this.fileName,
+    this.fileSizeBytes,
   });
 
   final String id;
@@ -106,6 +112,12 @@ class LocalMessage {
   final MessageDeliveryState deliveryState;
   final String messageType;
   final int? readAtMillis;
+  final String? mediaUrl;
+  final String? localMediaPath;
+  final String? thumbnailUrl;
+  final String? mimeType;
+  final String? fileName;
+  final int? fileSizeBytes;
 
   LocalMessage copyWith({MessageDeliveryState? deliveryState}) {
     return LocalMessage(
@@ -119,6 +131,12 @@ class LocalMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       messageType: messageType,
       readAtMillis: readAtMillis,
+      mediaUrl: mediaUrl,
+      localMediaPath: localMediaPath,
+      thumbnailUrl: thumbnailUrl,
+      mimeType: mimeType,
+      fileName: fileName,
+      fileSizeBytes: fileSizeBytes,
     );
   }
 
@@ -136,6 +154,12 @@ class LocalMessage {
       ),
       messageType: json['messageType'] as String? ?? 'text',
       readAtMillis: json['readAtMillis'] as int?,
+      mediaUrl: json['mediaUrl'] as String?,
+      localMediaPath: json['localMediaPath'] as String?,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      mimeType: json['mimeType'] as String?,
+      fileName: json['fileName'] as String?,
+      fileSizeBytes: json['fileSizeBytes'] as int?,
     );
   }
 
@@ -151,6 +175,12 @@ class LocalMessage {
       'deliveryState': deliveryState.name,
       'messageType': messageType,
       'readAtMillis': readAtMillis,
+      'mediaUrl': mediaUrl,
+      'localMediaPath': localMediaPath,
+      'thumbnailUrl': thumbnailUrl,
+      'mimeType': mimeType,
+      'fileName': fileName,
+      'fileSizeBytes': fileSizeBytes,
     };
   }
 }

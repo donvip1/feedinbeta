@@ -122,6 +122,8 @@ class _FeedShellState extends State<FeedShell> {
         });
       case FeedinRealtimeEventType.messageChanged:
         unawaited(_refreshMessagesAfterRealtimeEvent());
+      case FeedinRealtimeEventType.notificationChanged:
+        _refreshNotificationBadge();
     }
   }
 
@@ -199,6 +201,7 @@ class _FeedShellState extends State<FeedShell> {
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
         conversationStarter: widget.conversationStarter,
+        syncService: widget.syncService,
         profile: _profile,
         realtimeVersion: _messagesRealtimeVersion,
         initialConversationId: _initialConversationId,
