@@ -8,6 +8,10 @@ class ConversationSummary {
     required this.updatedAtMillis,
     required this.pendingCount,
     this.serverConversationId,
+    this.otherUserId,
+    this.otherUserAvatarUrl,
+    this.otherUserPresence,
+    this.otherUserLastSeenAtMillis,
   });
 
   final String id;
@@ -16,6 +20,10 @@ class ConversationSummary {
   final int updatedAtMillis;
   final int pendingCount;
   final String? serverConversationId;
+  final String? otherUserId;
+  final String? otherUserAvatarUrl;
+  final String? otherUserPresence;
+  final int? otherUserLastSeenAtMillis;
 
   ConversationSummary copyWith({
     String? title,
@@ -23,6 +31,10 @@ class ConversationSummary {
     int? updatedAtMillis,
     String? serverConversationId,
     int? pendingCount,
+    String? otherUserId,
+    String? otherUserAvatarUrl,
+    String? otherUserPresence,
+    int? otherUserLastSeenAtMillis,
   }) {
     return ConversationSummary(
       id: id,
@@ -31,6 +43,11 @@ class ConversationSummary {
       updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
       pendingCount: pendingCount ?? this.pendingCount,
       serverConversationId: serverConversationId ?? this.serverConversationId,
+      otherUserId: otherUserId ?? this.otherUserId,
+      otherUserAvatarUrl: otherUserAvatarUrl ?? this.otherUserAvatarUrl,
+      otherUserPresence: otherUserPresence ?? this.otherUserPresence,
+      otherUserLastSeenAtMillis:
+          otherUserLastSeenAtMillis ?? this.otherUserLastSeenAtMillis,
     );
   }
 
@@ -42,6 +59,10 @@ class ConversationSummary {
       updatedAtMillis: json['updatedAtMillis'] as int,
       pendingCount: json['pendingCount'] as int? ?? 0,
       serverConversationId: json['serverConversationId'] as String?,
+      otherUserId: json['otherUserId'] as String?,
+      otherUserAvatarUrl: json['otherUserAvatarUrl'] as String?,
+      otherUserPresence: json['otherUserPresence'] as String?,
+      otherUserLastSeenAtMillis: json['otherUserLastSeenAtMillis'] as int?,
     );
   }
 
@@ -53,6 +74,10 @@ class ConversationSummary {
       'updatedAtMillis': updatedAtMillis,
       'pendingCount': pendingCount,
       'serverConversationId': serverConversationId,
+      'otherUserId': otherUserId,
+      'otherUserAvatarUrl': otherUserAvatarUrl,
+      'otherUserPresence': otherUserPresence,
+      'otherUserLastSeenAtMillis': otherUserLastSeenAtMillis,
     };
   }
 }
@@ -65,23 +90,35 @@ class LocalMessage {
     required this.body,
     required this.createdAtMillis,
     required this.deliveryState,
+    this.senderId,
+    this.senderAvatarUrl,
+    this.messageType = 'text',
+    this.readAtMillis,
   });
 
   final String id;
   final String conversationId;
   final String senderName;
+  final String? senderId;
+  final String? senderAvatarUrl;
   final String body;
   final int createdAtMillis;
   final MessageDeliveryState deliveryState;
+  final String messageType;
+  final int? readAtMillis;
 
   LocalMessage copyWith({MessageDeliveryState? deliveryState}) {
     return LocalMessage(
       id: id,
       conversationId: conversationId,
       senderName: senderName,
+      senderId: senderId,
+      senderAvatarUrl: senderAvatarUrl,
       body: body,
       createdAtMillis: createdAtMillis,
       deliveryState: deliveryState ?? this.deliveryState,
+      messageType: messageType,
+      readAtMillis: readAtMillis,
     );
   }
 
@@ -90,11 +127,15 @@ class LocalMessage {
       id: json['id'] as String,
       conversationId: json['conversationId'] as String,
       senderName: json['senderName'] as String,
+      senderId: json['senderId'] as String?,
+      senderAvatarUrl: json['senderAvatarUrl'] as String?,
       body: json['body'] as String,
       createdAtMillis: json['createdAtMillis'] as int,
       deliveryState: MessageDeliveryState.values.byName(
         json['deliveryState'] as String,
       ),
+      messageType: json['messageType'] as String? ?? 'text',
+      readAtMillis: json['readAtMillis'] as int?,
     );
   }
 
@@ -103,9 +144,13 @@ class LocalMessage {
       'id': id,
       'conversationId': conversationId,
       'senderName': senderName,
+      'senderId': senderId,
+      'senderAvatarUrl': senderAvatarUrl,
       'body': body,
       'createdAtMillis': createdAtMillis,
       'deliveryState': deliveryState.name,
+      'messageType': messageType,
+      'readAtMillis': readAtMillis,
     };
   }
 }

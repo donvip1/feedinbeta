@@ -327,6 +327,7 @@ class ConnectionsModalView {
     this.followingCount = 0,
     this.defaultTab = ConnectionsTab.followers,
     this.isLoading = false,
+    this.listsUnavailable = false,
   });
 
   final List<FollowRowView> followers;
@@ -335,6 +336,12 @@ class ConnectionsModalView {
   final int followingCount;
   final ConnectionsTab defaultTab;
   final bool isLoading;
+
+  /// True when counts are known but native has no follower/following row source.
+  ///
+  /// This lets the UI avoid dishonest "No followers" copy when the count is
+  /// non-zero but the underlying list cannot be loaded in native yet.
+  final bool listsUnavailable;
 }
 
 /// Whole Friends modal state.

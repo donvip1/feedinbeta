@@ -68,7 +68,9 @@ class UploadQueueService {
           draftId: draft.id,
           uploadState: DraftUploadState.uploading,
         );
+        await _uploadQueueRepository.updateProgress(draft.id, 10);
         final mediaUrls = await _uploadMediaIfNeeded(client, userId, draft);
+        await _uploadQueueRepository.updateProgress(draft.id, 90);
         final mediaTypes = _mediaTypesFor(draft, mediaUrls.length);
 
         switch (draft.draftKind) {
@@ -98,6 +100,7 @@ class UploadQueueService {
           draftId: draft.id,
           uploadState: DraftUploadState.uploaded,
         );
+        await _uploadQueueRepository.updateProgress(draft.id, 100);
         await _uploadQueueRepository.remove(draft.id);
         uploaded++;
       } catch (error) {
@@ -105,6 +108,7 @@ class UploadQueueService {
           draftId: draft.id,
           uploadState: DraftUploadState.failed,
         );
+        await _uploadQueueRepository.updateProgress(draft.id, 0);
         failed++;
         return UploadQueueSummary(
           attempted: true,
@@ -181,6 +185,7 @@ class UploadQueueService {
     if (mediaPaths.isEmpty) return const [];
 
     final urls = <String>[];
+    final total = mediaPaths.where((path) => path.isNotEmpty).length;
     for (final (index, mediaPath) in mediaPaths.indexed) {
       if (mediaPath.isEmpty) continue;
       final file = File(mediaPath);
@@ -193,6 +198,11 @@ class UploadQueueService {
           '$userId/${draft.id}/${DateTime.now().millisecondsSinceEpoch}_$index.$extension';
       await client.storage.from('post-media').upload(storagePath, file);
       urls.add(client.storage.from('post-media').getPublicUrl(storagePath));
+      final completed = urls.length;
+      final progress = total <= 0
+          ? 80
+          : 10 + ((completed / total) * 70).round();
+      await _uploadQueueRepository.updateProgress(draft.id, progress);
     }
     return urls;
   }

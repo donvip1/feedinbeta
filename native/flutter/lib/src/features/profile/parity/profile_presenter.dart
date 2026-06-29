@@ -7,9 +7,9 @@
 /// easy to unit-test.
 ///
 /// Where a field/count is not yet available locally (followers/following user
-/// lists, friends, view history, social link URLs, admin role, plan tier) the
-/// mapper produces a graceful empty/placeholder view rather than inventing a
-/// backend call — matching the project's offline-first first-pass parity goal.
+/// lists, friends, view history) the mapper
+/// produces an honest empty/unavailable view rather than inventing a backend
+/// call — matching the project's offline-first first-pass parity goal.
 library;
 
 import '../../feed/feed_post.dart';
@@ -20,21 +20,25 @@ import 'profile_view_models.dart';
 class ProfilePresenter {
   const ProfilePresenter._();
 
-  /// Resolve the verified tier from a profile. Only `isPremium` is available
-  /// locally today, so premium maps to [VerifiedTier.premium] and everything
-  /// else to [VerifiedTier.none]. Pro/popular tiers require a subscription
-  /// tier name that the local model does not carry yet.
+  /// Resolve the verified tier from a profile. Explicit plan metadata wins;
+  /// legacy `isPremium` still maps older rows to premium.
   static VerifiedTier verifiedTier(UserProfile profile) {
+    final plan = profile.planTier?.toLowerCase() ?? '';
+    if (plan.contains('premium')) return VerifiedTier.premium;
+    if (plan.contains('pro') || plan.contains('popular')) {
+      return VerifiedTier.pro;
+    }
     return profile.isPremium ? VerifiedTier.premium : VerifiedTier.none;
   }
 
-  /// Resolve the header badge bundle. Admin role is not stored locally, so it
-  /// is always null/hidden; the plan chip is shown for premium profiles.
+  /// Resolve the header badge bundle from role and plan metadata.
   static ProfileBadgeSet badges(UserProfile profile) {
+    final role = _roleKind(profile.role);
     return ProfileBadgeSet(
       verifiedTier: verifiedTier(profile),
-      plan: profile.isPremium ? PlanBadgeKind.premium : null,
-      showRole: false,
+      role: role,
+      plan: _planKind(profile.planTier, profile.isPremium),
+      showRole: role != null,
     );
   }
 
@@ -53,7 +57,10 @@ class ProfilePresenter {
   /// Map a single local [FeedPost] to a grid tile, classifying it as
   /// image/video/text from the available media metadata.
   static PostTileView tile(FeedPost post) {
-    final mediaUrl = post.mediaUrl ?? _firstNonEmpty(post.mediaUrls);
+    final mediaUrl =
+        _trimmedOrNull(post.localMediaPath) ??
+        _trimmedOrNull(post.mediaUrl) ??
+        _firstNonEmpty(post.mediaUrls);
     final mediaType = post.mediaType ?? _firstNonEmpty(post.mediaTypes);
     final mediaCount = post.mediaUrls.isNotEmpty ? post.mediaUrls.length : 1;
 
@@ -88,6 +95,28 @@ class ProfilePresenter {
       isLoading: isLoading,
     );
   }
+
+  /// Build a Connections modal state from counts only.
+  ///
+  /// The active native schema/contract exposes follower/following counts, but
+  /// not the row-level follow graph. Mark non-zero count lists unavailable so
+  /// the sheet does not claim there are no followers when only rows are absent.
+  static ConnectionsModalView connections(
+    UserProfile profile, {
+    ConnectionsTab defaultTab = ConnectionsTab.followers,
+  }) {
+    return ConnectionsModalView(
+      followersCount: profile.followersCount,
+      followingCount: profile.followingCount,
+      defaultTab: defaultTab,
+      listsUnavailable:
+          profile.followersCount > 0 || profile.followingCount > 0,
+    );
+  }
+
+  /// Native has no view-history contract/RPC wired yet, so render the real
+  /// empty state instead of fabricating recently viewed posts.
+  static const ViewHistoryView viewHistory = ViewHistoryView(canClear: false);
 
   /// Parse the profile's free-form `location` into city/country halves so the
   /// header can compose 'city, country'. Splits on the first comma; the whole
@@ -129,16 +158,56 @@ class ProfilePresenter {
     );
   }
 
-  /// Resolve the social links list from the local profile. Only `websiteUrl`
-  /// is stored locally today, so at most the Website pill is produced; the
-  /// other six networks need profile columns that are not in the local model
-  /// yet (see report). Returns an empty list when there is no website.
+  /// Resolve the social links list from the local profile in web render order.
   static List<SocialLinkVm> socialLinks(UserProfile profile) {
-    final website = profile.websiteUrl?.trim();
     return [
-      if (website != null && website.isNotEmpty)
-        SocialLinkVm(network: SocialNetwork.website, url: website),
+      if (_trimmedOrNull(profile.instagramUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.instagram, url: url),
+      if (_trimmedOrNull(profile.twitterUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.twitter, url: url),
+      if (_trimmedOrNull(profile.linkedinUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.linkedin, url: url),
+      if (_trimmedOrNull(profile.facebookUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.facebook, url: url),
+      if (_trimmedOrNull(profile.tiktokUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.tiktok, url: url),
+      if (_trimmedOrNull(profile.youtubeUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.youtube, url: url),
+      if (_trimmedOrNull(profile.websiteUrl) case final url?)
+        SocialLinkVm(network: SocialNetwork.website, url: url),
     ];
+  }
+
+  static RoleBadgeKind? _roleKind(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'super_admin':
+      case 'superadmin':
+      case 'full_access':
+        return RoleBadgeKind.superAdmin;
+      case 'developer':
+        return RoleBadgeKind.developer;
+      case 'admin':
+        return RoleBadgeKind.admin;
+      case 'moderator':
+        return RoleBadgeKind.moderator;
+      default:
+        return null;
+    }
+  }
+
+  static PlanBadgeKind? _planKind(String? value, bool isPremium) {
+    final plan = value?.trim().toLowerCase();
+    if (plan != null && plan.isNotEmpty) {
+      if (plan.contains('premium')) return PlanBadgeKind.premium;
+      if (plan.contains('pro')) return PlanBadgeKind.pro;
+      if (plan.contains('popular')) return PlanBadgeKind.popular;
+    }
+    return isPremium ? PlanBadgeKind.premium : null;
+  }
+
+  static String? _trimmedOrNull(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   static String? _firstNonEmpty(List<String> values) {

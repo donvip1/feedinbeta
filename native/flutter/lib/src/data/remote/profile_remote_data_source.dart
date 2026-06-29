@@ -13,7 +13,7 @@ class ProfileRemoteDataSource {
     final row = await Supabase.instance.client
         .from('profiles')
         .select(
-          'id, display_name, username, bio, avatar_url, cover_url, banner_url, location, website_url, followers_count, following_count, total_views, is_premium, updated_at',
+          'id, display_name, username, bio, avatar_url, cover_url, banner_url, location, website_url, instagram_url, twitter_url, linkedin_url, facebook_url, tiktok_url, youtube_url, role, plan_tier, followers_count, following_count, total_views, is_premium, updated_at',
         )
         .eq('id', userId)
         .maybeSingle();
@@ -32,6 +32,12 @@ class ProfileRemoteDataSource {
       'bio': profile.bio,
       'location': profile.location,
       'website_url': profile.websiteUrl,
+      'instagram_url': profile.instagramUrl,
+      'twitter_url': profile.twitterUrl,
+      'linkedin_url': profile.linkedinUrl,
+      'facebook_url': profile.facebookUrl,
+      'tiktok_url': profile.tiktokUrl,
+      'youtube_url': profile.youtubeUrl,
     });
   }
 
@@ -51,6 +57,14 @@ class ProfileRemoteDataSource {
       coverUrl: row['cover_url']?.toString() ?? row['banner_url']?.toString(),
       location: row['location']?.toString(),
       websiteUrl: row['website_url']?.toString(),
+      instagramUrl: row['instagram_url']?.toString(),
+      twitterUrl: row['twitter_url']?.toString(),
+      linkedinUrl: row['linkedin_url']?.toString(),
+      facebookUrl: row['facebook_url']?.toString(),
+      tiktokUrl: row['tiktok_url']?.toString(),
+      youtubeUrl: row['youtube_url']?.toString(),
+      role: row['role']?.toString(),
+      planTier: row['plan_tier']?.toString(),
       followersCount: row['followers_count'] as int? ?? 0,
       followingCount: row['following_count'] as int? ?? 0,
       totalViews: row['total_views'] as int? ?? 0,

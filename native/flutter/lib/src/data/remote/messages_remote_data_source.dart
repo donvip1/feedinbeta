@@ -31,7 +31,7 @@ class MessagesRemoteDataSource {
     final rows = await Supabase.instance.client
         .from('messages')
         .select(
-          'id, conversation_id, sender_id, content, status, created_at, profiles(display_name, username)',
+          'id, conversation_id, sender_id, content, message_type, status, is_read, read_at, created_at, profiles(display_name, username, avatar_url)',
         )
         .eq('conversation_id', serverConversationId)
         .order('created_at');
@@ -40,6 +40,22 @@ class MessagesRemoteDataSource {
         .whereType<Map>()
         .map((row) => RemoteMessage.fromJson(Map<String, Object?>.from(row)))
         .toList();
+  }
+
+  Future<void> markConversationRead(String serverConversationId) async {
+    if (!isConfigured) return;
+    await Supabase.instance.client.rpc<void>(
+      'mark_conversation_read',
+      params: {'p_conversation_id': serverConversationId},
+    );
+  }
+
+  Future<void> updatePresence(String status) async {
+    if (!isConfigured) return;
+    await Supabase.instance.client.rpc<void>(
+      'update_presence',
+      params: {'p_status': status},
+    );
   }
 }
 
@@ -50,6 +66,10 @@ class RemoteConversation {
     required this.lastMessagePreview,
     required this.updatedAtMillis,
     required this.unreadCount,
+    this.otherUserId,
+    this.otherUserAvatarUrl,
+    this.otherUserPresence,
+    this.otherUserLastSeenAtMillis,
   });
 
   final String serverConversationId;
@@ -57,6 +77,10 @@ class RemoteConversation {
   final String lastMessagePreview;
   final int updatedAtMillis;
   final int unreadCount;
+  final String? otherUserId;
+  final String? otherUserAvatarUrl;
+  final String? otherUserPresence;
+  final int? otherUserLastSeenAtMillis;
 
   factory RemoteConversation.fromJson(Map<String, Object?> json) {
     final displayName = json['other_user_display_name']?.toString();
@@ -65,11 +89,17 @@ class RemoteConversation {
 
     return RemoteConversation(
       serverConversationId: json['conversation_id'].toString(),
+      otherUserId: json['other_user_id']?.toString(),
       title: (displayName != null && displayName.isNotEmpty)
           ? displayName
           : (username != null && username.isNotEmpty)
           ? '@$username'
           : 'feedIn chat',
+      otherUserAvatarUrl: json['other_user_avatar_url']?.toString(),
+      otherUserPresence: json['other_user_presence']?.toString(),
+      otherUserLastSeenAtMillis: _parseNullableMillis(
+        json['other_user_last_seen_at'],
+      ),
       lastMessagePreview:
           json['last_message_content']?.toString() ??
           'Tap to send your first message.',
@@ -88,6 +118,9 @@ class RemoteMessage {
     required this.body,
     required this.createdAtMillis,
     required this.deliveryStateName,
+    this.senderAvatarUrl,
+    this.messageType = 'text',
+    this.readAtMillis,
   });
 
   final String id;
@@ -97,6 +130,9 @@ class RemoteMessage {
   final String body;
   final int createdAtMillis;
   final String deliveryStateName;
+  final String? senderAvatarUrl;
+  final String messageType;
+  final int? readAtMillis;
 
   factory RemoteMessage.fromJson(Map<String, Object?> json) {
     final profile = json['profiles'];
@@ -115,11 +151,21 @@ class RemoteMessage {
           : (username != null && username.isNotEmpty)
           ? '@$username'
           : 'feedIn user',
+      senderAvatarUrl: profileMap?['avatar_url']?.toString(),
       body: json['content']?.toString() ?? '',
       createdAtMillis: _parseMillis(json['created_at']),
-      deliveryStateName: json['status']?.toString() ?? 'delivered',
+      deliveryStateName: _deliveryState(json),
+      messageType: json['message_type']?.toString() ?? 'text',
+      readAtMillis: _parseNullableMillis(json['read_at']),
     );
   }
+}
+
+String _deliveryState(Map<String, Object?> json) {
+  final status = json['status']?.toString();
+  final isRead = json['is_read'] == true || status == 'read';
+  if (isRead) return 'read';
+  return status == null || status.isEmpty ? 'delivered' : status;
 }
 
 int _parseMillis(Object? value) {
@@ -127,4 +173,10 @@ int _parseMillis(Object? value) {
   final parsed = DateTime.tryParse(value?.toString() ?? '');
   return parsed?.millisecondsSinceEpoch ??
       DateTime.now().millisecondsSinceEpoch;
+}
+
+int? _parseNullableMillis(Object? value) {
+  if (value == null) return null;
+  if (value is DateTime) return value.millisecondsSinceEpoch;
+  return DateTime.tryParse(value.toString())?.millisecondsSinceEpoch;
 }

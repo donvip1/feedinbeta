@@ -101,6 +101,7 @@ class _ConnectionsModalBodyState extends State<ConnectionsModalBody> {
               child: _ConnectionsList(
                 rows: rows,
                 isLoading: view.isLoading,
+                listsUnavailable: view.listsUnavailable,
                 isFollowersTab: isFollowers,
                 onOpenUser: widget.onOpenUser,
                 onToggleFollow: widget.onToggleFollow,
@@ -201,6 +202,7 @@ class _ConnectionsList extends StatelessWidget {
   const _ConnectionsList({
     required this.rows,
     required this.isLoading,
+    required this.listsUnavailable,
     required this.isFollowersTab,
     required this.onOpenUser,
     required this.onToggleFollow,
@@ -208,6 +210,7 @@ class _ConnectionsList extends StatelessWidget {
 
   final List<FollowRowView> rows;
   final bool isLoading;
+  final bool listsUnavailable;
   final bool isFollowersTab;
   final ValueChanged<ProfileUserRef> onOpenUser;
   final ValueChanged<ProfileUserRef> onToggleFollow;
@@ -226,6 +229,9 @@ class _ConnectionsList extends StatelessWidget {
         ),
       );
     }
+    if (listsUnavailable) {
+      return const _UnavailableListState();
+    }
     if (rows.isEmpty) {
       return Center(
         child: Text(
@@ -242,6 +248,41 @@ class _ConnectionsList extends StatelessWidget {
         row: rows[index],
         onOpenUser: onOpenUser,
         onToggleFollow: onToggleFollow,
+      ),
+    );
+  }
+}
+
+class _UnavailableListState extends StatelessWidget {
+  const _UnavailableListState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: ProfileSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 44,
+              color: ProfileColors.mutedForeground,
+            ),
+            SizedBox(height: ProfileSpacing.md),
+            Text(
+              'Connection list unavailable',
+              textAlign: TextAlign.center,
+              style: ProfileTextStyles.emptyTitle,
+            ),
+            SizedBox(height: ProfileSpacing.xs),
+            Text(
+              'Native can show the counts, but follower and following rows are not wired yet.',
+              textAlign: TextAlign.center,
+              style: ProfileTextStyles.emptySubtitle,
+            ),
+          ],
+        ),
       ),
     );
   }

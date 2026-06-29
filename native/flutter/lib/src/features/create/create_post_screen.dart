@@ -375,6 +375,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final retryCounts = {
       for (final item in queue) item.draftId: item.retryCount,
     };
+    final progressByDraft = {
+      for (final item in queue) item.draftId: item.progress,
+    };
 
     final rows = drafts
         .map(
@@ -384,6 +387,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             status: _statusFor(draft, queuedIds.contains(draft.id)),
             createdAtMillis: draft.createdAtMillis,
             mediaType: draft.mediaType,
+            progress: _progressFor(
+              draft,
+              queuedIds.contains(draft.id),
+              progressByDraft[draft.id],
+            ),
             retryCount: retryCounts[draft.id] ?? 0,
           ),
         )
@@ -396,9 +404,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     });
   }
 
+  int? _progressFor(PostDraft draft, bool isQueued, int? queueProgress) {
+    switch (_statusFor(draft, isQueued)) {
+      case DraftStatus.uploading:
+        return queueProgress?.clamp(1, 99) ?? 10;
+      case DraftStatus.uploaded:
+        return 100;
+      case DraftStatus.queued:
+        return queueProgress?.clamp(0, 99) ?? 0;
+      case DraftStatus.failed:
+      case DraftStatus.local:
+        return null;
+    }
+  }
+
   /// Maps the persisted [DraftUploadState] (plus live queue membership) into the
-  /// view-model [DraftStatus]. The upload service exposes no streaming progress,
-  /// so per-row state comes entirely from the draft's upload-state enum.
+  /// view-model [DraftStatus].
   DraftStatus _statusFor(PostDraft draft, bool isQueued) {
     switch (draft.uploadState) {
       case DraftUploadState.uploading:

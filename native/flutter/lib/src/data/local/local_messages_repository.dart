@@ -211,6 +211,23 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     );
   }
 
+  @override
+  Future<void> markConversationRead(String conversationId) async {
+    final raw = _conversationsBox.get(conversationId);
+    if (raw != null) {
+      final conversation = ConversationSummary.fromJson(
+        Map<String, Object?>.from(raw),
+      );
+      await _conversationsBox.put(
+        conversationId,
+        conversation.copyWith(pendingCount: 0).toJson(),
+      );
+    }
+
+    // Do not fake per-message read receipts locally. Real read state is
+    // materialized from Supabase after `mark_conversation_read` runs remotely.
+  }
+
   Future<void> _seedDemoConversationIfEmpty() async {
     if (_conversationsBox.isNotEmpty) return;
 

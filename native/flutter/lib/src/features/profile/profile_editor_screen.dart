@@ -38,10 +38,18 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   late final TextEditingController _bioController;
   late final TextEditingController _locationController;
   late final TextEditingController _websiteController;
+  late final TextEditingController _instagramController;
+  late final TextEditingController _twitterController;
+  late final TextEditingController _linkedinController;
+  late final TextEditingController _facebookController;
+  late final TextEditingController _tiktokController;
+  late final TextEditingController _youtubeController;
   late Future<List<FeedPost>> _postsFuture;
   bool _isSaving = false;
   String? _message;
   String? _errorMessage;
+
+  UserProfile get _profile => widget.profile;
 
   @override
   void initState() {
@@ -57,7 +65,46 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     _websiteController = TextEditingController(
       text: widget.profile.websiteUrl ?? '',
     );
+    _instagramController = TextEditingController(
+      text: widget.profile.instagramUrl ?? '',
+    );
+    _twitterController = TextEditingController(
+      text: widget.profile.twitterUrl ?? '',
+    );
+    _linkedinController = TextEditingController(
+      text: widget.profile.linkedinUrl ?? '',
+    );
+    _facebookController = TextEditingController(
+      text: widget.profile.facebookUrl ?? '',
+    );
+    _tiktokController = TextEditingController(
+      text: widget.profile.tiktokUrl ?? '',
+    );
+    _youtubeController = TextEditingController(
+      text: widget.profile.youtubeUrl ?? '',
+    );
     _postsFuture = widget.feedRepository.loadPostsByUser(widget.profile.userId);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileEditorScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile.userId != widget.profile.userId) {
+      _postsFuture = widget.feedRepository.loadPostsByUser(
+        widget.profile.userId,
+      );
+      _displayNameController.text = widget.profile.displayName;
+      _handleController.text = widget.profile.handle;
+      _bioController.text = widget.profile.bio;
+      _locationController.text = widget.profile.location ?? '';
+      _websiteController.text = widget.profile.websiteUrl ?? '';
+      _instagramController.text = widget.profile.instagramUrl ?? '';
+      _twitterController.text = widget.profile.twitterUrl ?? '';
+      _linkedinController.text = widget.profile.linkedinUrl ?? '';
+      _facebookController.text = widget.profile.facebookUrl ?? '';
+      _tiktokController.text = widget.profile.tiktokUrl ?? '';
+      _youtubeController.text = widget.profile.youtubeUrl ?? '';
+    }
   }
 
   @override
@@ -67,6 +114,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     _bioController.dispose();
     _locationController.dispose();
     _websiteController.dispose();
+    _instagramController.dispose();
+    _twitterController.dispose();
+    _linkedinController.dispose();
+    _facebookController.dispose();
+    _tiktokController.dispose();
+    _youtubeController.dispose();
     super.dispose();
   }
 
@@ -93,6 +146,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       bio: _bioController.text.trim(),
       location: _emptyToNull(_locationController.text),
       websiteUrl: _emptyToNull(_websiteController.text),
+      instagramUrl: _emptyToNull(_instagramController.text),
+      twitterUrl: _emptyToNull(_twitterController.text),
+      linkedinUrl: _emptyToNull(_linkedinController.text),
+      facebookUrl: _emptyToNull(_facebookController.text),
+      tiktokUrl: _emptyToNull(_tiktokController.text),
+      youtubeUrl: _emptyToNull(_youtubeController.text),
     );
 
     try {
@@ -144,32 +203,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        _ProfileHero(profile: widget.profile),
+        _ProfileHero(profile: _profile),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Connect'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Message'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
               Text(
                 'Edit profile',
                 style: Theme.of(
@@ -223,6 +262,15 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 12),
+              _SocialLinksEditor(
+                instagramController: _instagramController,
+                twitterController: _twitterController,
+                linkedinController: _linkedinController,
+                facebookController: _facebookController,
+                tiktokController: _tiktokController,
+                youtubeController: _youtubeController,
+              ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _isSaving ? null : _save,
@@ -249,12 +297,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
               ],
               const SizedBox(height: 24),
               SocialLinksCard(
-                links: ProfilePresenter.socialLinks(widget.profile),
+                links: ProfilePresenter.socialLinks(_profile),
                 onOpen: _copyLink,
               ),
               const SizedBox(height: 16),
               ViewHistoryCard(
-                view: const ViewHistoryView(),
+                view: ProfilePresenter.viewHistory,
                 onOpenPost: (_) {},
               ),
               const SizedBox(height: 24),
@@ -466,13 +514,68 @@ class _ProfileHero extends StatelessWidget {
   void _openConnections(BuildContext context, ConnectionsTab tab) {
     showConnectionsModal(
       context,
-      view: ConnectionsModalView(
-        followersCount: profile.followersCount,
-        followingCount: profile.followingCount,
-        defaultTab: tab,
-      ),
+      view: ProfilePresenter.connections(profile, defaultTab: tab),
       onOpenUser: (_) {},
       onToggleFollow: (_) {},
+    );
+  }
+}
+
+class _SocialLinksEditor extends StatelessWidget {
+  const _SocialLinksEditor({
+    required this.instagramController,
+    required this.twitterController,
+    required this.linkedinController,
+    required this.facebookController,
+    required this.tiktokController,
+    required this.youtubeController,
+  });
+
+  final TextEditingController instagramController;
+  final TextEditingController twitterController;
+  final TextEditingController linkedinController;
+  final TextEditingController facebookController;
+  final TextEditingController tiktokController;
+  final TextEditingController youtubeController;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      title: const Text('Social links'),
+      subtitle: const Text('Add public profile links for web parity.'),
+      children: [
+        _SocialLinkField(label: 'Instagram', controller: instagramController),
+        _SocialLinkField(label: 'Twitter / X', controller: twitterController),
+        _SocialLinkField(label: 'LinkedIn', controller: linkedinController),
+        _SocialLinkField(label: 'Facebook', controller: facebookController),
+        _SocialLinkField(label: 'TikTok', controller: tiktokController),
+        _SocialLinkField(label: 'YouTube', controller: youtubeController),
+      ],
+    );
+  }
+}
+
+class _SocialLinkField extends StatelessWidget {
+  const _SocialLinkField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.url,
+        textInputAction: TextInputAction.next,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      ),
     );
   }
 }

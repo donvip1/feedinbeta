@@ -321,15 +321,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   late Future<List<LocalMessage>> _messagesFuture;
   String? _title;
   ReplyPreview? _replyTarget;
-
-  // Local presence state for the other participant. There is no backend
-  // presence/last-seen signal yet, so these hold their neutral defaults and the
-  // header renders the neutral placeholder subtitle. When a realtime presence
-  // source lands, convert these to mutable fields and drive them via setState —
-  // the header reads them through [_headerView] with no further wiring.
-  static const PresenceState _otherPresence = PresenceState.offline;
+  PresenceState _otherPresence = PresenceState.offline;
   static const ChatActivity _otherActivity = ChatActivity.none;
-  static const int? _otherLastSeenMillis = null;
+  int? _otherLastSeenMillis;
 
   String get _currentUserKey => widget.profile.displayName;
 
@@ -354,15 +348,31 @@ class _ConversationScreenState extends State<ConversationScreen> {
       widget.conversationId,
     );
     _resolveTitle();
+    _markReadLocally();
   }
 
   Future<void> _resolveTitle() async {
-    if (_title != null && _title!.isNotEmpty) return;
     final conversation = await widget.messagesRepository.loadConversation(
       widget.conversationId,
     );
     if (!mounted || conversation == null) return;
-    setState(() => _title = conversation.title);
+    setState(() {
+      _title = (_title != null && _title!.isNotEmpty)
+          ? _title
+          : conversation.title;
+      _otherPresence = conversationPresence(conversation);
+      _otherLastSeenMillis = conversationLastSeenMillis(conversation);
+    });
+  }
+
+  Future<void> _markReadLocally() async {
+    await widget.messagesRepository.markConversationRead(widget.conversationId);
+    if (!mounted) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
   }
 
   @override
@@ -375,6 +385,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           widget.conversationId,
         );
       });
+      _resolveTitle();
+      _markReadLocally();
     }
   }
 

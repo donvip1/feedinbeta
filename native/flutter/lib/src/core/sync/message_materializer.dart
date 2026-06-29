@@ -30,9 +30,13 @@ class MessageMaterializer {
             id: remoteMessage.id,
             conversationId: localConversation.id,
             senderName: remoteMessage.senderName,
+            senderId: remoteMessage.senderId,
+            senderAvatarUrl: remoteMessage.senderAvatarUrl,
             body: remoteMessage.body,
             createdAtMillis: remoteMessage.createdAtMillis,
             deliveryState: _deliveryState(remoteMessage.deliveryStateName),
+            messageType: remoteMessage.messageType,
+            readAtMillis: remoteMessage.readAtMillis,
           ),
         );
         messagesSaved++;
@@ -58,6 +62,11 @@ class MessageMaterializer {
           updatedAtMillis: remoteConversation.updatedAtMillis,
           pendingCount: remoteConversation.unreadCount,
           serverConversationId: remoteConversation.serverConversationId,
+          otherUserId: remoteConversation.otherUserId,
+          otherUserAvatarUrl: remoteConversation.otherUserAvatarUrl,
+          otherUserPresence: remoteConversation.otherUserPresence,
+          otherUserLastSeenAtMillis:
+              remoteConversation.otherUserLastSeenAtMillis,
         ) ??
         ConversationSummary(
           id: remoteConversation.serverConversationId,
@@ -66,6 +75,11 @@ class MessageMaterializer {
           updatedAtMillis: remoteConversation.updatedAtMillis,
           pendingCount: remoteConversation.unreadCount,
           serverConversationId: remoteConversation.serverConversationId,
+          otherUserId: remoteConversation.otherUserId,
+          otherUserAvatarUrl: remoteConversation.otherUserAvatarUrl,
+          otherUserPresence: remoteConversation.otherUserPresence,
+          otherUserLastSeenAtMillis:
+              remoteConversation.otherUserLastSeenAtMillis,
         );
     await _messagesRepository.upsertConversation(conversation);
     return conversation;

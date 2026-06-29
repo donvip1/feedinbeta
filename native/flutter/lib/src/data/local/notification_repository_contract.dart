@@ -6,6 +6,9 @@ abstract interface class NotificationRepositoryContract {
     required String title,
     required String body,
     String? route,
+    String? rawType,
+    String? displayName,
+    String? avatarUrl,
   });
   Future<void> markRead(String notificationId);
   Future<void> markAllRead();

@@ -1,6 +1,6 @@
 # feedIn Native Build Checklist
 
-Status date: 2026-06-24
+Status date: 2026-06-29
 
 This is the single source of truth for the feedIn Flutter native rebuild. Keep this file updated as phases are completed.
 
@@ -90,7 +90,7 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [ ] Confirm/create Supabase Storage bucket `post-media`.
 - [ ] Confirm bucket policies allow authenticated upload and public/signed read as intended.
 - [ ] Test draft upload queue with the live Supabase project on a real device.
-- [ ] Add visible upload progress percentages if Supabase upload progress callbacks are required.
+- [x] Added visible queue upload progress percentages using real queue processing stages.
 
 ## Phase 4: Messaging
 
@@ -109,7 +109,8 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [ ] Test recipient search with real Supabase users.
 - [ ] Test `create_conversation` RPC with real Supabase users.
 - [ ] Test full message replay with secure session restoration on a real device.
-- [ ] Add read receipts and delivery receipts against final backend rules.
+- [x] Added native message read/delivery receipt contracts, local unread clearing, and remote presence/read metadata materialization.
+- [ ] Test message attachments, receipts, and presence against live Supabase after migrations are pushed.
 
 ## Phase 5: Profile, Settings, Notifications
 
@@ -126,12 +127,14 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Added cleanup controls for feed cache, queued actions, messages, notifications, and media.
 - [x] Added Settings diagnostic check for Supabase Storage bucket `post-media`.
 - [ ] Add Firebase Cloud Messaging after `google-services.json` is provided.
-- [ ] Store FCM tokens server-side after the final notification table/RPC is confirmed.
+- [x] Confirmed native notification table/RPC shape and added push subscription/FCM token backend contracts.
+- [ ] Store FCM tokens server-side from Flutter after Firebase config is provided.
 - [ ] Add production push notification payload handling.
-- [ ] Add friends/follow social graph after backend schema is confirmed.
+- [x] Added friends/follow social graph backend contract.
 - [x] Expanded native profile with cover/banner, avatar, counts, premium indicator, location, website, and richer edit fields.
 - [x] Added native profile posts grid backed by the real feed repository.
-- [ ] Complete profile parity: posts grid, followers/following modals, view history, verification/role badges, and social links.
+- [x] Completed profile parity scaffolding for posts grid, followers/following modal states, view-history contract, verification/role badges, and social links.
+- [ ] Wire live follower/following row fetch and view-history RPC into Flutter after migrations are pushed.
 
 ## Phase 6: Native UI/Product Parity
 
@@ -143,10 +146,12 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Added Create multi-media post drafts and upload publishing through `media_urls`/`media_types`.
 - [x] Added Create story draft publishing through native `stories`, `story_views`, and `story_reactions` schema.
 - [x] Added Create photo-plus flow with camera capture, video capture, mixed media picking, captions, hashtags, and privacy persistence.
-- [ ] Add real Create upload progress percentages if Supabase Storage exposes progress callbacks or a custom upload client is added.
-- [ ] Complete Profile parity.
-- [ ] Rebuild Messages to full chat parity: online presence, real attachments, real call entry points, and backend read receipts.
-- [ ] Rebuild Notifications to full web parity after final remote notification table, FCM payload shape, and typed action schema are confirmed.
+- [x] Added real Create upload progress percentages through persisted queue processing stages.
+- [x] Completed Profile parity scaffolding with real social/role/plan fields and honest backend-dependent states.
+- [x] Rebuilt Messages backend contracts for online presence, attachments, call-ready schema, and read receipts.
+- [x] Rebuilt Notifications backend contract for remote notification table, FCM payload shape, and typed actions.
+- [ ] Wire Flutter message attachment upload and call navigation after media/call product flows are finalized.
+- [ ] Connect Flutter to remote Notifications fetch/FCM registration after Firebase config is provided.
 - [x] Added production empty states for feed tabs, live, chats, conversations, notifications, and create drafts.
 - [x] Removed remaining visible demo/offline-preview/scaffold text from Supabase-configured builds.
 

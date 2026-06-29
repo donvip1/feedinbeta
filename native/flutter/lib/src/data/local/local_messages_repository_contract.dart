@@ -24,4 +24,5 @@ abstract interface class LocalMessagesRepositoryContract {
     required String conversationId,
     required String serverConversationId,
   });
+  Future<void> markConversationRead(String conversationId);
 }

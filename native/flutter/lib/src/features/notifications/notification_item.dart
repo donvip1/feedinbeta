@@ -9,6 +9,10 @@ class NotificationItem {
     this.rawType,
     this.displayName,
     this.avatarUrl,
+    this.actionType,
+    this.relatedId,
+    this.relatedType,
+    this.data = const <String, Object?>{},
   });
 
   final String id;
@@ -20,6 +24,10 @@ class NotificationItem {
   final String? rawType;
   final String? displayName;
   final String? avatarUrl;
+  final String? actionType;
+  final String? relatedId;
+  final String? relatedType;
+  final Map<String, Object?> data;
 
   NotificationType get type {
     final normalizedRoute = route?.toLowerCase() ?? '';
@@ -45,6 +53,10 @@ class NotificationItem {
     String? rawType,
     String? displayName,
     String? avatarUrl,
+    String? actionType,
+    String? relatedId,
+    String? relatedType,
+    Map<String, Object?>? data,
   }) {
     return NotificationItem(
       id: id,
@@ -56,6 +68,10 @@ class NotificationItem {
       rawType: rawType ?? this.rawType,
       displayName: displayName ?? this.displayName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      actionType: actionType ?? this.actionType,
+      relatedId: relatedId ?? this.relatedId,
+      relatedType: relatedType ?? this.relatedType,
+      data: data ?? this.data,
     );
   }
 
@@ -79,7 +95,8 @@ class NotificationItem {
           _string(json, 'actionUrl') ??
           _string(json, 'action_url') ??
           _string(json, 'deepLink') ??
-          _string(json, 'deep_link'),
+          _string(json, 'deep_link') ??
+          _routeFromAction(json),
       rawType: _string(json, 'rawType') ?? _string(json, 'type'),
       displayName:
           _string(json, 'displayName') ??
@@ -91,6 +108,11 @@ class NotificationItem {
           _string(json, 'avatar_url') ??
           _string(json, 'senderAvatarUrl') ??
           _string(json, 'sender_avatar_url'),
+      actionType: _string(json, 'actionType') ?? _string(json, 'action_type'),
+      relatedId: _string(json, 'relatedId') ?? _string(json, 'related_id'),
+      relatedType:
+          _string(json, 'relatedType') ?? _string(json, 'related_type'),
+      data: _map(json, 'data') ?? _map(json, 'fcm_payload') ?? const {},
     );
   }
 
@@ -105,6 +127,10 @@ class NotificationItem {
       'rawType': rawType,
       'displayName': displayName,
       'avatarUrl': avatarUrl,
+      'actionType': actionType,
+      'relatedId': relatedId,
+      'relatedType': relatedType,
+      'data': data,
     };
   }
 }
@@ -137,4 +163,32 @@ int? _dateMillis(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is DateTime) return value.millisecondsSinceEpoch;
   return DateTime.tryParse(value?.toString() ?? '')?.millisecondsSinceEpoch;
+}
+
+Map<String, Object?>? _map(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is Map<String, Object?>) return value;
+  if (value is Map) return Map<String, Object?>.from(value);
+  return null;
+}
+
+String? _routeFromAction(Map<String, Object?> json) {
+  final actionUrl = _string(json, 'action_url') ?? _string(json, 'actionUrl');
+  if (actionUrl != null) return actionUrl;
+
+  final actionType =
+      _string(json, 'action_type') ?? _string(json, 'actionType');
+  final relatedId = _string(json, 'related_id') ?? _string(json, 'relatedId');
+  if (actionType == null || relatedId == null) return null;
+
+  switch (actionType) {
+    case 'open_profile':
+      return 'feedin://profile/$relatedId';
+    case 'open_post':
+      return 'feedin://post/$relatedId';
+    case 'open_conversation':
+      return 'conversation:$relatedId';
+    default:
+      return null;
+  }
 }

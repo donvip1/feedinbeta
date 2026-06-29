@@ -6,13 +6,9 @@ import 'chat_view_models.dart';
 /// `message_recipient.dart`) into the UI-facing view-models consumed by the
 /// chat widgets under `chat/widgets/`.
 ///
-/// The persistence layer is still minimal: messages carry no `senderId`,
-/// conversations carry no other-user identity/avatar/presence, and there is no
-/// reaction/read-receipt/media storage yet. These mappers therefore degrade
-/// gracefully — they fill the fields that exist today and leave the richer
-/// fields empty until the backend contract for them lands. `isMine` is derived
-/// from the sender display name against the current user's display name, which
-/// is the same heuristic the previous screen used.
+/// The persistence layer remains offline-first. These mappers use richer
+/// remote-backed fields when present, and degrade gracefully when local rows
+/// were created before those fields existed.
 
 /// Window within which consecutive messages from the same sender are visually
 /// grouped (tighter corners, shared avatar gutter).
@@ -32,13 +28,20 @@ DeliveryState mapDeliveryState(MessageDeliveryState state) {
 /// exposes the other participant's profile, the conversation title doubles as
 /// the display name and there is no avatar/presence.
 ConversationView conversationSummaryToView(ConversationSummary summary) {
+  final presence = _presence(summary.otherUserPresence);
   return ConversationView(
     id: summary.id,
     serverConversationId: summary.serverConversationId,
-    other: ChatUserRef(id: summary.id, displayName: summary.title),
+    other: ChatUserRef(
+      id: summary.otherUserId ?? summary.id,
+      displayName: summary.title,
+      avatarUrl: summary.otherUserAvatarUrl,
+    ),
     updatedAtMillis: summary.updatedAtMillis,
     lastMessageText: summary.lastMessagePreview,
+    unreadCount: summary.pendingCount,
     pendingCount: summary.pendingCount,
+    isOnline: presenceShowsDot(presence),
   );
 }
 
@@ -71,28 +74,61 @@ List<ChatMessageView> localMessagesToViews(
 
     final isFirstInGroup =
         previous == null ||
-        previous.senderName != message.senderName ||
+        _senderKey(previous) != _senderKey(message) ||
         (message.createdAtMillis - previous.createdAtMillis) >
             _groupWindowMillis;
     final isLastInGroup =
         next == null ||
-        next.senderName != message.senderName ||
+        _senderKey(next) != _senderKey(message) ||
         (next.createdAtMillis - message.createdAtMillis) > _groupWindowMillis;
+    final senderId = message.senderId ?? message.senderName;
 
     views.add(
       ChatMessageView(
         id: message.id,
         conversationId: message.conversationId,
-        senderId: message.senderName,
+        senderId: senderId,
         senderName: message.senderName,
+        senderAvatarUrl: message.senderAvatarUrl,
         createdAtMillis: message.createdAtMillis,
-        isMine: message.senderName == currentUserKey,
+        isMine:
+            senderId == currentUserKey || message.senderName == currentUserKey,
         deliveryState: mapDeliveryState(message.deliveryState),
         body: message.body,
+        readReceipts: [
+          if (message.readAtMillis case final readAt?)
+            ReadReceiptView(userId: senderId, readAtMillis: readAt),
+        ],
         isFirstInGroup: isFirstInGroup,
         isLastInGroup: isLastInGroup,
       ),
     );
   }
   return views;
+}
+
+PresenceState conversationPresence(ConversationSummary summary) {
+  return _presence(summary.otherUserPresence);
+}
+
+int? conversationLastSeenMillis(ConversationSummary summary) {
+  return summary.otherUserLastSeenAtMillis;
+}
+
+String _senderKey(LocalMessage message) {
+  return message.senderId ?? message.senderName;
+}
+
+PresenceState _presence(String? raw) {
+  switch (raw?.trim().toLowerCase()) {
+    case 'online':
+      return PresenceState.online;
+    case 'active_now':
+    case 'active':
+      return PresenceState.activeNow;
+    case 'away':
+      return PresenceState.away;
+    default:
+      return PresenceState.offline;
+  }
 }

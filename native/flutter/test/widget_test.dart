@@ -124,6 +124,9 @@ class _FakeUploadQueueRepository implements UploadQueueRepository {
 
   @override
   Future<void> remove(String draftId) async {}
+
+  @override
+  Future<void> updateProgress(String draftId, int progress) async {}
 }
 
 class _FakeStorageDiagnosticsService implements StorageDiagnosticsService {
@@ -207,6 +210,9 @@ class _FakeNotificationRepository implements NotificationRepositoryContract {
     required String title,
     required String body,
     String? route,
+    String? rawType,
+    String? displayName,
+    String? avatarUrl,
   }) async {
     _notifications.add(
       NotificationItem(
@@ -216,6 +222,9 @@ class _FakeNotificationRepository implements NotificationRepositoryContract {
         createdAtMillis: 2,
         isRead: false,
         route: route,
+        rawType: rawType,
+        displayName: displayName,
+        avatarUrl: avatarUrl,
       ),
     );
   }
@@ -496,6 +505,9 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String conversationId,
     required String serverConversationId,
   }) async {}
+
+  @override
+  Future<void> markConversationRead(String conversationId) async {}
 
   @override
   Future<void> queueMessage({

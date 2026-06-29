@@ -9,6 +9,14 @@ class UserProfile {
     this.coverUrl,
     this.location,
     this.websiteUrl,
+    this.instagramUrl,
+    this.twitterUrl,
+    this.linkedinUrl,
+    this.facebookUrl,
+    this.tiktokUrl,
+    this.youtubeUrl,
+    this.role,
+    this.planTier,
     this.followersCount = 0,
     this.followingCount = 0,
     this.totalViews = 0,
@@ -24,6 +32,14 @@ class UserProfile {
   final String? coverUrl;
   final String? location;
   final String? websiteUrl;
+  final String? instagramUrl;
+  final String? twitterUrl;
+  final String? linkedinUrl;
+  final String? facebookUrl;
+  final String? tiktokUrl;
+  final String? youtubeUrl;
+  final String? role;
+  final String? planTier;
   final int followersCount;
   final int followingCount;
   final int totalViews;
@@ -37,6 +53,14 @@ class UserProfile {
     String? coverUrl,
     String? location,
     String? websiteUrl,
+    String? instagramUrl,
+    String? twitterUrl,
+    String? linkedinUrl,
+    String? facebookUrl,
+    String? tiktokUrl,
+    String? youtubeUrl,
+    String? role,
+    String? planTier,
     int? followersCount,
     int? followingCount,
     int? totalViews,
@@ -52,6 +76,14 @@ class UserProfile {
       coverUrl: coverUrl ?? this.coverUrl,
       location: location ?? this.location,
       websiteUrl: websiteUrl ?? this.websiteUrl,
+      instagramUrl: instagramUrl ?? this.instagramUrl,
+      twitterUrl: twitterUrl ?? this.twitterUrl,
+      linkedinUrl: linkedinUrl ?? this.linkedinUrl,
+      facebookUrl: facebookUrl ?? this.facebookUrl,
+      tiktokUrl: tiktokUrl ?? this.tiktokUrl,
+      youtubeUrl: youtubeUrl ?? this.youtubeUrl,
+      role: role ?? this.role,
+      planTier: planTier ?? this.planTier,
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount ?? this.followingCount,
       totalViews: totalViews ?? this.totalViews,
@@ -70,6 +102,14 @@ class UserProfile {
       coverUrl: json['coverUrl'] as String?,
       location: json['location'] as String?,
       websiteUrl: json['websiteUrl'] as String?,
+      instagramUrl: json['instagramUrl'] as String?,
+      twitterUrl: json['twitterUrl'] as String?,
+      linkedinUrl: json['linkedinUrl'] as String?,
+      facebookUrl: json['facebookUrl'] as String?,
+      tiktokUrl: json['tiktokUrl'] as String?,
+      youtubeUrl: json['youtubeUrl'] as String?,
+      role: json['role'] as String?,
+      planTier: json['planTier'] as String?,
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
       totalViews: json['totalViews'] as int? ?? 0,
@@ -88,6 +128,14 @@ class UserProfile {
       'coverUrl': coverUrl,
       'location': location,
       'websiteUrl': websiteUrl,
+      'instagramUrl': instagramUrl,
+      'twitterUrl': twitterUrl,
+      'linkedinUrl': linkedinUrl,
+      'facebookUrl': facebookUrl,
+      'tiktokUrl': tiktokUrl,
+      'youtubeUrl': youtubeUrl,
+      'role': role,
+      'planTier': planTier,
       'followersCount': followersCount,
       'followingCount': followingCount,
       'totalViews': totalViews,
