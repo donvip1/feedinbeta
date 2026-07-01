@@ -310,24 +310,54 @@ class P2PRemoteDataSource {
   }
 
   /// Mark a transaction's payment proof as submitted (buyer side).
-  Future<void> markProofSubmitted(String transactionId) async {
-    final client = _client;
-    if (client == null) return;
-    await client
-        .from(_transactionsTable)
-        .update({'status': 'proof_submitted'})
-        .eq('id', transactionId);
-  }
+  ///
+  /// BACKEND GAP: the live schema has no UPDATE policy on `p2p_transactions`
+  /// (only INSERT for buyers + SELECT for parties), so a client-side status
+  /// change is refused by RLS and affects zero rows. We `select()` the row back
+  /// and throw [P2PBackendUnavailable] when the change did not persist, so the
+  /// UI shows an honest "needs a server contract" state instead of a fake
+  /// success. Wire this to a `submit_p2p_payment_proof` RPC when available.
+  Future<void> markProofSubmitted(String transactionId) =>
+      _updateTransactionStatus(transactionId, 'proof_submitted');
 
-  /// Cancel a transaction (buyer or seller). Only updates the status the client
-  /// is permitted to change; credit refunds are a backend concern.
-  Future<void> cancelTransaction(String transactionId) async {
+  /// Cancel a transaction (buyer or seller). Same RLS caveat as
+  /// [markProofSubmitted]: credit refunds and the status flip are a backend
+  /// concern, so an unpermitted no-op is surfaced honestly.
+  Future<void> cancelTransaction(String transactionId) =>
+      _updateTransactionStatus(transactionId, 'cancelled');
+
+  /// Attempts a client-side status change and verifies it persisted. Throws
+  /// [P2PBackendUnavailable] when RLS refuses the write (row unchanged / not
+  /// returned) or the RPC/table is missing.
+  Future<void> _updateTransactionStatus(
+    String transactionId,
+    String status,
+  ) async {
     final client = _client;
-    if (client == null) return;
-    await client
-        .from(_transactionsTable)
-        .update({'status': 'cancelled'})
-        .eq('id', transactionId);
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const P2PBackendUnavailable('Sign in to update this order.');
+    }
+    try {
+      final updated = await client
+          .from(_transactionsTable)
+          .update({'status': status})
+          .eq('id', transactionId)
+          .select('id, status')
+          .maybeSingle();
+      if (updated == null || updated['status']?.toString() != status) {
+        throw const P2PBackendUnavailable(
+          'This step needs a server-side transfer that is not available yet. '
+          'Your order status is managed by the backend.',
+        );
+      }
+    } on PostgrestException catch (error) {
+      throw P2PBackendUnavailable(
+        'Could not update this order. It needs a server-side contract that is '
+        'not available in this build yet.',
+        cause: error,
+      );
+    }
   }
 
   // --- Payment methods ----------------------------------------------------

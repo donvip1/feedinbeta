@@ -5,7 +5,11 @@ import '../live_theme.dart';
 
 /// A small pulsing red "LIVE" pill (web `.animate-pulse` LIVE badge).
 class LivePill extends StatelessWidget {
-  const LivePill({super.key, this.color = LiveTheme.liveRed, this.label = 'LIVE'});
+  const LivePill({
+    super.key,
+    this.color = LiveTheme.liveRed,
+    this.label = 'LIVE',
+  });
 
   final Color color;
   final String label;
@@ -14,7 +18,10 @@ class LivePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color, borderRadius: LiveTheme.pillRadius),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: LiveTheme.pillRadius,
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

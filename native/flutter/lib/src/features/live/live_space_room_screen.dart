@@ -7,6 +7,7 @@ import 'data/live_realtime.dart';
 import 'data/live_remote_data_source.dart';
 import 'live_theme.dart';
 import 'widgets/floating_reactions.dart';
+import 'widgets/gift_burst_overlay.dart';
 import 'widgets/live_chat_panel.dart';
 import 'widgets/live_common.dart';
 import 'widgets/live_gift_sheet.dart';
@@ -15,7 +16,7 @@ import 'widgets/live_reaction_bar.dart';
 /// Full-screen room for a live audio space. Renders the speaker grid
 /// (`live_space_speakers`), live chat (`live_space_messages`), a reaction bar
 /// (`live_space_reactions`) with float-up emoji, a gift action
-/// (`live_space_gifts`), and a live listener count.
+/// (`live_space_gifts`) with a center burst, and a live listener count.
 ///
 /// Web mapping: the native counterpart of `LiveSpaceRoom.tsx` / `SpaceChat.tsx`
 /// for the consumption path (speakers + chat + reactions + gifts + presence).
@@ -37,19 +38,24 @@ class LiveSpaceRoomScreen extends StatefulWidget {
 class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
   late final LiveRemoteDataSource _data =
       widget.dataSource ?? LiveRemoteDataSource.autoDetect();
-  late final LiveSpaceRealtime _realtime =
-      LiveSpaceRealtime(spaceId: widget.space.id);
+  late final LiveSpaceRealtime _realtime = LiveSpaceRealtime(
+    spaceId: widget.space.id,
+  );
   final _reactionsController = FloatingReactionsController();
+  final _giftBurstController = GiftBurstController();
+  final _chat = LiveChatBuffer();
 
-  final List<LiveChatLine> _chat = [];
   List<SpaceSpeaker> _speakers = const [];
   int _listenerCount = 0;
+  bool _loadingChat = true;
   Timer? _listenerPoll;
 
   StreamSubscription<SpaceMessage>? _messageSub;
   StreamSubscription<LiveReactionEvent>? _reactionSub;
   StreamSubscription<LiveGiftEvent>? _giftSub;
   StreamSubscription<void>? _speakerSub;
+
+  String? get _selfId => _data.currentUserId;
 
   @override
   void initState() {
@@ -59,32 +65,32 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
   }
 
   Future<void> _bootstrap() async {
-    final isHost = _data.currentUserId == widget.space.hostId;
-    await _data.joinSpace(
-      widget.space.id,
-      role: isHost ? 'host' : 'listener',
-    );
+    final isHost = _selfId == widget.space.hostId;
+    await _data.joinSpace(widget.space.id, role: isHost ? 'host' : 'listener');
 
     _realtime.connect();
     _messageSub = _realtime.messages.listen((message) {
       if (!mounted) return;
-      setState(() => _chat.add(LiveChatLine.fromSpaceMessage(message)));
+      setState(() => _chat.addRealtime(LiveChatLine.fromSpaceMessage(message)));
+      _hydrateAuthors();
     });
     _reactionSub = _realtime.reactions.listen((reaction) {
+      if (reaction.userId != null && reaction.userId == _selfId) return;
       _reactionsController.add(reaction.emoji);
     });
-    _giftSub = _realtime.gifts.listen((gift) {
-      _reactionsController.add(gift.emoji);
+    _giftSub = _realtime.gifts.listen(_onGiftEvent);
+    _speakerSub = _realtime.speakerChanges.listen((_) {
+      _refreshSpeakers();
+      _refreshListenerCount();
     });
-    _speakerSub = _realtime.speakerChanges.listen((_) => _refreshSpeakers());
 
     final messages = await _data.fetchSpaceMessages(widget.space.id);
     if (!mounted) return;
     setState(() {
-      _chat
-        ..clear()
-        ..addAll(messages.map(LiveChatLine.fromSpaceMessage));
+      _chat.replaceAll(messages.map(LiveChatLine.fromSpaceMessage));
+      _loadingChat = false;
     });
+    _hydrateAuthors();
 
     await _refreshSpeakers();
     await _refreshListenerCount();
@@ -92,6 +98,38 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
       const Duration(seconds: 12),
       (_) => _refreshListenerCount(),
     );
+  }
+
+  Future<void> _onGiftEvent(LiveGiftEvent gift) async {
+    // Skip our own gift — we already floated + burst it optimistically.
+    if (gift.senderId.isNotEmpty && gift.senderId == _selfId) return;
+    _reactionsController.add(gift.emoji);
+    String? senderName;
+    if (gift.senderId.isNotEmpty && gift.senderId != _selfId) {
+      final profiles = await _data.fetchProfiles([gift.senderId]);
+      senderName = profiles[gift.senderId]?.label;
+    }
+    if (!mounted) return;
+    _giftBurstController.add(
+      gift.emoji,
+      senderName: senderName,
+      label: _giftLabel(gift.giftType),
+    );
+  }
+
+  String _giftLabel(String type) {
+    for (final option in LiveGiftOption.catalog) {
+      if (option.type == type) return option.label;
+    }
+    return 'gift';
+  }
+
+  Future<void> _hydrateAuthors() async {
+    final missing = _chat.unresolvedAuthorIds;
+    if (missing.isEmpty) return;
+    final profiles = await _data.fetchProfiles(missing);
+    if (!mounted || profiles.isEmpty) return;
+    if (_chat.hydrateAuthors(profiles)) setState(() {});
   }
 
   Future<void> _refreshSpeakers() async {
@@ -118,16 +156,39 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
     unawaited(_data.leaveSpace(widget.space.id));
     unawaited(_realtime.dispose());
     _reactionsController.dispose();
+    _giftBurstController.dispose();
     super.dispose();
   }
 
   Future<void> _sendMessage(String body) async {
-    await _data.sendSpaceMessage(widget.space.id, body);
+    final selfId = _selfId;
+    if (selfId != null) {
+      setState(() {
+        _chat.addOptimistic(
+          LiveChatLine(
+            id: 'optimistic-${DateTime.now().microsecondsSinceEpoch}',
+            userId: selfId,
+            body: body,
+            pending: true,
+          ),
+        );
+      });
+      _hydrateAuthors();
+    }
+    try {
+      await _data.sendSpaceMessage(widget.space.id, body);
+    } catch (_) {
+      if (mounted) _showError('Could not send your message');
+    }
   }
 
   Future<void> _sendReaction(String type) async {
     _reactionsController.add(reactionEmojiFor(type));
-    await _data.sendSpaceReaction(widget.space.id, type);
+    try {
+      await _data.sendSpaceReaction(widget.space.id, type);
+    } catch (_) {
+      // Ephemeral; ignore.
+    }
   }
 
   Future<void> _openGiftSheet() async {
@@ -137,16 +198,27 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
     );
     if (gift == null) return;
     _reactionsController.add(gift.emoji);
-    await _data.sendSpaceGift(
-      spaceId: widget.space.id,
-      giftType: gift.type,
-      creditValue: gift.creditValue,
-      receiverId: widget.space.hostId,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
-    );
+    _giftBurstController.add(gift.emoji, label: gift.label);
+    try {
+      await _data.sendSpaceGift(
+        spaceId: widget.space.id,
+        giftType: gift.type,
+        creditValue: gift.creditValue,
+        receiverId: widget.space.hostId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
+      );
+    } catch (_) {
+      if (mounted) _showError('Could not send your gift');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -165,6 +237,7 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
             decoration: BoxDecoration(gradient: LiveTheme.bottomScrim),
           ),
           FloatingReactionsOverlay(controller: _reactionsController),
+          GiftBurstOverlay(controller: _giftBurstController),
           SafeArea(
             child: Padding(
               padding: EdgeInsets.only(bottom: bottomInset),
@@ -178,7 +251,10 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: LiveChatList(lines: _chat),
+                      child: LiveChatList(
+                        lines: _chat.lines,
+                        loading: _loadingChat,
+                      ),
                     ),
                   ),
                   Padding(
@@ -280,10 +356,7 @@ class _SpeakerGrid extends StatelessWidget {
 
     // Host fallback: ensure the space owner always appears on stage.
     if (host != null && seen.add(host!.id)) {
-      tiles.insert(
-        0,
-        _SpeakerTile(profile: host, isHost: true, muted: false),
-      );
+      tiles.insert(0, _SpeakerTile(profile: host, isHost: true, muted: false));
     }
 
     if (tiles.isEmpty) {

@@ -79,6 +79,38 @@ class LiveRemoteDataSource {
 
   String? get currentUserId => _client?.auth.currentUser?.id;
 
+  // --- Profiles --------------------------------------------------------------
+
+  /// Batch-resolve profiles by id, keyed by id. Used to hydrate the author of
+  /// realtime chat / reaction / gift rows, whose INSERT payloads carry only the
+  /// raw `user_id` (no embedded profile) — mirrors the web's `profileMap` fetch
+  /// in `SpaceChat` / `FlyingChat`. Returns an empty map on any failure so the
+  /// caller simply keeps the "feedIn user" fallback.
+  Future<Map<String, LiveProfile>> fetchProfiles(Iterable<String> ids) async {
+    final client = _client;
+    final unique = {
+      for (final id in ids)
+        if (id.isNotEmpty) id,
+    }.toList();
+    if (client == null || unique.isEmpty) return const {};
+    try {
+      final rows = await client
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .inFilter('id', unique);
+      final result = <String, LiveProfile>{};
+      for (final row in rows.whereType<Map>()) {
+        final profile = LiveProfile.tryFromEmbed(
+          Map<String, Object?>.from(row),
+        );
+        if (profile != null) result[profile.id] = profile;
+      }
+      return result;
+    } catch (_) {
+      return const {};
+    }
+  }
+
   // --- Browse ----------------------------------------------------------------
 
   /// Active (live) video streams, most-watched first. Falls back to an empty

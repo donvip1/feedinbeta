@@ -7,6 +7,7 @@ import 'data/live_realtime.dart';
 import 'data/live_remote_data_source.dart';
 import 'live_theme.dart';
 import 'widgets/floating_reactions.dart';
+import 'widgets/gift_burst_overlay.dart';
 import 'widgets/live_chat_panel.dart';
 import 'widgets/live_common.dart';
 import 'widgets/live_gift_sheet.dart';
@@ -14,9 +15,11 @@ import 'widgets/live_reaction_bar.dart';
 import 'widgets/live_stream_video.dart';
 
 /// Full-screen viewer for a live video stream. Plays the HLS `playback_url`
-/// (via [LiveStreamVideo] on the existing `video_player` package), overlays live
-/// chat (`live_stream_comments`), a reaction bar (`live_stream_reactions`) with
-/// float-up emoji, a gift action (`live_stream_gifts`), and a live viewer count.
+/// (via [LiveStreamVideo] on the existing `video_player` package, audio ON),
+/// overlays live chat (`live_stream_comments`), a reaction bar
+/// (`live_stream_reactions`) with float-up emoji, a gift action
+/// (`live_stream_gifts`) with a center burst, a mute toggle, and a live viewer
+/// count.
 ///
 /// Web mapping: this is the native counterpart of `LiveKitViewer.tsx` for the
 /// consumption path (chat + reactions + gifts + viewer presence). The actual
@@ -41,17 +44,24 @@ class LiveStreamViewerScreen extends StatefulWidget {
 class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
   late final LiveRemoteDataSource _data =
       widget.dataSource ?? LiveRemoteDataSource.autoDetect();
-  late final LiveStreamRealtime _realtime =
-      LiveStreamRealtime(streamId: widget.stream.id);
+  late final LiveStreamRealtime _realtime = LiveStreamRealtime(
+    streamId: widget.stream.id,
+  );
   final _reactionsController = FloatingReactionsController();
+  final _giftBurstController = GiftBurstController();
+  final _chat = LiveChatBuffer();
 
-  final List<LiveChatLine> _chat = [];
   int _viewerCount = 0;
+  bool _muted = false;
+  bool _loadingChat = true;
   Timer? _viewerPoll;
 
   StreamSubscription<LiveComment>? _commentSub;
   StreamSubscription<LiveReactionEvent>? _reactionSub;
   StreamSubscription<LiveGiftEvent>? _giftSub;
+  StreamSubscription<void>? _viewerSub;
+
+  String? get _selfId => _data.currentUserId;
 
   @override
   void initState() {
@@ -66,22 +76,24 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     _realtime.connect();
     _commentSub = _realtime.comments.listen((comment) {
       if (!mounted) return;
-      setState(() => _chat.add(LiveChatLine.fromComment(comment)));
+      setState(() => _chat.addRealtime(LiveChatLine.fromComment(comment)));
+      _hydrateAuthors();
     });
     _reactionSub = _realtime.reactions.listen((reaction) {
+      // Skip our own reaction — we already floated it optimistically.
+      if (reaction.userId != null && reaction.userId == _selfId) return;
       _reactionsController.add(reaction.emoji);
     });
-    _giftSub = _realtime.gifts.listen((gift) {
-      _reactionsController.add(gift.emoji);
-    });
+    _giftSub = _realtime.gifts.listen(_onGiftEvent);
+    _viewerSub = _realtime.viewerChanges.listen((_) => _refreshViewerCount());
 
     final comments = await _data.fetchStreamComments(widget.stream.id);
     if (!mounted) return;
     setState(() {
-      _chat
-        ..clear()
-        ..addAll(comments.map(LiveChatLine.fromComment));
+      _chat.replaceAll(comments.map(LiveChatLine.fromComment));
+      _loadingChat = false;
     });
+    _hydrateAuthors();
 
     await _refreshViewerCount();
     _viewerPoll = Timer.periodic(
@@ -90,11 +102,47 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     );
   }
 
+  Future<void> _onGiftEvent(LiveGiftEvent gift) async {
+    // Skip our own gift — we already floated + burst it optimistically.
+    if (gift.senderId.isNotEmpty && gift.senderId == _selfId) return;
+    _reactionsController.add(gift.emoji);
+    // Resolve the sender name for the burst caption (payload has no profile).
+    String? senderName;
+    if (gift.senderId.isNotEmpty && gift.senderId != _selfId) {
+      final profiles = await _data.fetchProfiles([gift.senderId]);
+      senderName = profiles[gift.senderId]?.label;
+    }
+    if (!mounted) return;
+    _giftBurstController.add(
+      gift.emoji,
+      senderName: senderName,
+      label: _giftLabel(gift.giftType),
+    );
+  }
+
+  String _giftLabel(String type) {
+    for (final option in LiveGiftOption.catalog) {
+      if (option.type == type) return option.label;
+    }
+    return 'gift';
+  }
+
+  /// Batch-resolve missing chat authors (realtime rows carry no profile).
+  Future<void> _hydrateAuthors() async {
+    final missing = _chat.unresolvedAuthorIds;
+    if (missing.isEmpty) return;
+    final profiles = await _data.fetchProfiles(missing);
+    if (!mounted || profiles.isEmpty) return;
+    if (_chat.hydrateAuthors(profiles)) setState(() {});
+  }
+
   Future<void> _refreshViewerCount() async {
     final count = await _data.countStreamViewers(widget.stream.id);
     if (!mounted) return;
     // Never show fewer than the host-reported starting count.
-    setState(() => _viewerCount = count > 0 ? count : widget.stream.viewerCount);
+    setState(
+      () => _viewerCount = count > 0 ? count : widget.stream.viewerCount,
+    );
   }
 
   @override
@@ -103,22 +151,48 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     _commentSub?.cancel();
     _reactionSub?.cancel();
     _giftSub?.cancel();
+    _viewerSub?.cancel();
     // Fire-and-forget presence cleanup; realtime teardown is awaited internally.
     unawaited(_data.leaveStream(widget.stream.id));
     unawaited(_realtime.dispose());
     _reactionsController.dispose();
+    _giftBurstController.dispose();
     super.dispose();
   }
 
   Future<void> _sendComment(String body) async {
-    // Optimistic append; the realtime echo is de-duplicated by id on refresh.
-    await _data.sendStreamComment(widget.stream.id, body);
+    // Optimistic append; the realtime echo upgrades/replaces this line by id.
+    final selfId = _selfId;
+    if (selfId != null) {
+      setState(() {
+        _chat.addOptimistic(
+          LiveChatLine(
+            id: 'optimistic-${DateTime.now().microsecondsSinceEpoch}',
+            userId: selfId,
+            body: body,
+            pending: true,
+          ),
+        );
+      });
+      _hydrateAuthors();
+    }
+    try {
+      await _data.sendStreamComment(widget.stream.id, body);
+    } catch (_) {
+      if (mounted) _showError('Could not send your message');
+    }
   }
 
   Future<void> _sendReaction(String type) async {
     _reactionsController.add(reactionEmojiFor(type));
-    await _data.sendStreamReaction(widget.stream.id, type);
+    try {
+      await _data.sendStreamReaction(widget.stream.id, type);
+    } catch (_) {
+      // Reaction is ephemeral; a failed insert is not worth interrupting for.
+    }
   }
+
+  void _toggleMute() => setState(() => _muted = !_muted);
 
   Future<void> _openGiftSheet() async {
     final gift = await showLiveGiftSheet(
@@ -126,33 +200,50 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
       recipientName: widget.stream.host?.label ?? 'the host',
     );
     if (gift == null) return;
+    // Local burst + float so the sender sees instant feedback.
     _reactionsController.add(gift.emoji);
-    await _data.sendStreamGift(
-      streamId: widget.stream.id,
-      giftType: gift.type,
-      creditValue: gift.creditValue,
-      receiverId: widget.stream.hostId,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
-    );
+    _giftBurstController.add(gift.emoji, label: gift.label);
+    try {
+      await _data.sendStreamGift(
+        streamId: widget.stream.id,
+        giftType: gift.type,
+        creditValue: gift.creditValue,
+        receiverId: widget.stream.hostId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
+      );
+    } catch (_) {
+      if (mounted) _showError('Could not send your gift');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final lines = _chat.lines;
     return Scaffold(
       backgroundColor: LiveTheme.background,
       resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          LiveStreamVideo(playbackUrl: widget.stream.playbackUrl),
+          LiveStreamVideo(
+            playbackUrl: widget.stream.playbackUrl,
+            muted: _muted,
+          ),
           const DecoratedBox(
             decoration: BoxDecoration(gradient: LiveTheme.bottomScrim),
           ),
           FloatingReactionsOverlay(controller: _reactionsController),
+          GiftBurstOverlay(controller: _giftBurstController),
           SafeArea(
             child: Padding(
               padding: EdgeInsets.only(bottom: bottomInset),
@@ -160,7 +251,7 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
                 children: [
                   _header(),
                   const Spacer(),
-                  _ChatOverlay(lines: _chat),
+                  _ChatOverlay(lines: lines, loading: _loadingChat),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                     child: Column(
@@ -223,7 +314,17 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
           const LivePill(),
           const SizedBox(width: 6),
           ViewerCountChip(count: _viewerCount),
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
+          if (widget.stream.playbackUrl != null &&
+              widget.stream.playbackUrl!.isNotEmpty)
+            IconButton(
+              onPressed: _toggleMute,
+              icon: Icon(
+                _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                color: LiveTheme.onSurface,
+              ),
+              tooltip: _muted ? 'Unmute' : 'Mute',
+            ),
           IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.close_rounded, color: LiveTheme.onSurface),
@@ -237,9 +338,10 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
 
 /// Height-capped, bottom-anchored chat overlay so the video stays visible.
 class _ChatOverlay extends StatelessWidget {
-  const _ChatOverlay({required this.lines});
+  const _ChatOverlay({required this.lines, required this.loading});
 
   final List<LiveChatLine> lines;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +350,7 @@ class _ChatOverlay extends StatelessWidget {
         maxHeight: MediaQuery.of(context).size.height * 0.32,
       ),
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      child: LiveChatList(lines: lines),
+      child: LiveChatList(lines: lines, loading: loading),
     );
   }
 }

@@ -324,6 +324,30 @@ class _StatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A failed media connection takes precedence and offers a retry.
+    if (controller.connectionFailed) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 16, color: CallColors.declineHi),
+          const SizedBox(width: 8),
+          const Text('Connection failed', style: CallTextStyles.statusLine),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: controller.retryConnection,
+            style: TextButton.styleFrom(
+              foregroundColor: CallColors.foreground,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
     final String text;
     switch (controller.phase) {
       case CallPhase.dialing:
@@ -333,10 +357,12 @@ class _StatusLine extends StatelessWidget {
         text = 'Connecting…';
         break;
       case CallPhase.connected:
-        text = controller.formattedDuration;
+        text = controller.isReconnecting
+            ? 'Reconnecting…'
+            : controller.formattedDuration;
         break;
       case CallPhase.ended:
-        text = 'Call ended';
+        text = controller.endedReason;
         break;
       case CallPhase.idle:
       case CallPhase.incoming:
@@ -344,13 +370,16 @@ class _StatusLine extends StatelessWidget {
         break;
     }
 
-    final connecting = controller.phase == CallPhase.dialing ||
-        controller.phase == CallPhase.connecting;
+    final showSpinner = controller.phase == CallPhase.dialing ||
+        controller.phase == CallPhase.connecting ||
+        (controller.phase == CallPhase.connected && controller.isReconnecting);
+    final isDuration =
+        controller.phase == CallPhase.connected && !controller.isReconnecting;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (connecting) ...[
+        if (showSpinner) ...[
           const SizedBox(
             width: 14,
             height: 14,
@@ -363,7 +392,7 @@ class _StatusLine extends StatelessWidget {
         ],
         Text(
           text,
-          style: controller.phase == CallPhase.connected
+          style: isDuration
               ? CallTextStyles.duration
               : CallTextStyles.statusLine,
         ),
@@ -413,7 +442,10 @@ class _EndedLayoutState extends State<_EndedLayout> {
                 style: CallTextStyles.callerName.copyWith(fontSize: 24),
               ),
               const SizedBox(height: 10),
-              const Text('Call ended', style: CallTextStyles.statusLine),
+              Text(
+                widget.controller.endedReason,
+                style: CallTextStyles.statusLine,
+              ),
             ],
           ),
         ),

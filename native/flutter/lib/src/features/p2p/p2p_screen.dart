@@ -24,10 +24,15 @@ import 'widgets/p2p_transaction_card.dart';
 /// history (which links into `P2PTransactionTimeline` / `P2PChat` /
 /// `P2PDisputePanel` on the detail screen).
 class P2PScreen extends StatefulWidget {
-  const P2PScreen({super.key, P2PRemoteDataSource? dataSource})
+  const P2PScreen({super.key, P2PRemoteDataSource? dataSource, this.onBack})
     : _injectedDataSource = dataSource;
 
   final P2PRemoteDataSource? _injectedDataSource;
+
+  /// Optional back affordance. When provided (e.g. when the screen is pushed as
+  /// a route from the wallet), the header renders a back button that invokes
+  /// this. When null (e.g. wired as a bottom-nav tab), no back button is shown.
+  final VoidCallback? onBack;
 
   @override
   State<P2PScreen> createState() => _P2PScreenState();
@@ -159,7 +164,10 @@ class _P2PScreenState extends State<P2PScreen> {
         bottom: false,
         child: Column(
           children: [
-            _Header(onManagePayments: _openPaymentMethods),
+            _Header(
+              onManagePayments: _openPaymentMethods,
+              onBack: widget.onBack,
+            ),
             _TabBar(
               tab: _tab,
               onChanged: (tab) => setState(() => _tab = tab),
@@ -179,6 +187,13 @@ class _P2PScreenState extends State<P2PScreen> {
     return FutureBuilder<_P2PMarketplaceData>(
       future: _marketFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return P2PErrorState(
+            title: 'Couldn\'t load the marketplace',
+            subtitle: 'Check your connection and try again.',
+            onRetry: _reloadMarketplace,
+          );
+        }
         final data = snapshot.data;
         if (data == null) {
           return const Center(
@@ -252,6 +267,13 @@ class _P2PScreenState extends State<P2PScreen> {
     return FutureBuilder<List<P2PTransaction>>(
       future: _ordersFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return P2PErrorState(
+            title: 'Couldn\'t load your orders',
+            subtitle: 'Check your connection and try again.',
+            onRetry: _reloadOrders,
+          );
+        }
         final orders = snapshot.data;
         if (orders == null) {
           return const Center(
@@ -310,20 +332,27 @@ class _P2PMarketplaceData {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onManagePayments});
+  const _Header({required this.onManagePayments, this.onBack});
   final VoidCallback onManagePayments;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        P2PTheme.lg,
+      padding: EdgeInsets.fromLTRB(
+        onBack != null ? P2PTheme.xs : P2PTheme.lg,
         P2PTheme.md,
         P2PTheme.sm,
         P2PTheme.sm,
       ),
       child: Row(
         children: [
+          if (onBack != null)
+            IconButton(
+              tooltip: 'Back',
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back, color: P2PTheme.foreground),
+            ),
           const Expanded(child: Text('Marketplace', style: P2PTheme.screenTitle)),
           IconButton(
             tooltip: 'Payment methods',

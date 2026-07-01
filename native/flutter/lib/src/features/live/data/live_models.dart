@@ -259,18 +259,31 @@ class SpaceSpeaker {
 
 /// One float-up reaction event (`live_stream_reactions` / `live_space_reactions`).
 class LiveReactionEvent {
-  const LiveReactionEvent({required this.id, required this.reactionType});
+  const LiveReactionEvent({
+    required this.id,
+    required this.reactionType,
+    this.userId,
+  });
 
   final String id;
   final String reactionType;
+
+  /// Author of the reaction, when present on the row. Realtime INSERT payloads
+  /// carry `user_id`, so the viewer can suppress re-floating its own reaction
+  /// (which it already floated optimistically).
+  final String? userId;
 
   /// Emoji for a reaction key, mirroring the web `REACTION_EMOJIS` map.
   String get emoji => reactionEmojiFor(reactionType);
 
   factory LiveReactionEvent.fromJson(Map<String, Object?> json) {
+    final userId = json['user_id']?.toString();
     return LiveReactionEvent(
-      id: json['id']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      id:
+          json['id']?.toString() ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
       reactionType: json['reaction_type']?.toString() ?? 'heart',
+      userId: (userId != null && userId.isNotEmpty) ? userId : null,
     );
   }
 }
@@ -319,7 +332,12 @@ class LiveGiftOption {
 
   static const catalog = <LiveGiftOption>[
     LiveGiftOption(type: 'rose', label: 'Rose', emoji: '🌹', creditValue: 10),
-    LiveGiftOption(type: 'coffee', label: 'Coffee', emoji: '☕', creditValue: 20),
+    LiveGiftOption(
+      type: 'coffee',
+      label: 'Coffee',
+      emoji: '☕',
+      creditValue: 20,
+    ),
     LiveGiftOption(type: 'heart', label: 'Love', emoji: '❤️', creditValue: 50),
     LiveGiftOption(
       type: 'diamond',
@@ -327,7 +345,12 @@ class LiveGiftOption {
       emoji: '💎',
       creditValue: 100,
     ),
-    LiveGiftOption(type: 'crown', label: 'Crown', emoji: '👑', creditValue: 250),
+    LiveGiftOption(
+      type: 'crown',
+      label: 'Crown',
+      emoji: '👑',
+      creditValue: 250,
+    ),
     LiveGiftOption(
       type: 'rocket',
       label: 'Rocket',

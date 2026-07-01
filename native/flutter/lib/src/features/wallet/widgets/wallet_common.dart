@@ -279,6 +279,132 @@ class WalletEmptyState extends StatelessWidget {
   }
 }
 
+/// A tappable navigation tile (icon + title + subtitle + chevron), used e.g. to
+/// surface the P2P marketplace from the wallet.
+class WalletNavTile extends StatelessWidget {
+  const WalletNavTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: WalletRadii.card,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(WalletSpacing.md),
+          decoration: BoxDecoration(
+            color: WalletColors.card,
+            borderRadius: WalletRadii.card,
+            border: Border.all(color: WalletColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: WalletColors.primarySoft,
+                  borderRadius: WalletRadii.inner,
+                ),
+                child: Icon(icon, color: WalletColors.primary, size: 22),
+              ),
+              const SizedBox(width: WalletSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: WalletTextStyles.rowTitle),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: WalletTextStyles.rowMuted),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: WalletColors.mutedForeground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact inline error strip with an optional retry action, used where a
+/// full empty state would be too heavy (e.g. a failed balance refresh).
+class WalletInlineError extends StatelessWidget {
+  const WalletInlineError({
+    super.key,
+    required this.message,
+    this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: WalletSpacing.md,
+        vertical: WalletSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: WalletColors.destructiveFaint,
+        borderRadius: WalletRadii.inner,
+        border: Border.all(
+          color: WalletColors.destructive.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 18,
+            color: WalletColors.destructive,
+          ),
+          const SizedBox(width: WalletSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: WalletTextStyles.rowMuted.copyWith(
+                color: WalletColors.foreground,
+              ),
+            ),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(width: WalletSpacing.sm),
+            GestureDetector(
+              onTap: onRetry,
+              child: const Text(
+                'Retry',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: WalletColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// A simple loading placeholder used inside tabs.
 class WalletLoading extends StatelessWidget {
   const WalletLoading({super.key});

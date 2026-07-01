@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../p2p/p2p_screen.dart';
 import 'data/wallet_models.dart';
 import 'wallet_presenter.dart';
 import 'wallet_theme.dart';
@@ -95,6 +96,20 @@ class _WalletScreenState extends State<WalletScreen> {
       balance: _presenter.balance,
     );
     if (sent == true) await _presenter.refreshAfterMutation();
+  }
+
+  /// Opens the P2P credit marketplace. The wallet is the natural entry point:
+  /// users buy credits from the store here and can trade them peer-to-peer
+  /// there. Refreshes the balance/ledger on return since a trade may have
+  /// moved credits.
+  Future<void> _openP2P() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) =>
+            P2PScreen(onBack: () => Navigator.of(routeContext).maybePop()),
+      ),
+    );
+    if (mounted) await _presenter.refreshAfterMutation();
   }
 
   Future<void> _openCheckout(String value) async {
@@ -202,6 +217,16 @@ class _WalletScreenState extends State<WalletScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'P2P marketplace',
+            onPressed: _openP2P,
+            icon: const Icon(
+              Icons.storefront_rounded,
+              color: WalletColors.foreground,
+            ),
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: _presenter,
@@ -221,6 +246,24 @@ class _WalletScreenState extends State<WalletScreen> {
                   onWithdraw: p.isMonetizedCreator ? () => _openPayout() : null,
                   tierName: _activeTierName(),
                 ),
+                if (p.overviewState == WalletLoadState.error) ...[
+                  const SizedBox(height: 12),
+                  WalletInlineError(
+                    message:
+                        'Could not refresh your balance. Pull to retry or tap '
+                        'below.',
+                    onRetry: _presenter.loadOverview,
+                  ),
+                ],
+                const SizedBox(height: 16),
+
+                // Peer-to-peer marketplace entry.
+                WalletNavTile(
+                  icon: Icons.storefront_rounded,
+                  title: 'P2P marketplace',
+                  subtitle: 'Buy & sell credits with other users',
+                  onTap: _openP2P,
+                ),
                 const SizedBox(height: 20),
 
                 // Buy credits / tokens
@@ -229,6 +272,17 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 8),
                 if (p.packagesState == WalletLoadState.loading)
                   const WalletLoading()
+                else if (p.packagesState == WalletLoadState.error)
+                  WalletEmptyState(
+                    icon: Icons.error_outline_rounded,
+                    title: 'Couldn\'t load packages',
+                    subtitle: 'Check your connection and try again.',
+                    action: WalletSecondaryButton(
+                      label: 'Retry',
+                      icon: Icons.refresh_rounded,
+                      onPressed: _presenter.loadPackages,
+                    ),
+                  )
                 else if (p.packages.isEmpty)
                   _emptyLine('No credit packages available yet.')
                 else
@@ -246,11 +300,23 @@ class _WalletScreenState extends State<WalletScreen> {
 
                 // Subscription tiers
                 if (p.tiersState == WalletLoadState.loading ||
+                    p.tiersState == WalletLoadState.error ||
                     p.tiers.isNotEmpty) ...[
                   const WalletSectionHeader(title: 'Subscriptions'),
                   const SizedBox(height: 8),
                   if (p.tiersState == WalletLoadState.loading)
                     const WalletLoading()
+                  else if (p.tiersState == WalletLoadState.error)
+                    WalletEmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Couldn\'t load plans',
+                      subtitle: 'Check your connection and try again.',
+                      action: WalletSecondaryButton(
+                        label: 'Retry',
+                        icon: Icons.refresh_rounded,
+                        onPressed: _presenter.loadTiers,
+                      ),
+                    )
                   else
                     ...p.tiers.map(
                       (tier) => Padding(
@@ -271,6 +337,17 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 8),
                 if (p.transactionsState == WalletLoadState.loading)
                   const WalletLoading()
+                else if (p.transactionsState == WalletLoadState.error)
+                  WalletEmptyState(
+                    icon: Icons.error_outline_rounded,
+                    title: 'Couldn\'t load transactions',
+                    subtitle: 'Check your connection and try again.',
+                    action: WalletSecondaryButton(
+                      label: 'Retry',
+                      icon: Icons.refresh_rounded,
+                      onPressed: _presenter.loadTransactions,
+                    ),
+                  )
                 else
                   WalletTransactionList(
                     transactions: p.filteredTransactions,

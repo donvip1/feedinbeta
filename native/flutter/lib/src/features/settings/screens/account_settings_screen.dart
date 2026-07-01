@@ -30,6 +30,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final _displayNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
+  // Read-only identity fields. Held in state (rather than created inline in
+  // build) so they aren't leaked/recreated on every rebuild.
+  final _emailController = TextEditingController();
+  final _shortIdController = TextEditingController();
 
   AccountProfile? _profile;
   bool _loading = true;
@@ -49,6 +53,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     _displayNameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
+    _emailController.dispose();
+    _shortIdController.dispose();
     super.dispose();
   }
 
@@ -58,6 +64,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     setState(() {
       _profile = profile;
       _loading = false;
+      _emailController.text = profile?.email ?? 'Not signed in';
+      _shortIdController.text = profile?.shortId ?? '—';
       if (profile != null) {
         _displayNameController.text = profile.displayName;
         _usernameController.text = profile.username;
@@ -133,11 +141,16 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 padding: const EdgeInsets.all(SettingsSpacing.lg),
                 child: Column(
                   children: [
+                    _AccountAvatar(
+                      avatarUrl: _profile?.avatarUrl,
+                      displayName: _displayNameController.text.isNotEmpty
+                          ? _displayNameController.text
+                          : (_profile?.displayName ?? ''),
+                    ),
+                    const SizedBox(height: SettingsSpacing.lg),
                     SettingsTextField(
                       label: 'Email',
-                      controller: TextEditingController(
-                        text: _profile?.email ?? 'Not signed in',
-                      ),
+                      controller: _emailController,
                       readOnly: true,
                       helper: 'Contact the Help Center to change your email.',
                       prefixIcon: Icons.mail_outline,
@@ -148,9 +161,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         Expanded(
                           child: SettingsTextField(
                             label: 'FeedIn ID',
-                            controller: TextEditingController(
-                              text: _profile?.shortId ?? '—',
-                            ),
+                            controller: _shortIdController,
                             readOnly: true,
                           ),
                         ),
@@ -230,6 +241,80 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ],
         ],
       ],
+    );
+  }
+}
+
+/// A read-only avatar preview for the account Identity card. Shows the profile
+/// photo (with a gradient-initials fallback) plus a note that photo changes
+/// happen on the web — native has no image picker/cropper wired yet.
+class _AccountAvatar extends StatelessWidget {
+  const _AccountAvatar({required this.avatarUrl, required this.displayName});
+
+  final String? avatarUrl;
+  final String displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = displayName.trim().isNotEmpty
+        ? displayName.trim()[0].toUpperCase()
+        : 'U';
+    final hasImage = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+    return Row(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(
+            gradient: SettingsGradients.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: hasImage
+              ? Image.network(
+                  avatarUrl!,
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _Initial(initial),
+                )
+              : _Initial(initial),
+        ),
+        const SizedBox(width: SettingsSpacing.md),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Profile photo', style: SettingsTextStyles.rowTitle),
+              SizedBox(height: SettingsSpacing.xs),
+              Text(
+                'Update your photo from the web app for now.',
+                style: SettingsTextStyles.rowDescription,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Initial extends StatelessWidget {
+  const _Initial(this.initial);
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      initial,
+      style: const TextStyle(
+        color: SettingsColors.primaryForeground,
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }

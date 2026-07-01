@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../call_theme.dart';
 
@@ -167,7 +168,12 @@ class _CircleButton extends StatelessWidget {
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onPressed,
+        onTap: () {
+          // Native-feeling tactile feedback on call actions (SDK-only; a no-op
+          // on platforms/devices without a haptics channel).
+          HapticFeedback.lightImpact();
+          onPressed();
+        },
         customBorder: const CircleBorder(),
         child: SizedBox(
           width: diameter,

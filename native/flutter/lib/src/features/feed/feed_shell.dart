@@ -20,6 +20,8 @@ import '../../data/local/post_draft_repository.dart';
 import '../../data/local/profile_repository_contract.dart';
 import '../../data/local/upload_queue_repository.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
+import '../groups/screens/groups_screen.dart';
+import '../wallet/wallet_screen.dart';
 import '../create/create_post_screen.dart';
 import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
@@ -185,7 +187,7 @@ class _FeedShellState extends State<FeedShell> {
     if (conversationId != null) {
       setState(() {
         _showNotifications = false;
-        _index = 2;
+        _index = 1;
         _initialConversationId = conversationId;
         _messagesRealtimeVersion++;
       });
@@ -206,6 +208,58 @@ class _FeedShellState extends State<FeedShell> {
     return null;
   }
 
+  /// Create is a floating "+" action (web parity), pushed as a full route.
+  Future<void> _openCreate() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Create')),
+          body: CreatePostScreen(
+            draftRepository: widget.postDraftRepository,
+            uploadQueueRepository: widget.uploadQueueRepository,
+            uploadQueueService: widget.uploadQueueService,
+            onPostUploaded: () => setState(() => _feedRealtimeVersion++),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Settings lives under Profile (web parity), pushed as a full route.
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Settings')),
+          body: SettingsScreen(
+            syncService: widget.syncService,
+            uploadQueueService: widget.uploadQueueService,
+            storageDiagnosticsService: widget.storageDiagnosticsService,
+            preferencesRepository: widget.preferencesRepository,
+            realtimeConnected: _realtimeConnected,
+            storageMaintenance: widget.storageMaintenance,
+            onSignOut: widget.onSignOut,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Groups (group conversations) — reachable from the Chats tab app bar.
+  void _openGroups() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeCtx) => Scaffold(
+          backgroundColor: Colors.black,
+          body: GroupsScreen(
+            currentUserId: _profile.userId,
+            onBack: () => Navigator.of(routeCtx).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -215,12 +269,6 @@ class _FeedShellState extends State<FeedShell> {
         onOpenNotifications: _showNotificationsScreen,
         notificationUnreadCountFuture: _notificationUnreadCountFuture,
       ),
-      CreatePostScreen(
-        draftRepository: widget.postDraftRepository,
-        uploadQueueRepository: widget.uploadQueueRepository,
-        uploadQueueService: widget.uploadQueueService,
-        onPostUploaded: () => setState(() => _feedRealtimeVersion++),
-      ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
         conversationStarter: widget.conversationStarter,
@@ -229,30 +277,23 @@ class _FeedShellState extends State<FeedShell> {
         realtimeVersion: _messagesRealtimeVersion,
         initialConversationId: _initialConversationId,
       ),
+      const WalletScreen(),
       ProfileEditorScreen(
         profile: _profile,
         profileRepository: widget.profileRepository,
         feedRepository: widget.feedRepository,
         onSaved: (profile) => setState(() => _profile = profile),
       ),
-      SettingsScreen(
-        syncService: widget.syncService,
-        uploadQueueService: widget.uploadQueueService,
-        storageDiagnosticsService: widget.storageDiagnosticsService,
-        preferencesRepository: widget.preferencesRepository,
-        realtimeConnected: _realtimeConnected,
-        storageMaintenance: widget.storageMaintenance,
-        onSignOut: widget.onSignOut,
-      ),
     ];
 
-    // The feed tab is an immersive, full-bleed experience that draws its own
-    // top overlay, so the shared AppBar is hidden while it is on screen.
+    // The feed (immersive) and Wallet both draw their own chrome, so the shared
+    // AppBar is hidden while either is on screen.
     final immersiveFeed = _index == 0 && !_showNotifications;
+    final hideAppBar = immersiveFeed || (_index == 2 && !_showNotifications);
 
     return Scaffold(
       backgroundColor: immersiveFeed ? Colors.black : null,
-      appBar: immersiveFeed
+      appBar: hideAppBar
           ? null
           : AppBar(
               toolbarHeight: 64,
@@ -280,6 +321,18 @@ class _FeedShellState extends State<FeedShell> {
                   onPressed: () {},
                   icon: const Icon(Icons.search),
                 ),
+                if (_index == 1)
+                  IconButton(
+                    tooltip: 'Groups',
+                    onPressed: _openGroups,
+                    icon: const Icon(Icons.groups_2_outlined),
+                  ),
+                if (_index == 3)
+                  IconButton(
+                    tooltip: 'Settings',
+                    onPressed: _openSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
                 _NotificationBellAction(
                   unreadCountFuture: _notificationUnreadCountFuture,
                   onTap: _toggleNotifications,
@@ -293,6 +346,13 @@ class _FeedShellState extends State<FeedShell> {
               onChanged: _refreshNotificationBadge,
             )
           : pages[_index],
+      floatingActionButton: (immersiveFeed || _showNotifications)
+          ? null
+          : FloatingActionButton(
+              onPressed: _openCreate,
+              tooltip: 'Create',
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBar(
         height: 72,
         selectedIndex: _index,
@@ -307,24 +367,19 @@ class _FeedShellState extends State<FeedShell> {
             label: 'Feeds',
           ),
           NavigationDestination(
-            icon: Icon(Icons.add_box_outlined),
-            selectedIcon: Icon(Icons.add_box),
-            label: 'Create',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.mail_outline),
             selectedIcon: Icon(Icons.mail),
             label: 'Chats',
           ),
           NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet),
+            label: 'Wallet',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
           ),
         ],
       ),

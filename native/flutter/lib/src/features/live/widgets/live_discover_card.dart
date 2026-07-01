@@ -164,9 +164,7 @@ class LiveDiscoverCard extends StatelessWidget {
   Widget _gradientFallback() {
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: _isSpace
-            ? LiveTheme.spaceFallback
-            : LiveTheme.streamFallback,
+        gradient: _isSpace ? LiveTheme.spaceFallback : LiveTheme.streamFallback,
       ),
     );
   }

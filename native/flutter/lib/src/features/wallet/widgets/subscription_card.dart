@@ -73,7 +73,10 @@ class WalletSubscriptionCard extends StatelessWidget {
                     gradient: WalletGradients.action,
                     borderRadius: WalletRadii.chip,
                   ),
-                  child: const Text('Popular', style: WalletTextStyles.badge),
+                  child: const Text(
+                    'Most Popular',
+                    style: WalletTextStyles.badge,
+                  ),
                 )
               else if (isCurrent)
                 Container(

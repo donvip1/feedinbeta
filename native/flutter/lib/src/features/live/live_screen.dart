@@ -44,9 +44,15 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<_LiveBrowseData> _load() async {
-    final streams = await _data.fetchLiveStreams();
-    final spaces = await _data.fetchLiveSpaces();
-    return _LiveBrowseData(streams: streams, spaces: spaces);
+    // Fetch streams + spaces concurrently so browse loads in one round-trip.
+    final results = await Future.wait([
+      _data.fetchLiveStreams(),
+      _data.fetchLiveSpaces(),
+    ]);
+    return _LiveBrowseData(
+      streams: results[0] as List<LiveStreamSummary>,
+      spaces: results[1] as List<LiveSpaceSummary>,
+    );
   }
 
   Future<void> _refresh() async {
@@ -268,20 +274,72 @@ class _CardGridSliver extends StatelessWidget {
   }
 }
 
+/// Skeleton browse grid shown while the first fetch is in flight, mirroring the
+/// card layout so the transition to real content is not a jarring pop.
 class _LiveLoadingState extends StatelessWidget {
   const _LiveLoadingState();
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      children: const [
-        SizedBox(height: 200),
-        Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(LiveTheme.liveRed),
-          ),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _Header(onGoLive: () {}),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Text('LIVE STREAMS', style: LiveTheme.sectionLabel),
+        ),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 3 / 4,
+          children: const [
+            _SkeletonCard(),
+            _SkeletonCard(),
+            _SkeletonCard(),
+            _SkeletonCard(),
+          ],
         ),
       ],
+    );
+  }
+}
+
+/// A single shimmering placeholder card.
+class _SkeletonCard extends StatefulWidget {
+  const _SkeletonCard();
+
+  @override
+  State<_SkeletonCard> createState() => _SkeletonCardState();
+}
+
+class _SkeletonCardState extends State<_SkeletonCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.4, end: 0.8).animate(_controller),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: LiveTheme.surfaceRaised,
+          borderRadius: LiveTheme.cardRadius,
+        ),
+      ),
     );
   }
 }
@@ -295,7 +353,11 @@ class _LiveEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.sensors_off_rounded, color: LiveTheme.onSurfaceFaint, size: 48),
+          Icon(
+            Icons.sensors_off_rounded,
+            color: LiveTheme.onSurfaceFaint,
+            size: 48,
+          ),
           SizedBox(height: 12),
           Text(
             'No one is live right now',

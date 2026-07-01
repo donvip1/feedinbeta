@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/group_models.dart';
+import '../data/group_realtime_service.dart';
 import '../data/groups_remote_data_source.dart';
 import '../groups_theme.dart';
 import '../view_models/group_view_models.dart';
@@ -11,8 +14,9 @@ import '../widgets/group_members_sheet.dart';
 import '../widgets/group_message_bubble.dart';
 
 /// The open group room: header, message list, composer, plus members / add /
-/// leave affordances. Loads messages + members from [dataSource] and posts new
-/// messages back through it, then refreshes.
+/// leave affordances. Loads messages + members from [dataSource], posts new
+/// messages back through it, and subscribes to a [GroupRealtimeService] so
+/// messages from other members appear live.
 class GroupChatScreen extends StatefulWidget {
   const GroupChatScreen({
     super.key,
@@ -23,6 +27,7 @@ class GroupChatScreen extends StatefulWidget {
     required this.initialMemberCount,
     required this.onBack,
     this.onLeft,
+    this.realtime,
   });
 
   final GroupsRemoteDataSource dataSource;
@@ -38,39 +43,78 @@ class GroupChatScreen extends StatefulWidget {
   /// back to the list and refresh it.
   final VoidCallback? onLeft;
 
+  /// Optional injected realtime service (defaults to
+  /// [GroupRealtimeService.autoDetect] for the conversation). Kept optional so
+  /// the public constructor stays backward-compatible.
+  final GroupRealtimeService? realtime;
+
   @override
   State<GroupChatScreen> createState() => _GroupChatScreenState();
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen> {
   final _messageController = TextEditingController();
-  late Future<List<GroupMessageView>> _messagesFuture;
+
+  /// Loaded messages, oldest-first. Null until the first load resolves so the
+  /// UI can distinguish "loading" from "empty". Held in state (rather than a
+  /// swapped Future) so background refreshes never flash a spinner.
+  List<GroupMessageView>? _messages;
 
   List<GroupMemberView> _members = const [];
   bool _membersLoading = true;
   int _memberCount = 0;
   final _listController = ScrollController();
 
+  GroupRealtimeService? _realtime;
+  StreamSubscription<GroupRealtimeMessageEvent>? _realtimeSub;
+
   @override
   void initState() {
     super.initState();
     _memberCount = widget.initialMemberCount;
-    _messagesFuture = _loadMessages();
+    _loadMessages();
     _loadMembers();
     widget.dataSource.markRead(widget.conversationId);
+    _initRealtime();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _listController.dispose();
+    _realtimeSub?.cancel();
+    unawaited(_realtime?.dispose());
     super.dispose();
   }
 
-  Future<List<GroupMessageView>> _loadMessages() async {
+  void _initRealtime() {
+    final realtime = widget.realtime ??
+        GroupRealtimeService.autoDetect(widget.conversationId);
+    _realtime = realtime;
+    _realtimeSub = realtime.messages.listen(_onRealtimeMessage);
+    realtime.connect();
+  }
+
+  void _onRealtimeMessage(GroupRealtimeMessageEvent event) {
+    // Our own sends are already reflected by [_send]'s reload; only refresh for
+    // messages authored by other members.
+    if (event.senderId != null && event.senderId == widget.currentUserId) {
+      return;
+    }
+    _loadMessages();
+    widget.dataSource.markRead(widget.conversationId);
+  }
+
+  /// Fetches messages and swaps them into state, keeping any currently-shown
+  /// list visible while the network call is in flight.
+  Future<void> _loadMessages() async {
     final List<RemoteGroupMessage> remote = await widget.dataSource
         .fetchMessages(widget.conversationId);
-    return groupMessagesToViews(remote, currentUserId: widget.currentUserId);
+    if (!mounted) return;
+    setState(() {
+      _messages =
+          groupMessagesToViews(remote, currentUserId: widget.currentUserId);
+    });
   }
 
   Future<void> _loadMembers() async {
@@ -97,7 +141,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       body: text,
     );
     if (!mounted) return;
-    setState(() => _messagesFuture = _loadMessages());
+    await _loadMessages();
   }
 
   void _showMembers() {
@@ -188,6 +232,50 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Widget _buildMessages() {
+    final messages = _messages;
+    if (messages == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: GroupColors.primary),
+      );
+    }
+    if (messages.isEmpty) {
+      return const _EmptyRoomState();
+    }
+    return ListView.builder(
+      controller: _listController,
+      reverse: true,
+      padding: const EdgeInsets.symmetric(
+        horizontal: GroupSpacing.md,
+        vertical: GroupSpacing.md,
+      ),
+      itemCount: messages.length,
+      itemBuilder: (context, index) {
+        // Reversed list: display index 0 is the newest message (at the bottom).
+        final ordered = messages.length - 1 - index;
+        final view = messages[ordered];
+        // A day header sits above the first message of each calendar day.
+        final showDate = ordered == 0 ||
+            !groupIsSameDay(
+              messages[ordered - 1].createdAtMillis,
+              view.createdAtMillis,
+            );
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showDate) _DateSeparator(millis: view.createdAtMillis),
+            Padding(
+              padding: EdgeInsets.only(
+                top: view.isFirstInGroup && !showDate ? GroupSpacing.sm : 2,
+              ),
+              child: GroupMessageBubble(message: view),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -205,44 +293,41 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               onAddMembers: _showAddMembers,
               onLeaveGroup: _confirmLeave,
             ),
-            Expanded(
-              child: FutureBuilder<List<GroupMessageView>>(
-                future: _messagesFuture,
-                builder: (context, snapshot) {
-                  final messages = snapshot.data;
-                  if (messages == null) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: GroupColors.primary,
-                      ),
-                    );
-                  }
-                  if (messages.isEmpty) {
-                    return const _EmptyRoomState();
-                  }
-                  return ListView.builder(
-                    controller: _listController,
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: GroupSpacing.md,
-                      vertical: GroupSpacing.md,
-                    ),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final view = messages[messages.length - 1 - index];
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          top: view.isFirstInGroup ? GroupSpacing.sm : 2,
-                        ),
-                        child: GroupMessageBubble(message: view),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
+            Expanded(child: _buildMessages()),
             GroupComposer(controller: _messageController, onSend: _send),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A centered "Today" / "Yesterday" / date pill separating message days
+/// (web date header). Purely presentational.
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({required this.millis});
+
+  final int millis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: GroupSpacing.sm),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: GroupSpacing.md,
+            vertical: GroupSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: GroupColors.rowCard,
+            borderRadius: BorderRadius.circular(GroupRadii.pill),
+            border: Border.all(color: GroupColors.rowCardBorder),
+          ),
+          child: Text(
+            groupDateHeader(millis),
+            style: GroupTextStyles.timestamp,
+          ),
         ),
       ),
     );

@@ -2,8 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// A bottom-right overlay of emoji that float up and fade out, mirroring the web
-/// `FloatingReactions`. Callers push emoji strings via a [FloatingReactionsController].
+import '../live_theme.dart';
+
+/// A bottom-anchored overlay of emoji that float up, drift, spin, and fade out,
+/// mirroring the web `FloatingReactions` physics (`PhysicsReaction`). Callers
+/// push emoji — optionally with a sender name — via a
+/// [FloatingReactionsController].
 class FloatingReactionsOverlay extends StatefulWidget {
   const FloatingReactionsOverlay({super.key, required this.controller});
 
@@ -18,9 +22,11 @@ class FloatingReactionsOverlay extends StatefulWidget {
 class FloatingReactionsController extends ChangeNotifier {
   final List<_PendingReaction> _pending = [];
 
-  /// Enqueue [emoji] to float up. Safe to call rapidly.
-  void add(String emoji) {
-    _pending.add(_PendingReaction(emoji));
+  /// Enqueue [emoji] to float up. Optionally attribute it to [senderName], which
+  /// renders a small name badge under the emoji (web parity). Safe to call
+  /// rapidly; the overlay caps how many float at once.
+  void add(String emoji, {String? senderName}) {
+    _pending.add(_PendingReaction(emoji, senderName));
     notifyListeners();
   }
 
@@ -32,15 +38,21 @@ class FloatingReactionsController extends ChangeNotifier {
 }
 
 class _PendingReaction {
-  _PendingReaction(this.emoji);
+  _PendingReaction(this.emoji, this.senderName);
 
   final String emoji;
-  final String id = '${DateTime.now().microsecondsSinceEpoch}-'
+  final String? senderName;
+  final String id =
+      '${DateTime.now().microsecondsSinceEpoch}-'
       '${math.Random().nextInt(1 << 32)}';
 }
 
 class _FloatingReactionsOverlayState extends State<FloatingReactionsOverlay> {
   final List<_PendingReaction> _active = [];
+
+  /// Cap concurrent emoji so a gift/reaction storm cannot spawn unbounded
+  /// animation controllers.
+  static const _maxActive = 40;
 
   @override
   void initState() {
@@ -66,7 +78,12 @@ class _FloatingReactionsOverlayState extends State<FloatingReactionsOverlay> {
   void _onController() {
     final drained = widget.controller._drain();
     if (drained.isEmpty || !mounted) return;
-    setState(() => _active.addAll(drained));
+    setState(() {
+      _active.addAll(drained);
+      if (_active.length > _maxActive) {
+        _active.removeRange(0, _active.length - _maxActive);
+      }
+    });
   }
 
   void _remove(String id) {
@@ -83,6 +100,7 @@ class _FloatingReactionsOverlayState extends State<FloatingReactionsOverlay> {
             _FloatingEmoji(
               key: ValueKey(reaction.id),
               emoji: reaction.emoji,
+              senderName: reaction.senderName,
               onDone: () => _remove(reaction.id),
             ),
         ],
@@ -95,10 +113,12 @@ class _FloatingEmoji extends StatefulWidget {
   const _FloatingEmoji({
     super.key,
     required this.emoji,
+    required this.senderName,
     required this.onDone,
   });
 
   final String emoji;
+  final String? senderName;
   final VoidCallback onDone;
 
   @override
@@ -107,14 +127,18 @@ class _FloatingEmoji extends StatefulWidget {
 
 class _FloatingEmojiState extends State<_FloatingEmoji>
     with SingleTickerProviderStateMixin {
+  static final _random = math.Random();
+
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2600),
+    // Web uses 2.5–4s; match that spread.
+    duration: Duration(milliseconds: 2500 + _random.nextInt(1500)),
   );
 
-  late final double _horizontalDrift =
-      (math.Random().nextDouble() - 0.5) * 60;
-  late final double _startRight = 16 + math.Random().nextDouble() * 40;
+  late final double _horizontalDrift = (_random.nextDouble() - 0.5) * 90;
+  late final double _startRight = 16 + _random.nextDouble() * 48;
+  late final double _baseRotation = (_random.nextDouble() - 0.5) * 0.5;
+  late final double _peakScale = 1.0 + _random.nextDouble() * 0.5;
 
   @override
   void initState() {
@@ -134,23 +158,58 @@ class _FloatingEmojiState extends State<_FloatingEmoji>
       animation: _controller,
       builder: (context, child) {
         final t = _controller.value;
-        final rise = 220 * Curves.easeOut.transform(t);
+        final rise = 260 * Curves.easeOut.transform(t);
         final opacity = t < 0.15
             ? t / 0.15
             : (1 - ((t - 0.15) / 0.85)).clamp(0.0, 1.0);
+        // Organic wobble on the way up.
+        final wobble = math.sin(t * math.pi * 3) * 6;
+        final scale = 0.3 + (_peakScale - 0.3) * Curves.easeOut.transform(t);
         return Positioned(
-          right: _startRight + _horizontalDrift * t,
+          right: _startRight + _horizontalDrift * t + wobble,
           bottom: 24 + rise,
           child: Opacity(
             opacity: opacity,
-            child: Transform.scale(
-              scale: 0.8 + 0.4 * math.sin(t * math.pi),
-              child: child,
+            child: Transform.rotate(
+              angle: _baseRotation + math.sin(t * math.pi * 2) * 0.15,
+              child: Transform.scale(scale: scale, child: child),
             ),
           ),
         );
       },
-      child: Text(widget.emoji, style: const TextStyle(fontSize: 30)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.emoji,
+            style: const TextStyle(
+              fontSize: 32,
+              shadows: [Shadow(color: Color(0x80FF6464), blurRadius: 18)],
+            ),
+          ),
+          if (widget.senderName != null && widget.senderName!.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+              constraints: const BoxConstraints(maxWidth: 88),
+              decoration: BoxDecoration(
+                color: LiveTheme.chip,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                widget.senderName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

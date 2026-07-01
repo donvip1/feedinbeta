@@ -21,6 +21,16 @@ class WalletPackageCard extends StatelessWidget {
   final VoidCallback onPurchase;
   final bool busy;
 
+  /// Default "use credits for" perks (mirrors the web `DEFAULT_CREDIT_FEATURES`
+  /// fallback). Purely presentational — the live `credit_packages` table has no
+  /// per-package feature list, so we show the standard credit uses.
+  static const List<(IconData, String)> _defaultFeatures = [
+    (Icons.image_rounded, 'AI Image Generation'),
+    (Icons.chat_bubble_rounded, 'AI Chat & Writing'),
+    (Icons.card_giftcard_rounded, 'Send Gifts to Creators'),
+    (Icons.trending_up_rounded, 'Promote Your Posts'),
+  ];
+
   Gradient? get _accentGradient {
     if (package.isReseller) return WalletGradients.reseller;
     if (package.isPremium) return WalletGradients.premium;
@@ -210,6 +220,76 @@ class WalletPackageCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: WalletSpacing.md),
+                // "Use credits for" perks (web PackageCard features list).
+                const Divider(color: WalletColors.border, height: 1),
+                const SizedBox(height: WalletSpacing.md),
+                Text(
+                  'USE CREDITS FOR',
+                  style: WalletTextStyles.rowMuted.copyWith(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    for (final (icon, label) in _defaultFeatures)
+                      SizedBox(
+                        width: (WalletSpacing.packageCardWidth - 32 - 12) / 2,
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_rounded,
+                              size: 13,
+                              color: WalletColors.success,
+                            ),
+                            const SizedBox(width: 5),
+                            Icon(
+                              icon,
+                              size: 13,
+                              color: WalletColors.mutedForeground,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: WalletTextStyles.rowMuted.copyWith(
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                if (package.isReseller) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 13,
+                        color: WalletColors.tierReseller,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Eligible for P2P reselling',
+                        style: WalletTextStyles.rowMuted.copyWith(
+                          fontSize: 11.5,
+                          color: WalletColors.tierReseller,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: WalletSpacing.lg),
                 WalletPrimaryButton(
                   label: 'Buy Now',

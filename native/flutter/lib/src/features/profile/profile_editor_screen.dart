@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +14,7 @@ import 'parity/profile_presenter.dart';
 import 'parity/profile_tokens.dart';
 import 'parity/profile_view_models.dart';
 import 'parity/widgets/connections_modal.dart';
+import 'parity/widgets/image_viewer.dart';
 import 'parity/widgets/past_spaces_card.dart';
 import 'parity/widgets/posts_grid.dart';
 import 'parity/widgets/profile_avatar.dart';
@@ -77,6 +80,10 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   bool _isSaving = false;
   String? _message;
   String? _errorMessage;
+
+  /// Bumped by pull-to-refresh so the self-loading sub-sections (Past Spaces,
+  /// View History) re-fetch. The posts/likes futures are refreshed directly.
+  int _refreshTick = 0;
 
   UserProfile get _profile => widget.profile;
 
@@ -241,19 +248,44 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  /// Pull-to-refresh: re-run the live reads (posts grid + Likes aggregate) and
+  /// bump [_refreshTick] so the self-loading sections rebuild and re-fetch.
+  Future<void> _refresh() async {
+    final postsFuture = widget.feedRepository.loadPostsByUser(
+      widget.profile.userId,
+    );
+    final likesFuture = _profileSections.fetchTotalLikes(widget.profile.userId);
+    if (mounted) {
+      setState(() {
+        _postsFuture = postsFuture;
+        _totalLikesFuture = likesFuture;
+        _refreshTick++;
+      });
+    }
+    // Await the posts read so the refresh spinner reflects real work.
+    await postsFuture.catchError((_) => <FeedPost>[]);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        _ProfileHero(
-          profile: _profile,
-          socialGraph: _socialGraph,
-          totalLikesFuture: _totalLikesFuture,
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return RefreshIndicator(
+      color: ProfileColors.primary,
+      backgroundColor: ProfileColors.card,
+      onRefresh: _refresh,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          _ProfileHero(
+            profile: _profile,
+            socialGraph: _socialGraph,
+            totalLikesFuture: _totalLikesFuture,
+            onViewImage: _viewImage,
+            onOpenLink: _openLink,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
@@ -350,17 +382,38 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
               const SizedBox(height: 24),
               _ProfilePostsGrid(postsFuture: _postsFuture, isOwnProfile: true),
               _PastSpacesSection(
+                key: ValueKey('spaces-$_refreshTick'),
                 profileSections: _profileSections,
                 userId: _profile.userId,
                 onOpenSpace: _openSpace,
               ),
               const SizedBox(height: 16),
-              _ViewHistorySection(postViews: _postViews),
+              _ViewHistorySection(
+                key: ValueKey('history-$_refreshTick'),
+                postViews: _postViews,
+              ),
               _ProfileDetailsSection(profile: _profile),
             ],
           ),
-        ),
-      ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Opens the full-screen viewer for the avatar (circle) or cover (rect).
+  void _viewImage({required bool isCover}) {
+    final url = isCover ? _profile.coverUrl : _profile.avatarUrl;
+    final initial = _profile.displayName.trim().isEmpty
+        ? 'U'
+        : _profile.displayName.trim().characters.first.toUpperCase();
+    unawaited(
+      ProfileImageViewer.show(
+        context,
+        imageUrl: url,
+        initial: initial,
+        isCircle: !isCover,
+      ),
     );
   }
 
@@ -416,7 +469,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
 /// and supports clearing the history. Like the connections sheet, all backend
 /// access lives here and the card stays purely presentational.
 class _ViewHistorySection extends StatefulWidget {
-  const _ViewHistorySection({required this.postViews});
+  const _ViewHistorySection({super.key, required this.postViews});
 
   final PostViewsRemoteDataSource postViews;
 
@@ -489,6 +542,7 @@ class _ViewHistorySectionState extends State<_ViewHistorySection> {
 /// there is no dead gap on profiles without spaces.
 class _PastSpacesSection extends StatefulWidget {
   const _PastSpacesSection({
+    super.key,
     required this.profileSections,
     required this.userId,
     required this.onOpenSpace,
@@ -576,10 +630,15 @@ class _ProfilePostsGrid extends StatelessWidget {
     return FutureBuilder<List<FeedPost>>(
       future: postsFuture,
       builder: (context, snapshot) {
-        final posts = snapshot.data;
-        final view = posts == null
+        // Show the skeleton only while the read is genuinely in flight. On
+        // error the future completes with no data — fall through to the empty
+        // "No posts yet" state instead of an endless skeleton.
+        final view = snapshot.connectionState == ConnectionState.waiting
             ? const PostsGridView(isLoading: true)
-            : ProfilePresenter.postsGrid(posts, isOwnProfile: isOwnProfile);
+            : ProfilePresenter.postsGrid(
+                snapshot.data ?? const [],
+                isOwnProfile: isOwnProfile,
+              );
         final count = view.tiles.length;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,6 +684,8 @@ class _ProfileHero extends StatelessWidget {
     required this.profile,
     required this.socialGraph,
     required this.totalLikesFuture,
+    required this.onViewImage,
+    required this.onOpenLink,
   });
 
   final UserProfile profile;
@@ -632,6 +693,12 @@ class _ProfileHero extends StatelessWidget {
 
   /// Resolves the header "Likes" stat (sum of the user's active-post likes).
   final Future<int> totalLikesFuture;
+
+  /// Opens the full-screen image viewer for the avatar (false) or cover (true).
+  final void Function({required bool isCover}) onViewImage;
+
+  /// Opens (or copies) an external link — used by the website meta pill.
+  final ValueChanged<String> onOpenLink;
 
   @override
   Widget build(BuildContext context) {
@@ -662,46 +729,58 @@ class _ProfileHero extends StatelessWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.topCenter,
             children: [
-              SizedBox(
-                height: ProfileSpacing.coverHeight,
-                width: double.infinity,
-                child: hasCover
-                    ? Image.network(
-                        coverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const DecoratedBox(
+              GestureDetector(
+                onTap: hasCover ? () => onViewImage(isCover: true) : null,
+                child: SizedBox(
+                  height: ProfileSpacing.coverHeight,
+                  width: double.infinity,
+                  child: hasCover
+                      ? Image.network(
+                          coverUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: ProfileGradients.coverPlaceholder,
+                            ),
+                          ),
+                        )
+                      : const DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: ProfileGradients.coverPlaceholder,
                           ),
                         ),
-                      )
-                    : const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: ProfileGradients.coverPlaceholder,
-                        ),
-                      ),
+                ),
               ),
               // Fade the bottom of the cover into the page background so the
               // overlapping avatar reads cleanly (web from-transparent to-bg).
-              Positioned(
+              // IgnorePointer so it never intercepts the cover's view tap.
+              const Positioned(
                 left: 0,
                 right: 0,
                 top: 0,
                 height: ProfileSpacing.coverHeight,
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, ProfileColors.background],
-                      stops: [0.55, 1.0],
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, ProfileColors.background],
+                        stops: [0.55, 1.0],
+                      ),
                     ),
                   ),
                 ),
               ),
               Positioned(
                 top: avatarTop,
-                child: _ProfileAvatar(profile: profile),
+                child: GestureDetector(
+                  onTap: profile.avatarUrl != null &&
+                          profile.avatarUrl!.trim().isNotEmpty
+                      ? () => onViewImage(isCover: false)
+                      : null,
+                  child: _ProfileAvatar(profile: profile),
+                ),
               ),
             ],
           ),
@@ -776,7 +855,11 @@ class _ProfileHero extends StatelessWidget {
                     if (location.isNotEmpty)
                       _MetaPill(icon: Icons.place_outlined, label: location),
                     if (website.isNotEmpty)
-                      _MetaPill(icon: Icons.language, label: website),
+                      _MetaPill(
+                        icon: Icons.language,
+                        label: website,
+                        onTap: () => onOpenLink(website),
+                      ),
                   ],
                 ),
               ],
@@ -1126,28 +1209,56 @@ class _ProfileStat extends StatelessWidget {
 }
 
 /// Muted icon + label meta chip (location / website) used under the header.
+/// When [onTap] is provided (e.g. the website pill) the label is tinted with
+/// the brand color and the whole chip becomes tappable.
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.icon, required this.label});
+  const _MetaPill({required this.icon, required this.label, this.onTap});
 
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final interactive = onTap != null;
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: ProfileColors.mutedForeground),
+        Icon(
+          icon,
+          size: 16,
+          color: interactive
+              ? ProfileColors.primary
+              : ProfileColors.mutedForeground,
+        ),
         const SizedBox(width: ProfileSpacing.xs + 2),
         Flexible(
           child: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: ProfileTextStyles.meta,
+            style: interactive
+                ? ProfileTextStyles.meta.copyWith(color: ProfileColors.primary)
+                : ProfileTextStyles.meta,
           ),
         ),
       ],
+    );
+    if (!interactive) return row;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: ProfileRadii.chip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: ProfileRadii.chip,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ProfileSpacing.xs,
+            vertical: 2,
+          ),
+          child: row,
+        ),
+      ),
     );
   }
 }

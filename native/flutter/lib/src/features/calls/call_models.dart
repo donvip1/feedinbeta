@@ -112,6 +112,20 @@ enum CallPhase {
 /// Direction of a call relative to the local user.
 enum CallDirection { outgoing, incoming }
 
+/// Formats a call duration in [totalSeconds] as `mm:ss`, or `h:mm:ss` once the
+/// call runs an hour or longer (the web `formatDuration` only ever shows two
+/// segments; this keeps long calls readable without overflowing the minutes
+/// field to values like `65:00`). Negative input is clamped to zero.
+String formatCallDuration(int totalSeconds) {
+  final seconds = totalSeconds < 0 ? 0 : totalSeconds;
+  final hours = seconds ~/ 3600;
+  final minutes = (seconds % 3600) ~/ 60;
+  final secs = seconds % 60;
+  final mm = minutes.toString().padLeft(2, '0');
+  final ss = secs.toString().padLeft(2, '0');
+  return hours > 0 ? '$hours:$mm:$ss' : '$mm:$ss';
+}
+
 /// A lightweight participant descriptor used to render avatars/names on the
 /// call screens. Sourced from `profiles`/`public_profiles` at call start; the
 /// call layer never fetches profile rows itself beyond the remote data source.

@@ -46,26 +46,46 @@ class _P2PTransactionDetailScreenState
 
   Future<void> _submitProof() async {
     setState(() => _busy = true);
-    await widget.dataSource.markProofSubmitted(_transaction.id);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _transaction = _clone(status: 'proof_submitted');
-    });
-    _toast('Payment proof marked as submitted.');
+    try {
+      await widget.dataSource.markProofSubmitted(_transaction.id);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _transaction = _clone(status: 'proof_submitted');
+      });
+      _toast('Payment proof marked as submitted.');
+    } on P2PBackendUnavailable catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast('Could not update this order. Please try again.');
+    }
   }
 
   Future<void> _cancel() async {
     final reason = await _promptCancel();
     if (reason == null) return;
     setState(() => _busy = true);
-    await widget.dataSource.cancelTransaction(_transaction.id);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _transaction = _clone(status: 'cancelled');
-    });
-    _toast('Order cancelled.');
+    try {
+      await widget.dataSource.cancelTransaction(_transaction.id);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _transaction = _clone(status: 'cancelled');
+      });
+      _toast('Order cancelled.');
+    } on P2PBackendUnavailable catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast('Could not cancel this order. Please try again.');
+    }
   }
 
   Future<void> _openDispute() async {

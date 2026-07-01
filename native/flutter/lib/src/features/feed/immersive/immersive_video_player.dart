@@ -5,13 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'feed_immersive_theme.dart';
+import 'immersive_audio.dart';
 
 /// Full-screen, TikTok-style autoplay video player.
 ///
 /// Built on the `video_player` package (same dependency as the simpler
 /// [FeedVideoPlayer] at `../feed_video_player.dart`). Plays only while
-/// [isActive] is true, loops forever, and starts muted to mirror TikTok web
-/// autoplay behaviour.
+/// [isActive] is true and loops forever.
+///
+/// Audio behaviour (web parity with `src/components/feed/ImmersivePostCard.tsx`):
+/// the active reel autoplays **with sound**. Mute is a shared, session-wide flag
+/// ([immersiveFeedMuted]) so toggling it on one reel carries to every reel you
+/// swipe to. Off-screen reels are always paused *and* have their volume zeroed,
+/// so only the single active page ever produces audio — no bleed between pages.
 class ImmersiveVideoPlayer extends StatefulWidget {
   const ImmersiveVideoPlayer({
     super.key,
@@ -41,9 +47,6 @@ class ImmersiveVideoPlayer extends StatefulWidget {
 class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   VideoPlayerController? _controller;
 
-  /// Muted by default, like TikTok web autoplay.
-  bool _isMuted = true;
-
   /// Whether the controller finished initializing successfully.
   bool _isInitialized = false;
 
@@ -54,6 +57,9 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    // Re-apply the correct volume whenever the shared mute flag flips while this
+    // reel is on screen (e.g. the user mutes from a different reel).
+    immersiveFeedMuted.addListener(_onMuteChanged);
     _initialize();
   }
 
@@ -77,6 +83,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
 
   @override
   void dispose() {
+    immersiveFeedMuted.removeListener(_onMuteChanged);
     _tapIconTimer?.cancel();
     _disposeController();
     super.dispose();
@@ -97,10 +104,16 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     final url = widget.url;
 
     final controller = localPath != null && File(localPath).existsSync()
-        ? VideoPlayerController.file(File(localPath))
+        ? VideoPlayerController.file(
+            File(localPath),
+            videoPlayerOptions: _audioPlaybackOptions(),
+          )
         : url == null
         ? null
-        : VideoPlayerController.networkUrl(Uri.parse(url));
+        : VideoPlayerController.networkUrl(
+            Uri.parse(url),
+            videoPlayerOptions: _audioPlaybackOptions(),
+          );
 
     // No source -> show the gradient placeholder via build().
     if (controller == null) {
@@ -114,7 +127,9 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     try {
       await controller.setLooping(true);
       await controller.initialize();
-      await controller.setVolume(_isMuted ? 0 : 1);
+      // Apply the current audio state up front so the active reel comes up with
+      // sound (or muted, if the user muted a previous reel this session).
+      await controller.setVolume(_effectiveVolume);
     } catch (_) {
       // Initialization failed (bad URL/codec). Leave the placeholder visible.
       if (!mounted) {
@@ -136,15 +151,41 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     _syncPlayback();
   }
 
-  void _onControllerUpdate() {
-    // Drive the progress bar and play/pause state.
+  /// Options that let media audio play through the device speaker.
+  ///
+  /// `mixWithOthers: false` claims exclusive audio focus for the active reel, so
+  /// starting one reel ducks/stops other app audio and — combined with the
+  /// per-page volume gating below — guarantees only one reel is ever audible.
+  VideoPlayerOptions _audioPlaybackOptions() =>
+      VideoPlayerOptions(mixWithOthers: false);
+
+  /// The volume this reel should currently play at: full volume only when it is
+  /// the active page and the shared mute flag is off; silent otherwise. This is
+  /// what prevents audio bleed between the active reel and its neighbours.
+  double get _effectiveVolume =>
+      (widget.isActive && !immersiveFeedMuted.value) ? 1.0 : 0.0;
+
+  void _onMuteChanged() {
+    final controller = _controller;
+    if (controller != null && _isInitialized) {
+      controller.setVolume(_effectiveVolume);
+    }
     if (mounted) setState(() {});
   }
 
-  /// Aligns playback with [widget.isActive].
+  void _onControllerUpdate() {
+    // Drive the progress bar, buffering spinner, and play/pause state.
+    if (mounted) setState(() {});
+  }
+
+  /// Aligns playback and volume with [widget.isActive].
   void _syncPlayback() {
     final controller = _controller;
     if (controller == null || !_isInitialized) return;
+
+    // Always re-assert volume: an off-screen reel must be silent even if it was
+    // left playing for a frame during a fast swipe.
+    controller.setVolume(_effectiveVolume);
 
     if (widget.isActive) {
       controller.play();
@@ -175,14 +216,20 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     });
   }
 
-  Future<void> _toggleMute() async {
-    final controller = _controller;
-    final nextMuted = !_isMuted;
-    if (controller != null && _isInitialized) {
-      await controller.setVolume(nextMuted ? 0 : 1);
-    }
-    if (!mounted) return;
-    setState(() => _isMuted = nextMuted);
+  /// Flips the shared, session-wide mute flag (web parity: `toggleMute`). The
+  /// notifier listener re-applies volume to this and every other live reel.
+  void _toggleMute() {
+    immersiveFeedMuted.value = !immersiveFeedMuted.value;
+  }
+
+  /// True once the controller reports it is actively buffering (network stalls).
+  bool _isBuffering(VideoPlayerController controller) {
+    final value = controller.value;
+    if (!value.isInitialized) return false;
+    if (!value.isBuffering) return false;
+    // Only surface the spinner when we actually intend to be playing, otherwise
+    // a paused off-screen reel would show a spinner.
+    return widget.isActive;
   }
 
   @override
@@ -202,6 +249,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
               _buildVideo(controller)
             else
               _buildPlaceholder(loading: _hasSource),
+            if (ready && _isBuffering(controller)) _buildBufferingSpinner(),
             if (ready) ...[_buildTapFeedback(), _buildProgressBar(controller)],
             _buildMuteButton(enabled: ready),
           ],
@@ -251,6 +299,21 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     );
   }
 
+  /// Spinner shown over the (already visible) first frame while the network
+  /// stream re-buffers mid-playback.
+  Widget _buildBufferingSpinner() {
+    return const Center(
+      child: SizedBox(
+        width: 34,
+        height: 34,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.6,
+          valueColor: AlwaysStoppedAnimation<Color>(FeedImmersiveTheme.onMedia),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTapFeedback() {
     final icon = _tapIcon;
     return Center(
@@ -294,6 +357,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   }
 
   Widget _buildMuteButton({required bool enabled}) {
+    final muted = immersiveFeedMuted.value;
     return Align(
       alignment: Alignment.bottomRight,
       child: Padding(
@@ -305,11 +369,11 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            tooltip: _isMuted ? 'Unmute' : 'Mute',
+            tooltip: muted ? 'Unmute' : 'Mute',
             onPressed: enabled ? _toggleMute : null,
             color: FeedImmersiveTheme.onMedia,
             iconSize: 22,
-            icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
+            icon: Icon(muted ? Icons.volume_off : Icons.volume_up),
           ),
         ),
       ),

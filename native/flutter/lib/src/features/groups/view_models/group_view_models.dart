@@ -266,3 +266,28 @@ String groupClockTime(int millis) {
   final m = t.minute.toString().padLeft(2, '0');
   return '$h:$m';
 }
+
+/// Whether two epoch-millis timestamps fall on the same calendar day.
+bool groupIsSameDay(int aMillis, int bMillis) {
+  final a = DateTime.fromMillisecondsSinceEpoch(aMillis);
+  final b = DateTime.fromMillisecondsSinceEpoch(bMillis);
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+/// A day-separator label for the message list (web `formatDateHeader`):
+/// "Today" / "Yesterday" / "Month D, YYYY".
+String groupDateHeader(int millis) {
+  final date = DateTime.fromMillisecondsSinceEpoch(millis);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final thatDay = DateTime(date.year, date.month, date.day);
+  final deltaDays = today.difference(thatDay).inDays;
+  if (deltaDays == 0) return 'Today';
+  if (deltaDays == 1) return 'Yesterday';
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  final month = months[date.month - 1];
+  return '$month ${date.day}, ${date.year}';
+}

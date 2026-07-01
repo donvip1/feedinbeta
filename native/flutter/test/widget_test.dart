@@ -73,7 +73,7 @@ void main() {
     expect(find.text('Videos'), findsOneWidget);
     expect(find.text('Photos'), findsOneWidget);
     expect(find.text('Live'), findsOneWidget);
-    expect(find.text('Create'), findsOneWidget);
+    expect(find.text('Wallet'), findsOneWidget);
   });
 }
 

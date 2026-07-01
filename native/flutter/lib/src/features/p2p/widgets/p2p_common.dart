@@ -118,6 +118,52 @@ class P2PEmptyState extends StatelessWidget {
   }
 }
 
+/// Centered error state with a retry action. Used when a marketplace / orders
+/// read throws, so the user gets an honest failure + retry instead of an
+/// infinite spinner.
+class P2PErrorState extends StatelessWidget {
+  const P2PErrorState({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.onRetry,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(P2PTheme.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const P2PGradientGlyph(icon: Icons.wifi_off_rounded),
+            const SizedBox(height: P2PTheme.lg),
+            Text(title, style: P2PTheme.sectionTitle),
+            const SizedBox(height: P2PTheme.sm),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: P2PTheme.muted,
+            ),
+            const SizedBox(height: P2PTheme.lg),
+            P2PPrimaryButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              expand: false,
+              onPressed: onRetry,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Small rounded pill used for meta labels (rate, window, escrow, status).
 class P2PChip extends StatelessWidget {
   const P2PChip({

@@ -48,6 +48,12 @@ class CallController extends ChangeNotifier {
   Timer? _durationTimer;
   Timer? _ringTimeoutTimer;
   Timer? _statusPollTimer;
+  Timer? _incomingPollTimer;
+  Timer? _incomingTimeoutTimer;
+
+  /// How long an outgoing call rings before it is auto-marked missed, and how
+  /// long an unanswered incoming banner lingers before it is auto-dismissed.
+  static const Duration _ringTimeout = Duration(seconds: 45);
 
   bool _initialized = false;
   bool _disposed = false;
@@ -81,6 +87,17 @@ class CallController extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  /// True after the media transport reports a failed connection while a call is
+  /// live. The UI surfaces a retry affordance; [retryConnection] clears it.
+  bool _connectFailed = false;
+  bool get connectionFailed => _connectFailed;
+
+  /// Whether the live media session is currently re-establishing (drives a
+  /// "Reconnecting…" indicator). Only meaningful during an active call.
+  bool get isReconnecting =>
+      hasActiveCall &&
+      _media.connectionState == CallMediaConnectionState.reconnecting;
+
   /// A pending INCOMING call awaiting the local user's accept/decline. Separate
   /// from [session] so the app shell can show an incoming banner/screen even
   /// while another surface is foregrounded. Null when there's no ringing call.
@@ -89,6 +106,24 @@ class CallController extends ChangeNotifier {
 
   bool get isVideoCall => callType.isVideo;
   bool get hasActiveCall => _phase != CallPhase.idle && _phase != CallPhase.ended;
+
+  /// A short human label for how a finished call ended, shown on the ended
+  /// screen. Derived from the last known session status (matches the web call
+  /// log labels: declined / missed / no answer / call ended).
+  String get endedReason {
+    if (_connectFailed) return 'Connection failed';
+    switch (_session?.status) {
+      case CallStatus.rejected:
+        return (_session?.isOutgoing ?? false) ? 'Call declined' : 'Declined';
+      case CallStatus.missed:
+        return (_session?.isOutgoing ?? false) ? 'No answer' : 'Missed call';
+      case CallStatus.ended:
+      case CallStatus.answered:
+      case CallStatus.pending:
+      case null:
+        return 'Call ended';
+    }
+  }
 
   /// Live media connection state (drives the "Connecting…" UI).
   CallMediaConnectionState get mediaState => _media.connectionState;
@@ -131,6 +166,7 @@ class CallController extends ChangeNotifier {
     if (_disposed) return null;
     if (hasActiveCall) return _session; // already in a call
     _errorMessage = null;
+    _connectFailed = false;
 
     // Optimistically enter dialing so the UI can open immediately.
     _isVideoOff = false;
@@ -168,6 +204,9 @@ class CallController extends ChangeNotifier {
     if (target == null) return;
 
     _incomingCall = null;
+    _stopIncomingWatch();
+    _connectFailed = false;
+    _errorMessage = null;
     _session = target.copyWith(status: CallStatus.answered);
     _isMuted = false;
     _isVideoOff = false;
@@ -192,6 +231,7 @@ class CallController extends ChangeNotifier {
     final target = call ?? _incomingCall;
     if (target == null) return;
     _incomingCall = null;
+    _stopIncomingWatch();
     _safeNotify();
     try {
       await _data.rejectCall(target.id);
@@ -239,7 +279,14 @@ class CallController extends ChangeNotifier {
     _stopDurationTimer();
     _cancelRingTimeout();
     _stopStatusPolling();
+    _connectFailed = false;
 
+    // Reflect the terminal status on the local session so the ended screen can
+    // label it (an unanswered dial reads "No answer"; anything else "ended").
+    _session = current.copyWith(
+      status: wasDialing ? CallStatus.missed : CallStatus.ended,
+      durationSeconds: wasConnected ? _elapsedSeconds : 0,
+    );
     _setPhase(CallPhase.ended);
     await _media.disconnect();
 
@@ -262,9 +309,11 @@ class CallController extends ChangeNotifier {
     _stopDurationTimer();
     _cancelRingTimeout();
     _stopStatusPolling();
+    _stopIncomingWatch();
     _session = null;
     _elapsedSeconds = 0;
     _errorMessage = null;
+    _connectFailed = false;
     _setPhase(CallPhase.idle);
   }
 
@@ -282,15 +331,27 @@ class CallController extends ChangeNotifier {
   }
 
   Future<void> _handleIncoming(CallRealtimeEvent event) async {
-    // Ignore if it's not actually pending, we placed it, or we're mid-call.
+    // Ignore if it's not actually pending or we already surfaced this call.
     if (event.status != CallStatus.pending) return;
-    if (hasActiveCall) return;
     if (_incomingCall?.id == event.callId) return;
+
+    // Busy: a call is already active or another one is ringing. Auto-decline
+    // the newcomer so the caller stops ringing instead of timing out.
+    if (hasActiveCall || _incomingCall != null) {
+      try {
+        await _data.rejectCall(event.callId);
+      } catch (_) {}
+      return;
+    }
 
     final callerId = event.callerId;
     if (callerId == null) return;
     final peer = await _data.fetchParticipant(callerId) ??
         CallParticipant(userId: callerId, displayName: 'feedIn user');
+
+    // Guard against a race where a call started while we were resolving the
+    // caller profile.
+    if (hasActiveCall || _incomingCall != null) return;
 
     _incomingCall = CallSession(
       id: event.callId,
@@ -301,13 +362,14 @@ class CallController extends ChangeNotifier {
       direction: CallDirection.incoming,
       peer: peer,
     );
-    _safeNotify();
+    _afterIncomingSet();
   }
 
   void _handleStatusChange(String callId, CallStatus status) {
     // Incoming ringing call was cancelled/answered elsewhere -> dismiss banner.
     if (_incomingCall?.id == callId && status != CallStatus.pending) {
       _incomingCall = null;
+      _stopIncomingWatch();
       _safeNotify();
     }
 
@@ -340,6 +402,7 @@ class CallController extends ChangeNotifier {
     _stopDurationTimer();
     _cancelRingTimeout();
     _stopStatusPolling();
+    _connectFailed = false;
     _session = _session?.copyWith(status: status);
     _setPhase(CallPhase.ended);
     unawaited(_media.disconnect());
@@ -369,7 +432,52 @@ class CallController extends ChangeNotifier {
     final pending = await _data.fetchPendingIncomingCall();
     if (pending == null || hasActiveCall || _incomingCall != null) return;
     _incomingCall = pending;
+    _afterIncomingSet();
+  }
+
+  /// Start the belt-and-braces watch for a freshly surfaced incoming call: a
+  /// 3s status poll (in case the realtime cancel/answer event is dropped, as
+  /// the web `IncomingCallListener` does) plus a safety timeout that dismisses
+  /// a never-answered banner so it can never hang forever.
+  void _afterIncomingSet() {
+    _startIncomingWatch();
     _safeNotify();
+  }
+
+  void _startIncomingWatch() {
+    _stopIncomingWatch();
+    _incomingPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final ringing = _incomingCall;
+      if (ringing == null) {
+        _stopIncomingWatch();
+        return;
+      }
+      final status = await _data.fetchCallStatus(ringing.id);
+      // The caller cancelled / it was answered elsewhere -> drop the banner.
+      if (status != null && status != CallStatus.pending) {
+        if (_incomingCall?.id == ringing.id) {
+          _incomingCall = null;
+          _stopIncomingWatch();
+          _safeNotify();
+        }
+      }
+    });
+    _incomingTimeoutTimer = Timer(_ringTimeout, () {
+      // Auto-dismiss an unanswered incoming banner and record the miss.
+      final ringing = _incomingCall;
+      if (ringing == null) return;
+      _incomingCall = null;
+      _stopIncomingWatch();
+      _safeNotify();
+      unawaited(_data.markMissed(ringing.id));
+    });
+  }
+
+  void _stopIncomingWatch() {
+    _incomingPollTimer?.cancel();
+    _incomingPollTimer = null;
+    _incomingTimeoutTimer?.cancel();
+    _incomingTimeoutTimer = null;
   }
 
   // --- Media orchestration ---------------------------------------------------
@@ -386,14 +494,23 @@ class CallController extends ChangeNotifier {
   void _onMediaState(CallMediaConnectionState state) {
     switch (state) {
       case CallMediaConnectionState.connected:
-        if (_phase == CallPhase.connecting || _phase == CallPhase.dialing) {
+        _connectFailed = false;
+        _errorMessage = null;
+        if (_phase != CallPhase.connected) {
           _setPhase(CallPhase.connected);
-          _startDurationTimer();
         }
+        // Resume/begin counting once media is live (the timer keeps its elapsed
+        // value across a reconnect so a blip doesn't reset the call clock).
+        if (_durationTimer == null) _startDurationTimer();
+        _safeNotify();
         break;
       case CallMediaConnectionState.failed:
+        // Keep the call alive and offer a retry (mirrors the web
+        // ConnectionStatus "Retry Connection"); the user can still hang up.
+        _connectFailed = true;
         _errorMessage = 'Connection failed';
-        _remoteEnded(CallStatus.ended);
+        _stopDurationTimer();
+        _safeNotify();
         break;
       case CallMediaConnectionState.idle:
       case CallMediaConnectionState.connecting:
@@ -404,11 +521,28 @@ class CallController extends ChangeNotifier {
     }
   }
 
+  /// Re-attempt the media connection after a [connectionFailed] state, without
+  /// tearing down the signalling call. No-op when there is no active session.
+  Future<void> retryConnection() async {
+    final current = _session;
+    if (current == null || _phase == CallPhase.ended) return;
+    _connectFailed = false;
+    _errorMessage = null;
+    if (_phase != CallPhase.connected) {
+      _setPhase(CallPhase.connecting);
+    } else {
+      _safeNotify();
+    }
+    await _connectMedia();
+  }
+
   // --- Timers ----------------------------------------------------------------
 
   void _startDurationTimer() {
     _durationTimer?.cancel();
-    _elapsedSeconds = 0;
+    // Elapsed is zeroed when a fresh call begins (startCall / acceptIncomingCall
+    // / reset); it is intentionally preserved here so a mid-call reconnect
+    // resumes the clock rather than restarting it.
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _elapsedSeconds += 1;
       _safeNotify();
@@ -423,7 +557,7 @@ class CallController extends ChangeNotifier {
   /// If nobody answers within the timeout, mark the outgoing call missed.
   void _startRingTimeout() {
     _cancelRingTimeout();
-    _ringTimeoutTimer = Timer(const Duration(seconds: 45), () {
+    _ringTimeoutTimer = Timer(_ringTimeout, () {
       if (_phase == CallPhase.dialing) {
         unawaited(hangUp());
       }
@@ -451,12 +585,9 @@ class CallController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Formats [elapsedSeconds] as mm:ss (web `formatDuration`).
-  String get formattedDuration {
-    final mins = (_elapsedSeconds ~/ 60).toString().padLeft(2, '0');
-    final secs = (_elapsedSeconds % 60).toString().padLeft(2, '0');
-    return '$mins:$secs';
-  }
+  /// Formats [elapsedSeconds] as mm:ss (web `formatDuration`), promoting to
+  /// h:mm:ss for calls that run an hour or longer.
+  String get formattedDuration => formatCallDuration(_elapsedSeconds);
 
   @override
   void dispose() {
@@ -464,6 +595,7 @@ class CallController extends ChangeNotifier {
     _stopDurationTimer();
     _cancelRingTimeout();
     _stopStatusPolling();
+    _stopIncomingWatch();
     _realtimeSub?.cancel();
     _mediaStateSub?.cancel();
     _renderSub?.cancel();
