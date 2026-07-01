@@ -7,12 +7,15 @@ import '../../data/local/profile_repository_contract.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
 import '../../data/remote/social_graph_remote_data_source.dart';
 import '../feed/feed_post.dart';
+import 'parity/past_spaces_remote_data_source.dart';
 import 'parity/profile_presenter.dart';
 import 'parity/profile_tokens.dart';
 import 'parity/profile_view_models.dart';
 import 'parity/widgets/connections_modal.dart';
+import 'parity/widgets/past_spaces_card.dart';
 import 'parity/widgets/posts_grid.dart';
 import 'parity/widgets/profile_avatar.dart';
+import 'parity/widgets/profile_details_cards.dart';
 import 'parity/widgets/role_plan_badges.dart';
 import 'parity/widgets/social_links_card.dart';
 import 'parity/widgets/verified_badge.dart';
@@ -28,6 +31,7 @@ class ProfileEditorScreen extends StatefulWidget {
     required this.onSaved,
     this.socialGraphDataSource,
     this.postViewsDataSource,
+    this.profileSectionsDataSource,
   });
 
   final UserProfile profile;
@@ -43,6 +47,11 @@ class ProfileEditorScreen extends StatefulWidget {
   /// Live access to the post view-history contract for the View History card.
   /// Optional; falls back to an auto-detecting instance like the follow graph.
   final PostViewsRemoteDataSource? postViewsDataSource;
+
+  /// Live access to the extra profile sections (Past Spaces + the total-likes
+  /// aggregate for the Likes stat). Optional; falls back to an auto-detecting
+  /// instance like the other two data sources.
+  final ProfileSectionsRemoteDataSource? profileSectionsDataSource;
 
   @override
   State<ProfileEditorScreen> createState() => _ProfileEditorScreenState();
@@ -63,6 +72,8 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   late Future<List<FeedPost>> _postsFuture;
   late final SocialGraphRemoteDataSource _socialGraph;
   late final PostViewsRemoteDataSource _postViews;
+  late final ProfileSectionsRemoteDataSource _profileSections;
+  late Future<int> _totalLikesFuture;
   bool _isSaving = false;
   String? _message;
   String? _errorMessage;
@@ -107,6 +118,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
         SocialGraphRemoteDataSource.autoDetect();
     _postViews =
         widget.postViewsDataSource ?? PostViewsRemoteDataSource.autoDetect();
+    _profileSections =
+        widget.profileSectionsDataSource ??
+        ProfileSectionsRemoteDataSource.autoDetect();
+    _totalLikesFuture = _profileSections.fetchTotalLikes(
+      widget.profile.userId,
+    );
   }
 
   @override
@@ -114,6 +131,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.userId != widget.profile.userId) {
       _postsFuture = widget.feedRepository.loadPostsByUser(
+        widget.profile.userId,
+      );
+      _totalLikesFuture = _profileSections.fetchTotalLikes(
         widget.profile.userId,
       );
       _displayNameController.text = widget.profile.displayName;
@@ -226,7 +246,11 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        _ProfileHero(profile: _profile, socialGraph: _socialGraph),
+        _ProfileHero(
+          profile: _profile,
+          socialGraph: _socialGraph,
+          totalLikesFuture: _totalLikesFuture,
+        ),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -323,14 +347,32 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                 links: ProfilePresenter.socialLinks(_profile),
                 onOpen: _openLink,
               ),
-              const SizedBox(height: 16),
-              _ViewHistorySection(postViews: _postViews),
               const SizedBox(height: 24),
               _ProfilePostsGrid(postsFuture: _postsFuture, isOwnProfile: true),
+              _PastSpacesSection(
+                profileSections: _profileSections,
+                userId: _profile.userId,
+                onOpenSpace: _openSpace,
+              ),
+              const SizedBox(height: 16),
+              _ViewHistorySection(postViews: _postViews),
+              _ProfileDetailsSection(profile: _profile),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  /// Opens a recorded space. No in-app live-space route is exposed to the
+  /// profile tab yet, so this copies the space id to the clipboard and shows a
+  /// note — mirroring the profile's other "wired upstream later" affordances
+  /// (post-detail navigation) rather than silently doing nothing.
+  Future<void> _openSpace(String spaceId) async {
+    await Clipboard.setData(ClipboardData(text: spaceId));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Space replay opens once live spaces are wired.')),
     );
   }
 
@@ -439,6 +481,87 @@ class _ViewHistorySectionState extends State<_ViewHistorySection> {
   }
 }
 
+/// Stateful host for the Past Spaces section: loads the user's ended live
+/// spaces from `live_spaces` via [ProfileSectionsRemoteDataSource] and renders
+/// the presentational [PastSpacesCard]. Like the other sections, all backend
+/// access lives here and the card stays purely presentational. The whole
+/// section (including its top spacing) hides while loading or when empty, so
+/// there is no dead gap on profiles without spaces.
+class _PastSpacesSection extends StatefulWidget {
+  const _PastSpacesSection({
+    required this.profileSections,
+    required this.userId,
+    required this.onOpenSpace,
+  });
+
+  final ProfileSectionsRemoteDataSource profileSections;
+  final String userId;
+  final ValueChanged<String> onOpenSpace;
+
+  @override
+  State<_PastSpacesSection> createState() => _PastSpacesSectionState();
+}
+
+class _PastSpacesSectionState extends State<_PastSpacesSection> {
+  // null while loading; a (possibly empty) list once resolved.
+  List<PastSpace>? _spaces;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PastSpacesSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) {
+      _spaces = null;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final rows = await widget.profileSections.fetchPastSpaces(widget.userId);
+    if (!mounted) return;
+    setState(() => _spaces = rows);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spaces = _spaces;
+    final view = spaces == null
+        ? ProfilePresenter.pastSpacesLoading
+        : ProfilePresenter.pastSpacesLoaded(spaces);
+    // Nothing to show (loading or empty) -> render zero-size, no top spacer.
+    if (view.isLoading || !view.hasContent) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: PastSpacesCard(view: view, onOpenSpace: widget.onOpenSpace),
+    );
+  }
+}
+
+/// Renders the "Details" cards (Purpose + Marital Status) from the local
+/// profile. Both fields are absent from the native [UserProfile] today (see the
+/// FLAG on [ProfileDetailsView]), so this resolves to an empty view and renders
+/// nothing — the wiring is in place for when the shared model carries them.
+class _ProfileDetailsSection extends StatelessWidget {
+  const _ProfileDetailsSection({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final view = ProfilePresenter.details(profile);
+    if (view.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: ProfileDetailsCards(view: view),
+    );
+  }
+}
+
 class _ProfilePostsGrid extends StatelessWidget {
   const _ProfilePostsGrid({
     required this.postsFuture,
@@ -498,10 +621,17 @@ class _ProfilePostsGrid extends StatelessWidget {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.profile, required this.socialGraph});
+  const _ProfileHero({
+    required this.profile,
+    required this.socialGraph,
+    required this.totalLikesFuture,
+  });
 
   final UserProfile profile;
   final SocialGraphRemoteDataSource socialGraph;
+
+  /// Resolves the header "Likes" stat (sum of the user's active-post likes).
+  final Future<int> totalLikesFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -625,6 +755,7 @@ class _ProfileHero extends StatelessWidget {
               const SizedBox(height: ProfileSpacing.lg),
               _ProfileCountsRow(
                 profile: profile,
+                totalLikesFuture: totalLikesFuture,
                 onOpenConnections: (tab) => _openConnections(context, tab),
               ),
               if (profile.bio.trim().isNotEmpty) ...[
@@ -889,34 +1020,51 @@ class _ProfileAvatar extends StatelessWidget {
   }
 }
 
-/// Centered Followers / Following / Views counts row (web text-center stats).
-/// Followers and Following open the live connections sheet; Views is static.
+/// Centered Followers / Following / Friends / Likes / Views stats (web
+/// `flex-wrap gap-6` five-stat row). Followers and Following open the live
+/// connections sheet; Likes resolves live from the total-likes aggregate; Views
+/// is static from the profile.
+///
+/// FLAG: the "Friends" stat needs the `friend_requests` table + the
+/// `are_mutual_friends` RPC (both used by the web), neither of which exists in
+/// the native schema. It is rendered as a non-interactive '—/Friends' cell so
+/// the row matches the web layout honestly instead of inventing a count/modal.
 class _ProfileCountsRow extends StatelessWidget {
   const _ProfileCountsRow({
     required this.profile,
+    required this.totalLikesFuture,
     required this.onOpenConnections,
   });
 
   final UserProfile profile;
+  final Future<int> totalLikesFuture;
   final ValueChanged<ConnectionsTab> onOpenConnections;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: ProfileSpacing.xl,
+      runSpacing: ProfileSpacing.md,
       children: [
         _ProfileStat(
           value: profile.followersCount,
           label: 'Followers',
           onTap: () => onOpenConnections(ConnectionsTab.followers),
         ),
-        const SizedBox(width: ProfileSpacing.xl),
         _ProfileStat(
           value: profile.followingCount,
           label: 'Following',
           onTap: () => onOpenConnections(ConnectionsTab.following),
         ),
-        const SizedBox(width: ProfileSpacing.xl),
+        // Friends: unavailable natively (no friend_requests table). Muted
+        // placeholder matching the web "Not Friends"/'—' non-mutual state.
+        const _ProfileStat.placeholder(label: 'Friends'),
+        FutureBuilder<int>(
+          future: totalLikesFuture,
+          builder: (context, snapshot) =>
+              _ProfileStat(value: snapshot.data ?? 0, label: 'Likes'),
+        ),
         _ProfileStat(value: profile.totalViews, label: 'Views'),
       ],
     );
@@ -924,13 +1072,21 @@ class _ProfileCountsRow extends StatelessWidget {
 }
 
 /// One centered stat (bold value over a muted label). Tappable stats get a soft
-/// rounded ripple matching the web hover:opacity affordance.
+/// rounded ripple matching the web hover:opacity affordance. The [placeholder]
+/// variant renders a muted em-dash value for stats native cannot resolve yet.
 class _ProfileStat extends StatelessWidget {
-  const _ProfileStat({required this.value, required this.label, this.onTap});
+  const _ProfileStat({required this.value, required this.label, this.onTap})
+    : isPlaceholder = false;
+
+  const _ProfileStat.placeholder({required this.label})
+    : value = 0,
+      onTap = null,
+      isPlaceholder = true;
 
   final int value;
   final String label;
   final VoidCallback? onTap;
+  final bool isPlaceholder;
 
   @override
   Widget build(BuildContext context) {
@@ -938,7 +1094,14 @@ class _ProfileStat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(compactCount(value), style: ProfileTextStyles.statValue),
+        Text(
+          isPlaceholder ? '—' : compactCount(value),
+          style: isPlaceholder
+              ? ProfileTextStyles.statValue.copyWith(
+                  color: ProfileColors.mutedForeground,
+                )
+              : ProfileTextStyles.statValue,
+        ),
         const SizedBox(height: 2),
         Text(label, style: ProfileTextStyles.statLabel),
       ],

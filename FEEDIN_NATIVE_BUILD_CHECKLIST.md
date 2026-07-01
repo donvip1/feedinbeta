@@ -87,8 +87,8 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Feed cards render cached images with network fallback.
 - [x] Feed cards play cached/network videos.
 - [x] Added Settings media cache counts and cleanup.
-- [ ] Confirm/create Supabase Storage bucket `post-media`.
-- [ ] Confirm bucket policies allow authenticated upload and public/signed read as intended.
+- [x] Confirmed live: `post-media` bucket exists (public read) and `message-media` (private).
+- [x] Confirmed live: `post-media` has authenticated upload-own-path + public read + own delete policies.
 - [ ] Test draft upload queue with the live Supabase project on a real device.
 - [x] Added visible queue upload progress percentages using real queue processing stages.
 - [x] Persist picked Create media into app-owned cache paths before queuing uploads.
@@ -175,13 +175,24 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [ ] Set up Play Console internal testing.
 - [ ] Add iOS Firebase config and iOS release setup later.
 
-## Phase 8: Later Product Expansion
+## Phase 8: Native Feature Expansion (active — 2026-07-01)
 
-- [ ] Calls.
-- [ ] Live rooms.
-- [ ] Spaces.
-- [ ] Monetization.
-- [ ] Payments, payouts, credits, admin, and AI provider calls through server-owned code only.
+Building the native UIs for features that already exist in the web app, calling
+the existing server-owned schema/RPCs (payment/AI/provider secrets stay
+server-side; the app holds no secrets). Kicked off as a parallel 7-agent batch;
+each builds a self-contained feature module that the coordinator then wires into
+navigation + DI, builds, and live-tests on device.
+
+- [ ] Credits / tokens (`features/wallet`): balance, buy credit packages, transaction history, gifting/sharing credits, subscription tiers, creator payouts (`user_credits`, `credit_packages`, `credit_transactions`, `subscription_tiers`, `user_subscriptions`, `creator_payouts`).
+- [ ] P2P section (`features/p2p`): peer-to-peer credit transfer / marketplace — web `src/components/p2p`, built on `credit_transactions`/`user_credits`.
+- [ ] Groups & message rooms (`features/groups`): group conversations + members, create/join — web `src/components/groups`, built on `conversations`/`conversation_participants`.
+- [ ] Live streaming (`features/live`): browse/watch streams + audio spaces, live chat, reactions, gifts, viewers — web `src/components/live` (`live_streams`, `live_spaces`, + related).
+- [ ] Calls (`features/calls`): 1:1 and group audio/video calling from chat — `group_calls`, `group_call_participants`, call schema in `20260624000600`. Signaling + UX native; real media transport (WebRTC/Agora/LiveKit) flagged for a follow-up dep + server-owned provider config.
+- [ ] Profile deepening (`features/profile`): fuller profile to match web (tabs, stats, sections).
+- [ ] Settings completion (`features/settings`): the missing settings sections from web (account, privacy, security, notifications, blocked, appearance, data, about, delete account).
+- [ ] Coordinator: integrate the feature modules into navigation + DI, build, and live-test on device.
+
+Server-owned constraint retained: payment processing, payouts, admin, and AI provider calls stay in server-owned code; the native app calls RPC/table contracts only.
 
 ## User To-Do List
 
@@ -259,9 +270,9 @@ Steps:
 
 ### Supabase Storage
 
-- [ ] Confirm/create the `post-media` bucket.
-- [ ] Confirm authenticated upload policy.
-- [ ] Confirm read policy, either public read or signed URL read.
+- [x] Confirmed the `post-media` bucket exists (verified on live DB).
+- [x] Confirmed authenticated upload policy exists.
+- [x] Confirmed read policy (public read for `post-media`).
 
 Steps:
 
@@ -296,10 +307,11 @@ Steps:
 
 ### Firebase Cloud Messaging
 
-- [ ] Create/open Firebase project.
-- [ ] Add Android app with package name `com.feedin.app`.
-- [ ] Download `google-services.json`.
-- [ ] Place it at `native/flutter/android/app/google-services.json`.
+- [x] Created Firebase project `feedin-2ee69`.
+- [x] Added Android app with package name `com.feedin.app`.
+- [x] Downloaded `google-services.json`.
+- [x] Placed it at `native/flutter/android/app/google-services.json` (git-ignored).
+- [x] Wired FCM in Flutter and verified an android/fcm token registers to `push_subscriptions`.
 - [ ] Later for iOS, add bundle ID `com.feedin.app` and download `GoogleService-Info.plist`.
 
 Steps:

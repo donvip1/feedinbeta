@@ -404,6 +404,346 @@ class SettingsActionButton extends StatelessWidget {
   }
 }
 
+/// A tappable navigation row inside a [SettingsCard]: tinted icon bubble +
+/// title/description + trailing chevron. Mirrors the web Settings.tsx group
+/// item rows that push a sub-page. When [trailing] is provided (e.g. a value
+/// label or a count pill) it renders before the chevron.
+class SettingsNavRow extends StatelessWidget {
+  const SettingsNavRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.description,
+    this.accent = SettingsColors.mutedForeground,
+    this.accentBubble = SettingsColors.iconBubble,
+    this.trailing,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? description;
+  final VoidCallback onTap;
+
+  /// Leading icon tint.
+  final Color accent;
+
+  /// Leading icon bubble fill.
+  final Color accentBubble;
+
+  /// Optional trailing widget shown before the chevron (value / pill).
+  final Widget? trailing;
+
+  /// Renders the row in the destructive palette (title tinted red).
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleColor = destructive
+        ? SettingsColors.destructive
+        : SettingsColors.foreground;
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SettingsSpacing.lg,
+            vertical: SettingsSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: SettingsSpacing.iconBubble,
+                height: SettingsSpacing.iconBubble,
+                decoration: BoxDecoration(
+                  color: destructive
+                      ? SettingsColors.destructiveSoft
+                      : accentBubble,
+                  borderRadius: SettingsRadii.tile,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: destructive ? SettingsColors.destructive : accent,
+                ),
+              ),
+              const SizedBox(width: SettingsSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: SettingsTextStyles.rowTitle.copyWith(
+                        color: titleColor,
+                      ),
+                    ),
+                    if (description != null && description!.isNotEmpty) ...[
+                      const SizedBox(height: SettingsSpacing.xs),
+                      Text(
+                        description!,
+                        style: SettingsTextStyles.rowDescription,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: SettingsSpacing.sm),
+                trailing!,
+              ],
+              const SizedBox(width: SettingsSpacing.sm),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: SettingsColors.mutedForeground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small muted count/label pill used as a [SettingsNavRow.trailing].
+class SettingsCountPill extends StatelessWidget {
+  const SettingsCountPill({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: const BoxDecoration(
+        color: SettingsColors.mutedSoft,
+        borderRadius: SettingsRadii.chip,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: SettingsColors.mutedForeground,
+        ),
+      ),
+    );
+  }
+}
+
+/// A labelled text field styled for the settings surface. When [readOnly] is
+/// true the field is shown disabled/muted (web `bg-muted cursor-not-allowed`).
+class SettingsTextField extends StatelessWidget {
+  const SettingsTextField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.helper,
+    this.readOnly = false,
+    this.maxLines = 1,
+    this.keyboardType,
+    this.prefixIcon,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final String? helper;
+  final bool readOnly;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final IconData? prefixIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: SettingsTextStyles.rowTitle.copyWith(fontSize: 14),
+            ),
+            if (readOnly) ...[
+              const SizedBox(width: SettingsSpacing.xs),
+              const Icon(
+                Icons.lock_outline,
+                size: 13,
+                color: SettingsColors.mutedForeground,
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: SettingsSpacing.xs),
+        TextField(
+          controller: controller,
+          readOnly: readOnly,
+          enabled: !readOnly,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: const TextStyle(
+            color: SettingsColors.foreground,
+            fontSize: 15,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: hint,
+            hintStyle: const TextStyle(color: SettingsColors.mutedForeground),
+            prefixIcon: prefixIcon == null
+                ? null
+                : Icon(
+                    prefixIcon,
+                    size: 18,
+                    color: SettingsColors.mutedForeground,
+                  ),
+            filled: true,
+            fillColor: readOnly
+                ? SettingsColors.mutedSoft
+                : SettingsColors.cardElevated,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: SettingsSpacing.md,
+              vertical: SettingsSpacing.md,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: SettingsRadii.tile,
+              borderSide: const BorderSide(color: SettingsColors.border),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: SettingsRadii.tile,
+              borderSide: const BorderSide(color: SettingsColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: SettingsRadii.tile,
+              borderSide: const BorderSide(
+                color: SettingsColors.primary,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+        if (helper != null && helper!.isNotEmpty) ...[
+          const SizedBox(height: SettingsSpacing.xs),
+          Text(helper!, style: SettingsTextStyles.rowDescription),
+        ],
+      ],
+    );
+  }
+}
+
+/// A row with an avatar circle, name/handle, and a trailing action button —
+/// used by the Blocked / Muted lists. Ports the web BlockedUsers list item.
+class SettingsPersonRow extends StatelessWidget {
+  const SettingsPersonRow({
+    super.key,
+    required this.displayName,
+    required this.username,
+    required this.actionLabel,
+    required this.onAction,
+    this.avatarUrl,
+    this.subtitle,
+    this.busy = false,
+  });
+
+  final String displayName;
+  final String username;
+  final String? avatarUrl;
+  final String? subtitle;
+  final String actionLabel;
+  final VoidCallback onAction;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = displayName.trim().isNotEmpty
+        ? displayName.trim()[0].toUpperCase()
+        : 'U';
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SettingsSpacing.lg,
+        vertical: SettingsSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: SettingsColors.cardElevated,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: avatarUrl != null && avatarUrl!.isNotEmpty
+                ? Image.network(
+                    avatarUrl!,
+                    fit: BoxFit.cover,
+                    width: 40,
+                    height: 40,
+                    errorBuilder: (_, __, ___) => _AvatarInitial(initial),
+                  )
+                : _AvatarInitial(initial),
+          ),
+          const SizedBox(width: SettingsSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SettingsTextStyles.rowTitle,
+                ),
+                Text(
+                  '@$username',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SettingsTextStyles.rowDescription,
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty)
+                  Text(subtitle!, style: SettingsTextStyles.statLabel),
+              ],
+            ),
+          ),
+          const SizedBox(width: SettingsSpacing.md),
+          SettingsActionButton(
+            label: actionLabel,
+            icon: Icons.person_remove_outlined,
+            busy: busy,
+            onPressed: busy ? null : onAction,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarInitial extends StatelessWidget {
+  const _AvatarInitial(this.initial);
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      initial,
+      style: const TextStyle(
+        color: SettingsColors.foreground,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
 /// A compact diagnostic stat: a value over a muted label, in a tinted tile.
 class SettingsStat extends StatelessWidget {
   const SettingsStat({

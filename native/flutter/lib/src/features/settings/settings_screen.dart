@@ -8,6 +8,13 @@ import '../../core/sync/upload_queue_service.dart';
 import '../../data/local/preferences_repository_contract.dart';
 import '../../shared/storage_budget.dart';
 import 'app_preferences.dart';
+import 'screens/account_settings_screen.dart';
+import 'screens/appearance_language_screen.dart';
+import 'screens/blocked_users_screen.dart';
+import 'screens/help_about_screen.dart';
+import 'screens/notification_preferences_screen.dart';
+import 'screens/privacy_settings_screen.dart';
+import 'screens/security_settings_screen.dart';
 import 'settings_theme.dart';
 import 'settings_widgets.dart';
 
@@ -158,6 +165,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             const Text('Settings', style: SettingsTextStyles.screenTitle),
             const SizedBox(height: SettingsSpacing.lg),
+            _buildAccountPrivacyCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildPreferencesCard(),
+            const SizedBox(height: SettingsSpacing.lg),
             _buildPrivacyMediaCard(),
             const SizedBox(height: SettingsSpacing.lg),
             _buildDeviceStorageCard(),
@@ -165,10 +176,222 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildMaintenanceCard(),
             const SizedBox(height: SettingsSpacing.lg),
             _buildBudgetsCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildHelpAboutCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildDangerZoneCard(),
           ],
         ),
       ),
     );
+  }
+
+  // ── Navigation ──────────────────────────────────────────────────────────
+
+  Future<void> _push(Widget screen) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => screen),
+    );
+  }
+
+  Future<void> _openPrivacy() {
+    return _push(
+      PrivacySettingsScreen(
+        preferences: _preferences,
+        onChanged: _updatePreferences,
+        onOpenBlockedUsers: () => unawaited(_push(const BlockedUsersScreen())),
+      ),
+    );
+  }
+
+  /// Account & privacy: entries into the account, privacy, notifications,
+  /// security, and blocked-users sub-screens (web Settings.tsx
+  /// 'Account & Privacy' group).
+  Widget _buildAccountPrivacyCard() {
+    return SettingsCard(
+      icon: Icons.manage_accounts_outlined,
+      title: 'Account & privacy',
+      description: 'Profile, privacy, notifications and security.',
+      children: [
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.person_outline,
+          title: 'Account',
+          description: 'Profile, username & email',
+          accent: SettingsColors.blueInfo,
+          onTap: () => unawaited(_push(const AccountSettingsScreen())),
+        ),
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.shield_outlined,
+          title: 'Privacy',
+          description: 'Who can message, follow & see you',
+          accent: const Color(0xFFA855F7),
+          onTap: () => unawaited(_openPrivacy()),
+        ),
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.notifications_none,
+          title: 'Notifications',
+          description: 'Per-type push & email alerts',
+          accent: SettingsColors.primary,
+          onTap: () =>
+              unawaited(_push(const NotificationPreferencesScreen())),
+        ),
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.verified_user_outlined,
+          title: 'Security',
+          description: 'Sessions, 2FA & login activity',
+          accent: const Color(0xFF06B6D4),
+          onTap: () => unawaited(_push(const SecuritySettingsScreen())),
+        ),
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.person_off_outlined,
+          title: 'Blocked & muted',
+          description: 'People you\'ve blocked or muted',
+          accent: SettingsColors.destructive,
+          onTap: () => unawaited(_push(const BlockedUsersScreen())),
+        ),
+      ],
+    );
+  }
+
+  /// Preferences: appearance & language sub-screen (web 'Preferences' group +
+  /// Dark Mode toggle).
+  Widget _buildPreferencesCard() {
+    return SettingsCard(
+      icon: Icons.tune,
+      title: 'Preferences',
+      description: 'Appearance, language and app behaviour.',
+      children: [
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.palette_outlined,
+          title: 'Appearance & language',
+          description: 'Theme, motion & display language',
+          accent: const Color(0xFF14B8A6),
+          onTap: () => unawaited(
+            _push(
+              AppearanceLanguageScreen(
+                preferences: _preferences,
+                onChanged: _updatePreferences,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Help & legal: help/about sub-screen (web 'Help & Legal' group).
+  Widget _buildHelpAboutCard() {
+    return SettingsCard(
+      icon: Icons.help_outline,
+      title: 'Help & about',
+      description: 'Support, legal and app info.',
+      children: [
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.help_outline,
+          title: 'Help & about',
+          description: 'FAQ, terms, privacy & version',
+          accent: const Color(0xFF06B6D4),
+          onTap: () => unawaited(_push(const HelpAboutScreen())),
+        ),
+      ],
+    );
+  }
+
+  /// Danger zone: sign out + delete account (web PrivacySettings danger zone +
+  /// Settings.tsx sign-out).
+  Widget _buildDangerZoneCard() {
+    return SettingsCard(
+      icon: Icons.warning_amber_rounded,
+      title: 'Account actions',
+      description: 'Sign out or permanently delete your account.',
+      accent: SettingsColors.destructive,
+      accentBubble: SettingsColors.destructiveSoft,
+      children: [
+        const SettingsDivider(),
+        Padding(
+          padding: const EdgeInsets.all(SettingsSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SettingsActionButton(
+                label: 'Sign out',
+                icon: Icons.logout,
+                variant: SettingsButtonVariant.destructive,
+                expanded: true,
+                onPressed: widget.onSignOut,
+              ),
+              const SizedBox(height: SettingsSpacing.sm),
+              SettingsActionButton(
+                label: 'Delete account',
+                icon: Icons.delete_forever_outlined,
+                variant: SettingsButtonVariant.destructive,
+                expanded: true,
+                onPressed: _confirmDeleteAccount,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: SettingsColors.card,
+          shape: RoundedRectangleBorder(borderRadius: SettingsRadii.card),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: SettingsColors.destructive),
+              SizedBox(width: SettingsSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Delete account?',
+                  style: TextStyle(color: SettingsColors.destructive),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'This cannot be undone. Your profile, posts, messages and '
+            'connections would be permanently removed.\n\nAccount deletion '
+            'needs a backend endpoint that isn\'t wired to the native app '
+            'yet, so this will only sign you out for now.',
+            style: TextStyle(color: SettingsColors.mutedForeground),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: SettingsColors.mutedForeground),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                'Sign out',
+                style: TextStyle(color: SettingsColors.destructive),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      widget.onSignOut();
+    }
   }
 
   /// Privacy & Media toggles (web PrivacySettingsPanel grouping + tinted rows).
@@ -351,13 +574,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Maintenance & account: sync / upload / diagnostics / sign-out, plus the
-  /// last operation's status message as a banner.
+  /// Maintenance & diagnostics: sync / upload / diagnostics, plus the last
+  /// operation's status message as a banner.
   Widget _buildMaintenanceCard() {
     return SettingsCard(
-      icon: Icons.tune,
-      title: 'Maintenance & account',
-      description: 'Sync data, run diagnostics, or sign out.',
+      icon: Icons.build_outlined,
+      title: 'Maintenance & diagnostics',
+      description: 'Sync data or run storage diagnostics.',
       children: [
         const SettingsDivider(),
         Padding(
@@ -388,14 +611,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 expanded: true,
                 busy: _isCheckingStorage,
                 onPressed: _isCheckingStorage ? null : _checkStorage,
-              ),
-              const SizedBox(height: SettingsSpacing.sm),
-              SettingsActionButton(
-                label: 'Sign out',
-                icon: Icons.logout,
-                variant: SettingsButtonVariant.destructive,
-                expanded: true,
-                onPressed: widget.onSignOut,
               ),
               if (_syncMessage != null) ...[
                 const SizedBox(height: SettingsSpacing.md),

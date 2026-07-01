@@ -478,6 +478,87 @@ class ViewHistoryView {
 }
 
 // ---------------------------------------------------------------------------
+// Past spaces
+// ---------------------------------------------------------------------------
+
+/// One ended live space row in the "Past Spaces" section.
+@immutable
+class PastSpaceView {
+  const PastSpaceView({
+    required this.id,
+    required this.title,
+    this.coverImageUrl,
+    this.endedAtMillis,
+    this.durationLabel,
+    this.viewerCount = 0,
+    this.hasRecording = false,
+  });
+
+  final String id;
+  final String title;
+
+  /// Cover thumbnail; when null the card shows the mic-icon placeholder.
+  final String? coverImageUrl;
+
+  /// Epoch millis the space ended (for relative-time formatting); null hides it.
+  final int? endedAtMillis;
+
+  /// Pre-formatted duration string (e.g. '1h 20m'); null hides the duration.
+  final String? durationLabel;
+
+  final int viewerCount;
+
+  /// True when a replay recording exists (drives the Replay pill + play glyph).
+  final bool hasRecording;
+
+  bool get hasCover =>
+      coverImageUrl != null && coverImageUrl!.trim().isNotEmpty;
+}
+
+/// Whole "Past Spaces" section state.
+@immutable
+class PastSpacesView {
+  const PastSpacesView({this.spaces = const [], this.isLoading = false});
+
+  final List<PastSpaceView> spaces;
+  final bool isLoading;
+
+  /// The web hides the whole section when there are no ended spaces, so the
+  /// host renders nothing unless this is true.
+  bool get hasContent => spaces.isNotEmpty;
+}
+
+// ---------------------------------------------------------------------------
+// Details cards (Purpose / Marital status)
+// ---------------------------------------------------------------------------
+
+/// The "Details" block below the posts grid: purpose chips + marital status.
+///
+/// FLAG: the native `profiles` table / [UserProfile] model does NOT yet carry
+/// `purpose`, `marital_status`, or `occupation`. Until those shared fields
+/// exist, the host constructs this view from whatever it can resolve (today:
+/// empty), and the widget hides any card whose data is absent — so the section
+/// renders honestly rather than inventing content.
+@immutable
+class ProfileDetailsView {
+  const ProfileDetailsView({
+    this.purposeChips = const [],
+    this.maritalStatus,
+  });
+
+  /// Human-readable purpose labels (e.g. 'Make friends', 'Networking').
+  final List<String> purposeChips;
+
+  /// Marital status label (already title-cased for display); null hides it.
+  final String? maritalStatus;
+
+  bool get hasPurpose => purposeChips.isNotEmpty;
+  bool get hasMaritalStatus =>
+      maritalStatus != null && maritalStatus!.trim().isNotEmpty;
+  bool get isEmpty => !hasPurpose && !hasMaritalStatus;
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 

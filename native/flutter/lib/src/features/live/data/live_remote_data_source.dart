@@ -1,0 +1,460 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'live_models.dart';
+
+/// Live access to the video-stream + audio-space consumption surface.
+///
+/// Modeled on [SocialGraphRemoteDataSource] / [ProfileSectionsRemoteDataSource]:
+/// auto-detects the Supabase singleton, exposes an `isConfigured` flag, and
+/// every method degrades gracefully when Supabase is unavailable or there is no
+/// authenticated user (reads return empty, writes become no-ops).
+///
+/// Talks directly to the native tables (there are no `join_live_stream` /
+/// `send_live_gift` RPCs in the applied migrations, unlike the web build which
+/// calls `send_live_gift` / `send_space_gift`). Every column referenced here is
+/// present on the live schema:
+///   * `live_streams`  : id, user_id, title, description, status, viewer_count,
+///                       thumbnail_url, playback_url, started_at
+///   * `live_spaces`   : id, user_id, title, description, status, viewer_count,
+///                       topic_category, started_at
+///   * `live_stream_viewers`   : (stream_id, user_id) pk, joined_at, left_at
+///   * `live_stream_comments`  : id, stream_id, user_id, content, created_at
+///   * `live_stream_reactions` : id, stream_id, user_id, reaction_type, created_at
+///   * `live_stream_gifts`     : id, stream_id, sender_id, receiver_id,
+///                               gift_type, credit_value, created_at
+///   * `live_space_speakers`   : id, space_id, user_id, role, status, muted,
+///                               joined_at, left_at
+///   * `live_space_messages`   : id, space_id, user_id, content, created_at
+///   * `live_space_reactions`  : id, space_id, user_id, reaction_type, created_at
+///   * `live_space_gifts`      : id, space_id, sender_id, receiver_id,
+///                               gift_type, credit_value, created_at
+class LiveRemoteDataSource {
+  const LiveRemoteDataSource({required this.isConfigured});
+
+  /// Convenience factory used by hosts that cannot see the app config: detects
+  /// configuration from whether the Supabase singleton was initialised.
+  factory LiveRemoteDataSource.autoDetect() {
+    return LiveRemoteDataSource(isConfigured: _supabaseAvailable());
+  }
+
+  final bool isConfigured;
+
+  // --- Table names -----------------------------------------------------------
+  static const _streamsTable = 'live_streams';
+  static const _spacesTable = 'live_spaces';
+  static const _streamViewersTable = 'live_stream_viewers';
+  static const _streamCommentsTable = 'live_stream_comments';
+  static const _streamReactionsTable = 'live_stream_reactions';
+  static const _streamGiftsTable = 'live_stream_gifts';
+  static const _spaceSpeakersTable = 'live_space_speakers';
+  static const _spaceMessagesTable = 'live_space_messages';
+  static const _spaceReactionsTable = 'live_space_reactions';
+  static const _spaceGiftsTable = 'live_space_gifts';
+
+  /// Embedded profile projection used across every read. `profiles!<fk>` picks
+  /// the FK-disambiguated relationship so the embed does not depend on the
+  /// auto-generated constraint name.
+  static const _hostEmbed =
+      'profiles!user_id(id, display_name, username, avatar_url)';
+  static const _commentAuthorEmbed =
+      'profiles!user_id(id, display_name, username, avatar_url)';
+
+  static bool _supabaseAvailable() {
+    try {
+      Supabase.instance.client;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  SupabaseClient? get _client {
+    if (!isConfigured) return null;
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? get currentUserId => _client?.auth.currentUser?.id;
+
+  // --- Browse ----------------------------------------------------------------
+
+  /// Active (live) video streams, most-watched first. Falls back to an empty
+  /// list on any schema/RLS hiccup so the browse grid simply shows nothing.
+  Future<List<LiveStreamSummary>> fetchLiveStreams({int limit = 30}) async {
+    final client = _client;
+    if (client == null) return const [];
+    try {
+      final rows = await client
+          .from(_streamsTable)
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'thumbnail_url, playback_url, started_at, $_hostEmbed',
+          )
+          .eq('status', 'live')
+          .order('viewer_count', ascending: false)
+          .limit(limit);
+      return [
+        for (final row in rows.whereType<Map>())
+          LiveStreamSummary.fromJson(Map<String, Object?>.from(row)),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Active (live) audio spaces, most-listened first.
+  Future<List<LiveSpaceSummary>> fetchLiveSpaces({int limit = 30}) async {
+    final client = _client;
+    if (client == null) return const [];
+    try {
+      final rows = await client
+          .from(_spacesTable)
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'topic_category, started_at, $_hostEmbed',
+          )
+          .eq('status', 'live')
+          .order('viewer_count', ascending: false)
+          .limit(limit);
+      return [
+        for (final row in rows.whereType<Map>())
+          LiveSpaceSummary.fromJson(Map<String, Object?>.from(row)),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Re-read a single stream (for the viewer header viewer-count refresh).
+  Future<LiveStreamSummary?> fetchStream(String streamId) async {
+    final client = _client;
+    if (client == null || streamId.isEmpty) return null;
+    try {
+      final row = await client
+          .from(_streamsTable)
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'thumbnail_url, playback_url, started_at, $_hostEmbed',
+          )
+          .eq('id', streamId)
+          .maybeSingle();
+      if (row == null) return null;
+      return LiveStreamSummary.fromJson(Map<String, Object?>.from(row));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Re-read a single space (for the room header viewer-count refresh).
+  Future<LiveSpaceSummary?> fetchSpace(String spaceId) async {
+    final client = _client;
+    if (client == null || spaceId.isEmpty) return null;
+    try {
+      final row = await client
+          .from(_spacesTable)
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'topic_category, started_at, $_hostEmbed',
+          )
+          .eq('id', spaceId)
+          .maybeSingle();
+      if (row == null) return null;
+      return LiveSpaceSummary.fromJson(Map<String, Object?>.from(row));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // --- Join / leave a stream -------------------------------------------------
+
+  /// Mark the current user as an active viewer of [streamId]. Idempotent: the
+  /// (stream_id, user_id) primary key makes a repeat join a no-op via upsert.
+  ///
+  /// Note: `viewer_count` on `live_streams` is host-owned (RLS only lets the
+  /// host update the row), so the native viewer cannot increment it directly.
+  /// The live count is instead derived from `live_stream_viewers` via
+  /// [countStreamViewers]. See the report's backend-gaps section.
+  Future<void> joinStream(String streamId) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || streamId.isEmpty) return;
+    try {
+      await client.from(_streamViewersTable).upsert({
+        'stream_id': streamId,
+        'user_id': userId,
+        'joined_at': DateTime.now().toUtc().toIso8601String(),
+        'left_at': null,
+      }, onConflict: 'stream_id,user_id');
+    } catch (_) {
+      // Best-effort presence; never block entering the viewer.
+    }
+  }
+
+  /// Mark the current user as no longer viewing [streamId].
+  Future<void> leaveStream(String streamId) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || streamId.isEmpty) return;
+    try {
+      await client
+          .from(_streamViewersTable)
+          .update({'left_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('stream_id', streamId)
+          .eq('user_id', userId);
+    } catch (_) {
+      // no-op
+    }
+  }
+
+  /// Live viewer count derived from active viewer rows (left_at is null).
+  Future<int> countStreamViewers(String streamId) async {
+    final client = _client;
+    if (client == null || streamId.isEmpty) return 0;
+    try {
+      final rows = await client
+          .from(_streamViewersTable)
+          .select('user_id')
+          .eq('stream_id', streamId)
+          .isFilter('left_at', null);
+      return rows.whereType<Map>().length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // --- Stream chat -----------------------------------------------------------
+
+  Future<List<LiveComment>> fetchStreamComments(
+    String streamId, {
+    int limit = 100,
+  }) async {
+    final client = _client;
+    if (client == null || streamId.isEmpty) return const [];
+    try {
+      final rows = await client
+          .from(_streamCommentsTable)
+          .select('id, user_id, content, created_at, $_commentAuthorEmbed')
+          .eq('stream_id', streamId)
+          .order('created_at')
+          .limit(limit);
+      return [
+        for (final row in rows.whereType<Map>())
+          LiveComment.fromJson(Map<String, Object?>.from(row)),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Post a chat line to [streamId] as the current user. RLS requires
+  /// `user_id == auth.uid()`.
+  Future<void> sendStreamComment(String streamId, String content) async {
+    final client = _client;
+    final userId = currentUserId;
+    final body = content.trim();
+    if (client == null || userId == null || streamId.isEmpty || body.isEmpty) {
+      return;
+    }
+    await client.from(_streamCommentsTable).insert({
+      'stream_id': streamId,
+      'user_id': userId,
+      'content': body,
+    });
+  }
+
+  // --- Stream reactions ------------------------------------------------------
+
+  Future<void> sendStreamReaction(String streamId, String reactionType) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || streamId.isEmpty) return;
+    await client.from(_streamReactionsTable).insert({
+      'stream_id': streamId,
+      'user_id': userId,
+      'reaction_type': reactionType,
+    });
+  }
+
+  // --- Stream gifts ----------------------------------------------------------
+
+  /// Send a gift in a stream. Native has no `send_live_gift` credit RPC, so this
+  /// inserts the gift row directly (no atomic credit deduction — see report).
+  /// [receiverId] defaults to the stream host.
+  Future<void> sendStreamGift({
+    required String streamId,
+    required String giftType,
+    required int creditValue,
+    required String receiverId,
+  }) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || streamId.isEmpty) return;
+    await client.from(_streamGiftsTable).insert({
+      'stream_id': streamId,
+      'sender_id': userId,
+      'receiver_id': receiverId.isEmpty ? null : receiverId,
+      'gift_type': giftType,
+      'credit_value': creditValue,
+    });
+  }
+
+  // --- Space join / speakers -------------------------------------------------
+
+  /// Register the current user as an active speaker/listener in [spaceId].
+  /// The native `live_space_speakers` unique(space_id, user_id) makes this an
+  /// upsert. Non-hosts join as `role: 'listener'` (a listener is still a row so
+  /// the room can render presence); [role] lets a host self-register as 'host'.
+  Future<void> joinSpace(String spaceId, {String role = 'listener'}) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || spaceId.isEmpty) return;
+    try {
+      await client.from(_spaceSpeakersTable).upsert({
+        'space_id': spaceId,
+        'user_id': userId,
+        'role': role,
+        'status': 'active',
+        'muted': role != 'host',
+        'joined_at': DateTime.now().toUtc().toIso8601String(),
+        'left_at': null,
+      }, onConflict: 'space_id,user_id');
+    } catch (_) {
+      // Best-effort presence.
+    }
+  }
+
+  Future<void> leaveSpace(String spaceId) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || spaceId.isEmpty) return;
+    try {
+      await client
+          .from(_spaceSpeakersTable)
+          .update({
+            'status': 'left',
+            'left_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('space_id', spaceId)
+          .eq('user_id', userId);
+    } catch (_) {
+      // no-op
+    }
+  }
+
+  /// Active speakers/participants in [spaceId] (left_at is null), hosts first.
+  Future<List<SpaceSpeaker>> fetchSpaceSpeakers(String spaceId) async {
+    final client = _client;
+    if (client == null || spaceId.isEmpty) return const [];
+    try {
+      final rows = await client
+          .from(_spaceSpeakersTable)
+          .select(
+            'user_id, role, status, muted, '
+            'profiles!user_id(id, display_name, username, avatar_url)',
+          )
+          .eq('space_id', spaceId)
+          .isFilter('left_at', null);
+      final speakers = [
+        for (final row in rows.whereType<Map>())
+          SpaceSpeaker.fromJson(Map<String, Object?>.from(row)),
+      ];
+      speakers.sort((a, b) {
+        if (a.isHost == b.isHost) return 0;
+        return a.isHost ? -1 : 1;
+      });
+      return speakers;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Live listener count for a space, derived from active speaker/listener rows.
+  Future<int> countSpaceListeners(String spaceId) async {
+    final client = _client;
+    if (client == null || spaceId.isEmpty) return 0;
+    try {
+      final rows = await client
+          .from(_spaceSpeakersTable)
+          .select('user_id')
+          .eq('space_id', spaceId)
+          .isFilter('left_at', null);
+      return rows.whereType<Map>().length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // --- Space chat ------------------------------------------------------------
+
+  Future<List<SpaceMessage>> fetchSpaceMessages(
+    String spaceId, {
+    int limit = 100,
+  }) async {
+    final client = _client;
+    if (client == null || spaceId.isEmpty) return const [];
+    try {
+      final rows = await client
+          .from(_spaceMessagesTable)
+          .select('id, user_id, content, created_at, $_commentAuthorEmbed')
+          .eq('space_id', spaceId)
+          .order('created_at')
+          .limit(limit);
+      return [
+        for (final row in rows.whereType<Map>())
+          SpaceMessage.fromJson(Map<String, Object?>.from(row)),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> sendSpaceMessage(String spaceId, String content) async {
+    final client = _client;
+    final userId = currentUserId;
+    final body = content.trim();
+    if (client == null || userId == null || spaceId.isEmpty || body.isEmpty) {
+      return;
+    }
+    await client.from(_spaceMessagesTable).insert({
+      'space_id': spaceId,
+      'user_id': userId,
+      'content': body,
+    });
+  }
+
+  // --- Space reactions -------------------------------------------------------
+
+  Future<void> sendSpaceReaction(String spaceId, String reactionType) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || spaceId.isEmpty) return;
+    await client.from(_spaceReactionsTable).insert({
+      'space_id': spaceId,
+      'user_id': userId,
+      'reaction_type': reactionType,
+    });
+  }
+
+  // --- Space gifts -----------------------------------------------------------
+
+  Future<void> sendSpaceGift({
+    required String spaceId,
+    required String giftType,
+    required int creditValue,
+    required String receiverId,
+  }) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || spaceId.isEmpty) return;
+    await client.from(_spaceGiftsTable).insert({
+      'space_id': spaceId,
+      'sender_id': userId,
+      'receiver_id': receiverId.isEmpty ? null : receiverId,
+      'gift_type': giftType,
+      'credit_value': creditValue,
+    });
+  }
+}

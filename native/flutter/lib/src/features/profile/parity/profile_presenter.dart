@@ -17,7 +17,21 @@ import '../../../data/remote/post_views_remote_data_source.dart';
 import '../../../data/remote/social_graph_remote_data_source.dart';
 import '../../feed/feed_post.dart';
 import '../user_profile.dart';
+import 'past_spaces_remote_data_source.dart';
 import 'profile_view_models.dart';
+
+/// Web PURPOSE_OPTIONS map (Profile.tsx): purpose key -> human label.
+const Map<String, String> profilePurposeLabels = {
+  'friends': 'Make friends',
+  'dating': 'Dating',
+  'networking': 'Networking',
+  'business': 'Business',
+  'gaming': 'Gaming',
+  'learning': 'Learning',
+  'content': 'Find content',
+  'streaming': 'Live streaming',
+  'browsing': 'Just browsing',
+};
 
 /// Pure mappers grouped under one namespace so the host imports a single file.
 class ProfilePresenter {
@@ -266,6 +280,77 @@ class ProfilePresenter {
       if (_trimmedOrNull(profile.websiteUrl) case final url?)
         SocialLinkVm(network: SocialNetwork.website, url: url),
     ];
+  }
+
+  /// Past Spaces section state while the `live_spaces` read is in flight.
+  static const PastSpacesView pastSpacesLoading = PastSpacesView(
+    isLoading: true,
+  );
+
+  /// Map resolved [PastSpace] rows into the Past Spaces section view-model,
+  /// preserving the newest-first ordering from the data source.
+  static PastSpacesView pastSpacesLoaded(List<PastSpace> spaces) {
+    return PastSpacesView(
+      spaces: [for (final space in spaces) pastSpace(space)],
+    );
+  }
+
+  /// Map a single [PastSpace] into a row view, composing the web duration
+  /// label ('Xm' / 'Xh Ym') from the started/ended timestamps.
+  static PastSpaceView pastSpace(PastSpace space) {
+    return PastSpaceView(
+      id: space.id,
+      title: space.title.trim().isEmpty ? 'Live space' : space.title,
+      coverImageUrl: space.coverImageUrl,
+      endedAtMillis: space.endedAtMillis,
+      durationLabel: _durationLabel(space.startedAtMillis, space.endedAtMillis),
+      viewerCount: space.viewerCount,
+      hasRecording:
+          space.recordingUrl != null && space.recordingUrl!.trim().isNotEmpty,
+    );
+  }
+
+  /// Web `getDuration`: minutes -> 'Xm', or 'Yh Zm' past an hour. Null when
+  /// either timestamp is missing or the span is negative.
+  static String? _durationLabel(int? startMillis, int? endMillis) {
+    if (startMillis == null || endMillis == null) return null;
+    final ms = endMillis - startMillis;
+    if (ms < 0) return null;
+    final mins = ms ~/ 60000;
+    if (mins < 60) return '${mins}m';
+    return '${mins ~/ 60}h ${mins % 60}m';
+  }
+
+  /// Build the "Details" block (purpose chips + marital status) from the local
+  /// profile. Purpose keys are mapped through [profilePurposeLabels].
+  ///
+  /// FLAG: `purpose` and `maritalStatus` are not on the native [UserProfile]
+  /// yet, so these default to empty/null and the [purpose]/[maritalStatus]
+  /// overrides let a host inject them once the shared model carries the fields.
+  static ProfileDetailsView details(
+    UserProfile profile, {
+    List<String> purpose = const [],
+    String? maritalStatus,
+  }) {
+    return ProfileDetailsView(
+      purposeChips: [
+        for (final key in purpose)
+          profilePurposeLabels[key.trim().toLowerCase()] ?? key,
+      ],
+      maritalStatus: _titleCase(maritalStatus),
+    );
+  }
+
+  /// Title-case a single-word/hyphenated status ('in_relationship' ->
+  /// 'In Relationship') for display; null/empty passes through as null.
+  static String? _titleCase(String? value) {
+    final raw = value?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    return raw
+        .split(RegExp(r'[_\s-]+'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+        .join(' ');
   }
 
   static RoleBadgeKind? _roleKind(String? value) {
