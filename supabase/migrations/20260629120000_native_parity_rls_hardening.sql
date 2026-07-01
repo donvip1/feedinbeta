@@ -159,6 +159,7 @@ end;
 $$;
 
 drop policy if exists "Authenticated users can create notifications" on public.notifications;
+drop policy if exists "Users can create notifications for self" on public.notifications;
 create policy "Users can create notifications for self"
 on public.notifications for insert
 with check (auth.uid() = user_id);
