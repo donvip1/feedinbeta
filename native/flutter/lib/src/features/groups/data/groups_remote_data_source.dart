@@ -225,6 +225,9 @@ class GroupsRemoteDataSource {
           'profiles!messages_sender_id_fkey(display_name, username, avatar_url)',
         )
         .eq('conversation_id', conversationId)
+        // Channel declarations/posts live in the same table but belong to the
+        // channels surface, not the main group thread — keep them out here.
+        .not('message_type', 'in', const ['channel_meta', 'channel_post'])
         .order('created_at');
 
     return rows
@@ -385,6 +388,160 @@ class GroupsRemoteDataSource {
     return inserted['id']?.toString();
   }
 
+  // -------------------------------------------------------------------------
+  // Channels (Telegram-style broadcast channels inside a group)
+  // -------------------------------------------------------------------------
+  //
+  // Modelled on the group conversation's `messages` (NO dedicated channels
+  // table exists — see [RemoteGroupChannel] + the module report). `channel_meta`
+  // rows declare channels, `channel_post` rows are posts. Both live in the same
+  // conversation and are therefore covered by the same RLS policies; the normal
+  // group message list filters them out (see the view-model mapper).
+
+  /// Lists the broadcast channels of a group conversation, most-recently-active
+  /// first. Reads the conversation's `channel_meta` (declarations) and
+  /// `channel_post` (posts) messages in one pass and reduces them per channel.
+  Future<List<RemoteGroupChannel>> fetchChannels(String conversationId) async {
+    final client = _client;
+    if (client == null) return const [];
+
+    final rows = await client
+        .from('messages')
+        .select(
+          'id, sender_id, content, message_type, created_at, '
+          'profiles!messages_sender_id_fkey(display_name, username)',
+        )
+        .eq('conversation_id', conversationId)
+        .inFilter('message_type', ['channel_meta', 'channel_post'])
+        .order('created_at');
+
+    // name -> aggregate. Insertion order (creation order) preserved by the
+    // ordered read; re-sorted by activity at the end.
+    final byName = <String, _ChannelAggregate>{};
+    for (final row in rows.whereType<Map>()) {
+      final map = Map<String, Object?>.from(row);
+      final type = map['message_type']?.toString();
+      final createdAt = parseGroupMillis(map['created_at']);
+      final content = map['content']?.toString() ?? '';
+      if (type == 'channel_meta') {
+        final name = content.trim();
+        if (name.isEmpty) continue;
+        (byName[name] ??= _ChannelAggregate(name, createdAt))
+            .noteCreation(createdAt);
+      } else if (type == 'channel_post') {
+        final decoded = decodeChannelPostContent(content);
+        if (decoded == null) continue;
+        final agg = byName[decoded.channelName] ??=
+            _ChannelAggregate(decoded.channelName, createdAt);
+        final profile = map['profiles'];
+        final profileMap =
+            profile is Map ? Map<String, Object?>.from(profile) : null;
+        final display = profileMap?['display_name']?.toString();
+        final username = profileMap?['username']?.toString();
+        final senderName = (display != null && display.isNotEmpty)
+            ? display
+            : (username != null && username.isNotEmpty)
+                ? '@$username'
+                : 'feedIn user';
+        agg.notePost(
+          body: decoded.body,
+          senderName: senderName,
+          atMillis: createdAt,
+        );
+      }
+    }
+
+    final channels = byName.values.map((a) => a.toRemote()).toList()
+      ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+    return channels;
+  }
+
+  /// Creates a broadcast channel named [name] in the group conversation by
+  /// posting a `channel_meta` declaration message. Idempotent-ish: returns the
+  /// trimmed name on success, null when unconfigured / blank. (Uniqueness is
+  /// enforced in the UI; duplicate declarations simply coalesce on read.)
+  Future<String?> createChannel({
+    required String conversationId,
+    required String name,
+  }) async {
+    final client = _client;
+    final me = currentUserId;
+    final trimmed = name.trim();
+    if (client == null || me == null || trimmed.isEmpty) return null;
+
+    await client.from('messages').insert({
+      'conversation_id': conversationId,
+      'sender_id': me,
+      'content': trimmed,
+      'message_type': 'channel_meta',
+      'status': 'sent',
+    });
+    return trimmed;
+  }
+
+  /// Posts [body] to the channel named [channelName] in the group conversation.
+  /// Returns the new message id (null when unconfigured / blank).
+  Future<String?> postToChannel({
+    required String conversationId,
+    required String channelName,
+    required String body,
+  }) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return null;
+    return sendMessage(
+      conversationId: conversationId,
+      body: encodeChannelPostContent(channelName, trimmed),
+      messageType: 'channel_post',
+    );
+  }
+
+  /// All posts of one channel in a group conversation, oldest first.
+  Future<List<RemoteGroupChannelPost>> fetchChannelPosts({
+    required String conversationId,
+    required String channelName,
+  }) async {
+    final client = _client;
+    if (client == null) return const [];
+
+    final rows = await client
+        .from('messages')
+        .select(
+          'id, sender_id, content, message_type, created_at, '
+          'profiles!messages_sender_id_fkey(display_name, username, avatar_url)',
+        )
+        .eq('conversation_id', conversationId)
+        .eq('message_type', 'channel_post')
+        .order('created_at');
+
+    final posts = <RemoteGroupChannelPost>[];
+    for (final row in rows.whereType<Map>()) {
+      final map = Map<String, Object?>.from(row);
+      final decoded = decodeChannelPostContent(map['content']?.toString() ?? '');
+      if (decoded == null || decoded.channelName != channelName) continue;
+      final profile = map['profiles'];
+      final profileMap =
+          profile is Map ? Map<String, Object?>.from(profile) : null;
+      final display = profileMap?['display_name']?.toString();
+      final username = profileMap?['username']?.toString();
+      posts.add(
+        RemoteGroupChannelPost(
+          id: map['id'].toString(),
+          channelName: channelName,
+          senderId: map['sender_id'].toString(),
+          senderName: (display != null && display.isNotEmpty)
+              ? display
+              : (username != null && username.isNotEmpty)
+                  ? '@$username'
+                  : 'feedIn user',
+          senderAvatarUrl: profileMap?['avatar_url']?.toString(),
+          body: decoded.body,
+          createdAtMillis: parseGroupMillis(map['created_at']),
+        ),
+      );
+    }
+    return posts;
+  }
+
   /// Advances the current user's read position via the shared RPC. Best-effort.
   Future<void> markRead(String conversationId) async {
     final client = _client;
@@ -416,6 +573,8 @@ class GroupsRemoteDataSource {
           'profiles!messages_sender_id_fkey(display_name, username, avatar_url)',
         )
         .inFilter('conversation_id', conversationIds)
+        // Exclude channel declarations/posts from the group list preview line.
+        .not('message_type', 'in', const ['channel_meta', 'channel_post'])
         .order('created_at', ascending: false);
 
     final latest = <String, RemoteGroupMessage>{};
@@ -474,4 +633,43 @@ class GroupsRemoteDataSource {
       return const {};
     }
   }
+}
+
+/// Mutable per-channel accumulator used while reducing `channel_meta` /
+/// `channel_post` rows into [RemoteGroupChannel]s.
+class _ChannelAggregate {
+  _ChannelAggregate(this.name, this.createdAtMillis);
+
+  final String name;
+  int createdAtMillis;
+  int postCount = 0;
+  String? lastPostBody;
+  String? lastPostSenderName;
+  int? lastPostAtMillis;
+
+  void noteCreation(int atMillis) {
+    // Earliest declaration wins as the creation time.
+    if (atMillis < createdAtMillis) createdAtMillis = atMillis;
+  }
+
+  void notePost({
+    required String body,
+    required String senderName,
+    required int atMillis,
+  }) {
+    postCount += 1;
+    // Rows arrive oldest-first, so the last one seen is the newest.
+    lastPostBody = body;
+    lastPostSenderName = senderName;
+    lastPostAtMillis = atMillis;
+  }
+
+  RemoteGroupChannel toRemote() => RemoteGroupChannel(
+        name: name,
+        createdAtMillis: createdAtMillis,
+        lastPostBody: lastPostBody,
+        lastPostSenderName: lastPostSenderName,
+        lastPostAtMillis: lastPostAtMillis,
+        postCount: postCount,
+      );
 }

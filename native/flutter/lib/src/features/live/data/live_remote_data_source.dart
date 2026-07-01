@@ -333,6 +333,82 @@ class LiveRemoteDataSource {
     });
   }
 
+  // --- Host PULSE cards (stream_features.host_cards) --------------------------
+
+  /// Read the host-published PULSE cards for [streamId] from
+  /// `live_streams.stream_features.host_cards`.
+  ///
+  /// The `stream_features` JSON column is NOT present on the deployed baseline
+  /// schema (see the module report's backend-gaps section). This method probes
+  /// it defensively: if the column is missing the select throws, which is caught
+  /// and surfaced as an empty list, so the PULSE panel simply shows no cards
+  /// rather than crashing. Once the column is added, cards round-trip for free.
+  Future<List<HostCard>> fetchHostCards(String streamId) async {
+    final client = _client;
+    if (client == null || streamId.isEmpty) return const [];
+    try {
+      final row = await client
+          .from(_streamsTable)
+          .select('stream_features')
+          .eq('id', streamId)
+          .maybeSingle();
+      if (row == null) return const [];
+      return hostCardsFromFeatures(
+        Map<String, Object?>.from(row)['stream_features'],
+      );
+    } catch (_) {
+      // Column absent / RLS / offline — degrade to no cards.
+      return const [];
+    }
+  }
+
+  /// Persist the full ordered [cards] list under
+  /// `live_streams.stream_features.host_cards`, preserving any sibling keys
+  /// already present in `stream_features`. Only the stream host may write (RLS
+  /// on `live_streams` restricts UPDATE to `user_id == auth.uid()`).
+  ///
+  /// Returns `true` if the write was accepted, `false` if it failed (e.g. the
+  /// `stream_features` column does not exist, or the caller is not the host).
+  /// The caller keeps its optimistic in-memory list either way, but a `false`
+  /// return means the change did not persist across sessions — the panel uses
+  /// this to warn the host.
+  Future<bool> updateHostCards(
+    String streamId,
+    List<HostCard> cards,
+  ) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null || streamId.isEmpty) return false;
+    try {
+      // Merge into any existing stream_features so we don't clobber sibling keys.
+      Map<String, Object?> features = {};
+      try {
+        final existing = await client
+            .from(_streamsTable)
+            .select('stream_features')
+            .eq('id', streamId)
+            .maybeSingle();
+        final raw = existing == null
+            ? null
+            : Map<String, Object?>.from(existing)['stream_features'];
+        if (raw is Map) features = Map<String, Object?>.from(raw);
+      } catch (_) {
+        // Column may be absent; fall through and attempt the write anyway so the
+        // failure (and the backend gap) surfaces via the update's catch below.
+      }
+      features['host_cards'] = [for (final card in cards) card.toJson()];
+      await client
+          .from(_streamsTable)
+          .update({'stream_features': features})
+          .eq('id', streamId);
+      return true;
+    } catch (_) {
+      // Column absent / not the host / offline — the panel keeps the optimistic
+      // list but signals that publishing did not persist.
+      return false;
+    }
+  }
+
   // --- Space join / speakers -------------------------------------------------
 
   /// Register the current user as an active speaker/listener in [spaceId].

@@ -10,18 +10,25 @@ import 'package:uuid/uuid.dart';
 import '../../core/sync/conversation_starter.dart';
 import '../../core/sync/sync_service.dart';
 import '../../data/local/local_messages_repository_contract.dart';
+import '../calls/call_controller.dart';
+import '../calls/call_models.dart';
+import '../calls/call_screen.dart';
 import '../profile/user_profile.dart';
+import 'chat/audio_message_support.dart';
 import 'chat/chat_mappers.dart';
 import 'chat/chat_theme.dart';
 import 'chat/chat_view_models.dart';
 import 'chat/widgets/attachment_options_sheet.dart';
+import 'chat/widgets/audio_note_recorder_sheet.dart';
 import 'chat/widgets/chat_composer.dart';
 import 'chat/widgets/chat_message_bubble.dart';
 import 'chat/widgets/conversation_list_tile.dart';
 import 'chat/widgets/media_message_content.dart';
 import 'chat/widgets/message_action_sheet.dart';
+import 'chat/widgets/music_message_bubble.dart';
 import 'chat/widgets/new_conversation_sheet.dart';
 import 'chat/widgets/typing_indicator_bubble.dart';
+import 'chat/widgets/voice_note_bubble.dart';
 import 'message_models.dart';
 import 'message_recipient.dart';
 
@@ -34,6 +41,7 @@ class MessagesScreen extends StatefulWidget {
     required this.profile,
     required this.realtimeVersion,
     this.initialConversationId,
+    this.callController,
   });
 
   final LocalMessagesRepositoryContract messagesRepository;
@@ -42,6 +50,11 @@ class MessagesScreen extends StatefulWidget {
   final UserProfile profile;
   final int realtimeVersion;
   final String? initialConversationId;
+
+  /// Shared, long-lived call controller from the app shell. When provided, a
+  /// conversation's header voice/video buttons place a real 1:1 call. Optional
+  /// so tests and standalone use still work (buttons show a "coming soon" note).
+  final CallController? callController;
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -130,6 +143,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         profile: widget.profile,
         realtimeVersion: widget.realtimeVersion,
         onBack: _closeConversation,
+        callController: widget.callController,
       );
     }
 
@@ -320,6 +334,7 @@ class ConversationScreen extends StatefulWidget {
     required this.realtimeVersion,
     required this.onBack,
     this.initialTitle,
+    this.callController,
   });
 
   final String conversationId;
@@ -329,6 +344,10 @@ class ConversationScreen extends StatefulWidget {
   final UserProfile profile;
   final int realtimeVersion;
   final VoidCallback onBack;
+
+  /// Shared call controller from the shell. When set (and the other user's id
+  /// resolves), the header voice/video buttons place a real 1:1 call.
+  final CallController? callController;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -343,6 +362,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   PresenceState _otherPresence = PresenceState.offline;
   static const ChatActivity _otherActivity = ChatActivity.none;
   int? _otherLastSeenMillis;
+
+  /// The other participant's identity, resolved from the conversation record so
+  /// the header can place a call to them. Null until resolved (or for group /
+  /// self-only conversations without a distinct other user).
+  String? _otherUserId;
+  String? _otherUserAvatarUrl;
 
   /// Identity-based key for "isMine" — the local profile's user id, which
   /// matches `messages.sender_id` from the server. Falls back to the display
@@ -395,6 +420,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           : conversation.title;
       _otherPresence = conversationPresence(conversation);
       _otherLastSeenMillis = conversationLastSeenMillis(conversation);
+      _otherUserId = conversation.otherUserId;
+      _otherUserAvatarUrl = conversation.otherUserAvatarUrl;
     });
   }
 
@@ -541,6 +568,37 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _toast('$feature needs the final backend contract.');
   }
 
+  /// Place a 1:1 [type] call to the other participant from the chat header.
+  ///
+  /// Requires the shared [CallController] (from the shell) and a resolved
+  /// [_otherUserId]. Uses [CallScreen.start], which inserts the call log and
+  /// pushes the immersive call screen; a null return means the call could not
+  /// be placed (unconfigured / signed out / already in a call).
+  Future<void> _startCall(CallType type) async {
+    final controller = widget.callController;
+    final calleeId = _otherUserId;
+    final kind = type.isVideo ? 'Video calling' : 'Voice calling';
+    if (controller == null || calleeId == null || calleeId.isEmpty) {
+      // No controller wired (tests/standalone) or the other user hasn't
+      // resolved yet (e.g. a brand-new local conversation without a server id).
+      _pendingBackend(kind);
+      return;
+    }
+    final session = await CallScreen.start(
+      context,
+      controller: controller,
+      callee: CallParticipant(
+        userId: calleeId,
+        displayName: _title ?? 'feedIn user',
+        avatarUrl: _otherUserAvatarUrl,
+      ),
+      type: type,
+    );
+    if (session == null && mounted) {
+      _toast("Couldn't start the call. Check your connection and try again.");
+    }
+  }
+
   /// Clearer attach entry point: a grid of attachment kinds. Each option routes
   /// to the neutral placeholder until the media-upload contract is finalised.
   void _openAttachmentOptions() {
@@ -570,8 +628,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 );
               case AttachmentOption.file:
                 _pendingBackend('File attachments');
+              case AttachmentOption.music:
+                await _shareMusicFile();
               case AttachmentOption.voiceNote:
-                _pendingBackend('Voice notes');
+                await _recordAudioNote();
             }
           },
         );
@@ -607,6 +667,107 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await _syncMessages();
   }
 
+  // ---------------------------------------------------------------------------
+  // Audio: music-file sharing (≤ 4min) + recorded audio notes
+  // ---------------------------------------------------------------------------
+
+  /// Music/audio FILE sharing entry point. Picking an arbitrary audio file needs
+  /// `file_picker` (image_picker cannot select audio files), so until that dep is
+  /// wired this surfaces a clear message. The full pipeline once a file is
+  /// available runs through [_queueAudioAttachment] with a validated
+  /// [StagedAudioMedia] of kind [StagedAudioKind.music].
+  Future<void> _shareMusicFile() async {
+    // FLAGGED: no audio file picker dependency (file_picker) is available. When
+    // one is added, pick the file here, build a StagedAudioMedia via
+    // AudioMediaValidator.validateMusicFile(...), then call
+    // _queueAudioAttachment(staged). The bubble/mapper/storage wiring below is
+    // already complete and needs no further change.
+    _toast(
+      'Sharing a music file needs the audio file picker (file_picker) to be '
+      'added.',
+    );
+  }
+
+  /// Records an in-chat audio note through the recorder seam and, on send,
+  /// queues + uploads it as an `audio` attachment. When no recorder backend is
+  /// wired the sheet itself explains why (see AudioRecorderFactory), so this
+  /// simply no-ops when the sheet returns null.
+  Future<void> _recordAudioNote() async {
+    final staged = await showAudioNoteRecorderSheet(context);
+    if (staged == null || !mounted) return;
+    final validation = AudioMediaValidator.validateDuration(staged.durationMs);
+    if (!validation.isValid) {
+      _toast(validation.error ?? 'That audio note could not be sent.');
+      return;
+    }
+    await _queueAudioAttachment(staged);
+  }
+
+  /// Queues a staged audio clip (music file or audio note) through the existing
+  /// attachment pipeline, then enriches the just-created local row with the
+  /// clip's duration/title so the bubble can render them.
+  ///
+  /// The duration/title bridge is needed because the repository's
+  /// queueAttachment() (in core/) has no duration parameter yet — see the
+  /// FLAGGED note in audio_message_support.dart. Everything here stays within the
+  /// messages feature: it re-reads the local rows and upserts an enriched copy.
+  Future<void> _queueAudioAttachment(StagedAudioMedia staged) async {
+    final sizeBytes = await _safeFileSize(staged.localPath);
+
+    await widget.messagesRepository.queueAttachment(
+      conversationId: widget.conversationId,
+      senderName: widget.profile.displayName,
+      localPath: staged.localPath,
+      mediaType: staged.messageType, // 'music' | 'audio'
+      mimeType: staged.mimeType,
+      fileName: staged.fileName,
+      fileSizeBytes: sizeBytes,
+    );
+
+    // Bridge the duration/title the queue path cannot carry yet. Find the row we
+    // just created (newest with this local path) and upsert an enriched copy.
+    if (staged.durationMs != null || staged.title != null) {
+      final messages = await widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+      LocalMessage? target;
+      for (final message in messages) {
+        if (message.localMediaPath == staged.localPath) {
+          if (target == null ||
+              message.createdAtMillis > target.createdAtMillis) {
+            target = message;
+          }
+        }
+      }
+      if (target != null) {
+        await widget.messagesRepository.upsertMessage(
+          target.copyWith(
+            durationMs: staged.durationMs,
+            musicTitle: staged.title,
+          ),
+        );
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    await _syncMessages();
+  }
+
+  Future<int?> _safeFileSize(String path) async {
+    try {
+      final file = File(path);
+      if (file.existsSync()) return await file.length();
+    } catch (_) {
+      // Best-effort; a missing size just omits the size chip.
+    }
+    return null;
+  }
+
   Future<String> _persistPickedAttachment(XFile picked) async {
     final source = File(picked.path);
     if (!source.existsSync()) return picked.path;
@@ -631,6 +792,56 @@ class _ConversationScreenState extends State<ConversationScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Selects the in-bubble media body for a message. Music files get the
+  /// track-style [MusicMessageBubble]; recorded audio notes get the waveform
+  /// [VoiceNoteBubble]; everything else (image/video/file) uses the generic
+  /// [MediaMessageContent]. Playback is routed through the player seam; with no
+  /// player backend wired the controls are inert and explain why on tap.
+  Widget? _mediaSlotFor(ChatMessageView view) {
+    if (!view.hasMedia) return null;
+    switch (view.mediaKind) {
+      case ChatMediaKind.music:
+        return MusicMessageBubble(
+          message: view,
+          onTogglePlay: () => _playAudio(view),
+        );
+      case ChatMediaKind.audio:
+        return VoiceNoteBubble(
+          message: view,
+          onTogglePlay: () => _playAudio(view),
+        );
+      case ChatMediaKind.none:
+      case ChatMediaKind.image:
+      case ChatMediaKind.video:
+      case ChatMediaKind.file:
+      case ChatMediaKind.callLog:
+        return MediaMessageContent(message: view);
+    }
+  }
+
+  /// Playback entry point for an audio/music bubble. Uses the player seam; when
+  /// no player backend is wired (current build) it surfaces a clear message
+  /// instead of failing. Wiring AudioPlayerFactory.instance later makes this a
+  /// real per-clip player with no UI change.
+  Future<void> _playAudio(ChatMessageView view) async {
+    if (!AudioPlayerFactory.isAvailable) {
+      _toast(const AudioPlayerUnavailable().message);
+      return;
+    }
+    // FLAGGED: with a player backend wired, create a controller here from the
+    // clip's local path / remote URL, drive isPlaying/positionMs into the
+    // bubble, and dispose on stop. The bubbles are already fully controlled.
+    try {
+      final controller = await AudioPlayerFactory.create(
+        localPath: view.media?.localPath,
+        remoteUrl: view.media?.remoteUrl,
+      );
+      await controller.playPause();
+    } catch (e) {
+      if (mounted) _toast('Could not play audio: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -643,8 +854,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
               title: _title ?? 'Conversation',
               header: _headerView,
               onBack: widget.onBack,
-              onVoiceCall: () => _pendingBackend('Voice calling'),
-              onVideoCall: () => _pendingBackend('Video calling'),
+              onVoiceCall: () => _startCall(CallType.voice),
+              onVideoCall: () => _startCall(CallType.video),
             ),
             Expanded(
               child: FutureBuilder<List<LocalMessage>>(
@@ -682,9 +893,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         ),
                         child: ChatMessageBubble(
                           message: view,
-                          mediaSlot: view.hasMedia
-                              ? MediaMessageContent(message: view)
-                              : null,
+                          mediaSlot: _mediaSlotFor(view),
                           onLongPress: () => _openMessageActions(view),
                           onSwipeReply: () => _setReply(view),
                         ),
@@ -708,7 +917,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               onCancelReply: () => setState(() => _replyTarget = null),
               onSend: _sendMessage,
               onAttach: _openAttachmentOptions,
-              onVoice: () => _pendingBackend('Voice notes'),
+              onVoice: _recordAudioNote,
             ),
           ],
         ),

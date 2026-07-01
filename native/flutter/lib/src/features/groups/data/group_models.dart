@@ -169,6 +169,83 @@ class RemoteGroupMessage {
   }
 }
 
+/// A broadcast/announcement channel inside a group (Telegram-style).
+///
+/// BACKEND GAP: there is NO `channels` table (nor a `conversation_type` column)
+/// in the applied native migrations, so a channel is modelled ENTIRELY on top of
+/// the existing `messages` table of the group conversation — the same technique
+/// the group *name* already uses (persisted as a message). Concretely:
+///   * a `message_type = 'channel_meta'` row DECLARES a channel; its `content`
+///     is the channel name.
+///   * a `message_type = 'channel_post'` row is a POST to a channel; its
+///     `content` is `"<channelName><body>"` (the U+0001 unit separator
+///     keys the post to its channel without needing a foreign key column).
+/// This keeps everything inside the group's RLS scope with no new tables/columns
+/// and no client-side secrets. The recommended shared change is a real
+/// `channels` table (+ `channel_id` on `messages`) — see the module report.
+class RemoteGroupChannel {
+  const RemoteGroupChannel({
+    required this.name,
+    required this.createdAtMillis,
+    this.lastPostBody,
+    this.lastPostSenderName,
+    this.lastPostAtMillis,
+    this.postCount = 0,
+  });
+
+  /// The channel's display name (unique within its group).
+  final String name;
+  final int createdAtMillis;
+  final String? lastPostBody;
+  final String? lastPostSenderName;
+  final int? lastPostAtMillis;
+  final int postCount;
+
+  /// Most-recent activity (last post, else creation) for list ordering.
+  int get updatedAtMillis => lastPostAtMillis ?? createdAtMillis;
+}
+
+/// A single post inside a channel (a decoded `channel_post` message).
+class RemoteGroupChannelPost {
+  const RemoteGroupChannelPost({
+    required this.id,
+    required this.channelName,
+    required this.senderId,
+    required this.senderName,
+    required this.body,
+    required this.createdAtMillis,
+    this.senderAvatarUrl,
+  });
+
+  final String id;
+  final String channelName;
+  final String senderId;
+  final String senderName;
+  final String? senderAvatarUrl;
+  final String body;
+  final int createdAtMillis;
+}
+
+/// The unit separator (U+0001) used to key a `channel_post` body to its channel
+/// name: `"<channelName><body>"`. Chosen because it never appears in
+/// user-typed text, so channel name / body split cleanly.
+const String kChannelPostSeparator = '';
+
+/// Encodes a channel post body for storage in `messages.content`.
+String encodeChannelPostContent(String channelName, String body) =>
+    '$channelName$kChannelPostSeparator$body';
+
+/// Decodes a stored `channel_post` content into (channelName, body). Returns
+/// null when the content is not a well-formed channel post.
+({String channelName, String body})? decodeChannelPostContent(String content) {
+  final idx = content.indexOf(kChannelPostSeparator);
+  if (idx < 0) return null;
+  return (
+    channelName: content.substring(0, idx),
+    body: content.substring(idx + 1),
+  );
+}
+
 /// A searchable candidate user for the "add members" picker.
 class RemoteGroupCandidate {
   const RemoteGroupCandidate({

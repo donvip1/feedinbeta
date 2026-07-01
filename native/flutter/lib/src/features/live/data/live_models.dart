@@ -9,9 +9,108 @@
 /// actually exist on the live database.
 library;
 
+import 'dart:convert';
+
 /// Kind of live room shown in the browse list. `stream` == video broadcast
 /// (`live_streams`), `space` == audio room (`live_spaces`).
 enum LiveRoomKind { stream, space }
+
+/// A host-published "PULSE" spotlight card shown to viewers inside a live
+/// stream: an announcement, promo code, or product highlight. Mirrors the web
+/// `HostCard` shape in `stream-v2/AICatchUpPanel.tsx` (emoji + title + body +
+/// optional link) so the same JSON round-trips between web and native.
+///
+/// Persisted under `live_streams.stream_features.host_cards` (a JSON array).
+/// See the module report for the backend gap: the `stream_features` column may
+/// not exist on the deployed schema, in which case host cards are read/written
+/// best-effort and simply do not persist.
+class HostCard {
+  const HostCard({
+    required this.id,
+    required this.emoji,
+    required this.title,
+    this.body = '',
+    this.link,
+  });
+
+  final String id;
+  final String emoji;
+  final String title;
+  final String body;
+  final String? link;
+
+  /// Emoji palette offered in the host add-card form (web `CARD_EMOJIS`).
+  static const emojiPalette = <String>[
+    '🔥',
+    '🎁',
+    '💎',
+    '🎯',
+    '🛍️',
+    '📢',
+    '🎶',
+    '⚡',
+    '🏷️',
+    '💰',
+  ];
+
+  bool get hasLink => link != null && link!.trim().isNotEmpty;
+
+  HostCard copyWith({String? emoji, String? title, String? body, String? link}) {
+    return HostCard(
+      id: id,
+      emoji: emoji ?? this.emoji,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      link: link ?? this.link,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'emoji': emoji,
+    'title': title,
+    'body': body,
+    if (hasLink) 'link': link!.trim(),
+  };
+
+  static HostCard? tryFromJson(Object? value) {
+    if (value is! Map) return null;
+    final map = Map<String, Object?>.from(value);
+    final id = map['id']?.toString();
+    final title = map['title']?.toString();
+    if (id == null || id.isEmpty || title == null || title.trim().isEmpty) {
+      return null;
+    }
+    final emoji = map['emoji']?.toString();
+    final link = map['link']?.toString();
+    return HostCard(
+      id: id,
+      emoji: (emoji != null && emoji.isNotEmpty) ? emoji : '🔥',
+      title: title.trim(),
+      body: map['body']?.toString() ?? '',
+      link: (link != null && link.trim().isNotEmpty) ? link.trim() : null,
+    );
+  }
+
+  /// Parse the `stream_features.host_cards` array into an ordered card list,
+  /// tolerating a raw JSON list, a JSON-encoded string, or a null/absent value.
+  static List<HostCard> listFrom(Object? hostCardsValue) {
+    final raw = hostCardsValue;
+    Iterable<Object?> entries;
+    if (raw is List) {
+      entries = raw;
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      final decoded = _tryDecode(raw);
+      entries = decoded is List ? decoded : const [];
+    } else {
+      entries = const [];
+    }
+    return [
+      for (final entry in entries)
+        if (HostCard.tryFromJson(entry) case final card?) card,
+    ];
+  }
+}
 
 /// Small profile projection embedded alongside live rows. Kept minimal so the
 /// PostgREST embed only selects columns that exist on `profiles`.
@@ -84,6 +183,7 @@ class LiveStreamSummary {
     this.playbackUrl,
     this.startedAtMillis,
     this.host,
+    this.hostCards = const [],
   });
 
   final String id;
@@ -99,6 +199,11 @@ class LiveStreamSummary {
   final String? playbackUrl;
   final int? startedAtMillis;
   final LiveProfile? host;
+
+  /// Host-published PULSE spotlight cards, decoded from
+  /// `stream_features.host_cards`. Empty when the column is absent or the host
+  /// has published none (the common case). See [HostCard].
+  final List<HostCard> hostCards;
 
   bool get isLive => status == 'live';
 
@@ -119,8 +224,40 @@ class LiveStreamSummary {
       playbackUrl: text('playback_url'),
       startedAtMillis: _parseNullableMillis(json['started_at']),
       host: LiveProfile.tryFromEmbed(json['profiles'] ?? json['host']),
+      hostCards: hostCardsFromFeatures(json['stream_features']),
     );
   }
+
+  LiveStreamSummary copyWith({List<HostCard>? hostCards}) {
+    return LiveStreamSummary(
+      id: id,
+      hostId: hostId,
+      title: title,
+      status: status,
+      viewerCount: viewerCount,
+      description: description,
+      thumbnailUrl: thumbnailUrl,
+      playbackUrl: playbackUrl,
+      startedAtMillis: startedAtMillis,
+      host: host,
+      hostCards: hostCards ?? this.hostCards,
+    );
+  }
+}
+
+/// Extract the ordered [HostCard] list from a `stream_features` value, which may
+/// arrive as a decoded map, a JSON-encoded string, or be entirely absent.
+List<HostCard> hostCardsFromFeatures(Object? streamFeatures) {
+  final features = streamFeatures;
+  Map<String, Object?>? map;
+  if (features is Map) {
+    map = Map<String, Object?>.from(features);
+  } else if (features is String && features.trim().isNotEmpty) {
+    final decoded = _tryDecode(features);
+    if (decoded is Map) map = Map<String, Object?>.from(decoded);
+  }
+  if (map == null) return const [];
+  return HostCard.listFrom(map['host_cards']);
 }
 
 /// A live audio space summary for the browse grid + room header.
@@ -416,6 +553,16 @@ String giftEmojiFor(String type) {
     if (option.type == type) return option.emoji;
   }
   return '🎁';
+}
+
+/// Best-effort JSON decode used when a JSON column arrives as a String rather
+/// than an already-decoded structure. Returns null on any parse failure.
+Object? _tryDecode(String source) {
+  try {
+    return jsonDecode(source);
+  } catch (_) {
+    return null;
+  }
 }
 
 int _parseInt(Object? value) {

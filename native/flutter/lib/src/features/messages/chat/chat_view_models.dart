@@ -19,7 +19,12 @@ import 'package:flutter/widgets.dart';
 enum DeliveryState { pending, sent, delivered, read, failed }
 
 /// Kind of attachment a message carries (drives bubble dispatch).
-enum ChatMediaKind { none, image, video, audio, file, callLog }
+///
+/// [audio] is a recorded in-chat *voice/audio note* (waveform bubble); [music]
+/// is a shared audio *file* (track-style bubble with a title). They are kept
+/// distinct so the bubble layer can render the two experiences separately, in
+/// parity with the web app (`WaveformPlayer` vs. the music/file bubble).
+enum ChatMediaKind { none, image, video, audio, music, file, callLog }
 
 /// The other user's live activity, ported from web `ActivityType`.
 /// (Gift/sticker content is excluded, but the enum values are kept so the
@@ -161,6 +166,7 @@ class MessageMedia {
     this.fileName,
     this.fileSizeBytes,
     this.audioDurationMs,
+    this.musicTitle,
     this.downloadState = MediaDownloadState.idle,
     this.downloadProgress = 0,
   });
@@ -175,6 +181,10 @@ class MessageMedia {
   final String? fileName;
   final int? fileSizeBytes;
   final int? audioDurationMs;
+
+  /// Track title for a [ChatMediaKind.music] file bubble (falls back to
+  /// [fileName] when absent). Ignored for other kinds.
+  final String? musicTitle;
   final MediaDownloadState downloadState;
 
   /// 0..1 while [downloadState] == downloading.

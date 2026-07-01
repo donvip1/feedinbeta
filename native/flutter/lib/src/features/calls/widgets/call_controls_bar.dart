@@ -5,7 +5,8 @@ import 'call_control_button.dart';
 
 /// The row of in-call controls, ported from the web `CallControls` component:
 /// mute, video toggle (or "switch to video" on an audio call), camera flip
-/// (video only), a central red hang-up, and a speaker toggle.
+/// (video only), screen-share toggle (voice + video), a central red hang-up,
+/// and a speaker toggle.
 ///
 /// Presentational only — every action is a callback; the widget reads no state
 /// beyond the flags passed in.
@@ -22,12 +23,17 @@ class CallControlsBar extends StatelessWidget {
     this.onToggleVideo,
     this.onFlipCamera,
     this.onUpgradeToVideo,
+    this.isScreenSharing = false,
+    this.onToggleScreenShare,
   });
 
   final bool isMuted;
   final bool isVideoOff;
   final bool isVideoCall;
   final bool isSpeakerOn;
+
+  /// Whether the local screen is currently being shared (active tint).
+  final bool isScreenSharing;
 
   final VoidCallback onToggleMute;
   final VoidCallback onToggleSpeaker;
@@ -41,6 +47,9 @@ class CallControlsBar extends StatelessWidget {
 
   /// Upgrade an audio call to video (web "Switch to video call"). Null hides it.
   final VoidCallback? onUpgradeToVideo;
+
+  /// Toggle sharing the local screen (voice + video). Null hides the affordance.
+  final VoidCallback? onToggleScreenShare;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +87,23 @@ class CallControlsBar extends StatelessWidget {
           icon: Icons.cameraswitch_rounded,
           onPressed: onFlipCamera!,
           tooltip: 'Flip camera',
+        ),
+
+      // Screen share (both voice and video calls — web parity). Tinted pink
+      // while active, like the speaker toggle.
+      if (onToggleScreenShare != null)
+        CallControlButton(
+          icon: isScreenSharing
+              ? Icons.stop_screen_share_rounded
+              : Icons.screen_share_rounded,
+          onPressed: onToggleScreenShare!,
+          background: isScreenSharing
+              ? CallColors.activeControlBg
+              : CallColors.controlChip,
+          foreground: isScreenSharing
+              ? CallColors.activeControlFg
+              : CallColors.controlIcon,
+          tooltip: isScreenSharing ? 'Stop sharing' : 'Share screen',
         ),
 
       // End call (central, red).

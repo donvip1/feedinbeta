@@ -24,6 +24,7 @@ class GroupsScreen extends StatefulWidget {
     required this.currentUserId,
     this.dataSource,
     this.onBack,
+    this.onGoLive,
   });
 
   /// The signed-in user's id (matches `messages.sender_id` /
@@ -36,6 +37,14 @@ class GroupsScreen extends StatefulWidget {
   /// Optional back affordance. When null, no back button is shown (the screen
   /// is assumed to be a tab). When provided, a back button is rendered.
   final VoidCallback? onBack;
+
+  /// Optional "Go Live from group" handler, forwarded to each opened
+  /// [GroupChatScreen]. When provided, group rooms surface a "Go Live" action
+  /// that calls back with the group's conversation id + title so the coordinator
+  /// can start a group-scoped livestream (this module does not depend on
+  /// features/live). When null, the affordance is hidden. Additive — the
+  /// existing public constructor is unchanged.
+  final GroupGoLiveCallback? onGoLive;
 
   @override
   State<GroupsScreen> createState() => _GroupsScreenState();
@@ -71,6 +80,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
           initialTitle: group.title,
           initialMemberCount: group.memberCount,
           onBack: () => Navigator.of(context).pop(),
+          onGoLive: widget.onGoLive,
           onLeft: () {
             Navigator.of(context).pop();
             _refresh();
@@ -110,6 +120,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 // creator + selected members.
                 initialMemberCount: result.memberIds.length + 1,
                 onBack: () => Navigator.of(context).pop(),
+                onGoLive: widget.onGoLive,
                 onLeft: () {
                   Navigator.of(context).pop();
                   _refresh();

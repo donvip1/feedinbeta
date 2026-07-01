@@ -8,15 +8,27 @@ import '../data/groups_remote_data_source.dart';
 import '../groups_theme.dart';
 import '../view_models/group_view_models.dart';
 import '../widgets/create_group_sheet.dart';
+import '../widgets/group_channels_sheet.dart';
 import '../widgets/group_chat_header.dart';
 import '../widgets/group_composer.dart';
 import '../widgets/group_members_sheet.dart';
 import '../widgets/group_message_bubble.dart';
+import 'group_channel_screen.dart';
+
+/// Signature for the "Go Live from group" callback. The coordinator wires this
+/// to the live feature's go-live entry (this module must NOT depend on
+/// features/live). It receives the group's [conversationId] and a human-readable
+/// [groupTitle] so a group-scoped livestream can be started/labelled.
+typedef GroupGoLiveCallback = void Function({
+  required String conversationId,
+  required String groupTitle,
+});
 
 /// The open group room: header, message list, composer, plus members / add /
-/// leave affordances. Loads messages + members from [dataSource], posts new
-/// messages back through it, and subscribes to a [GroupRealtimeService] so
-/// messages from other members appear live.
+/// leave affordances, broadcast channels, and an optional "Go Live" entry.
+/// Loads messages + members from [dataSource], posts new messages back through
+/// it, and subscribes to a [GroupRealtimeService] so messages from other members
+/// appear live.
 class GroupChatScreen extends StatefulWidget {
   const GroupChatScreen({
     super.key,
@@ -28,6 +40,7 @@ class GroupChatScreen extends StatefulWidget {
     required this.onBack,
     this.onLeft,
     this.realtime,
+    this.onGoLive,
   });
 
   final GroupsRemoteDataSource dataSource;
@@ -47,6 +60,13 @@ class GroupChatScreen extends StatefulWidget {
   /// [GroupRealtimeService.autoDetect] for the conversation). Kept optional so
   /// the public constructor stays backward-compatible.
   final GroupRealtimeService? realtime;
+
+  /// Optional "Go Live from group" handler. When provided, a "Go Live" action
+  /// is surfaced in the header; tapping it invokes this with the group's
+  /// conversation id + title so the coordinator can start a group-scoped
+  /// livestream (this module does not depend on features/live). When null, the
+  /// affordance is hidden — so the public constructor stays additive.
+  final GroupGoLiveCallback? onGoLive;
 
   @override
   State<GroupChatScreen> createState() => _GroupChatScreenState();
@@ -189,6 +209,63 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
+  /// Opens the broadcast-channels sheet for this group. Loads the channels,
+  /// then presents [GroupChannelsSheet] with create/open handlers.
+  Future<void> _showChannels() async {
+    // Present immediately with a loading state, then hydrate.
+    final loaded = await widget.dataSource.fetchChannels(widget.conversationId);
+    if (!mounted) return;
+    final channels = loaded.map(groupChannelToView).toList();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: GroupColors.barrier,
+      builder: (sheetContext) => GroupChannelsSheet(
+        channels: channels,
+        isLoading: false,
+        onOpenChannel: (name) {
+          Navigator.of(sheetContext).pop();
+          _openChannel(name);
+        },
+        onCreateChannel: (name) async {
+          // Dismiss the sheet up-front (mirrors the add-members flow) so no
+          // sheet BuildContext is used across the create await.
+          Navigator.of(sheetContext).pop();
+          final created = await widget.dataSource.createChannel(
+            conversationId: widget.conversationId,
+            name: name,
+          );
+          if (!mounted || created == null) return;
+          _openChannel(created);
+        },
+      ),
+    );
+  }
+
+  void _openChannel(String channelName) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeCtx) => GroupChannelScreen(
+          dataSource: widget.dataSource,
+          conversationId: widget.conversationId,
+          channelName: channelName,
+          currentUserId: widget.currentUserId,
+          onBack: () => Navigator.of(routeCtx).pop(),
+        ),
+      ),
+    );
+  }
+
+  /// Starts a group-scoped livestream by delegating to the host-provided
+  /// [GroupChatScreen.onGoLive] (this module never touches features/live).
+  void _goLive() {
+    widget.onGoLive?.call(
+      conversationId: widget.conversationId,
+      groupTitle: widget.initialTitle,
+    );
+  }
+
   Future<void> _confirmLeave() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -291,6 +368,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               onBack: widget.onBack,
               onShowMembers: _showMembers,
               onAddMembers: _showAddMembers,
+              onShowChannels: _showChannels,
+              onGoLive: widget.onGoLive != null ? _goLive : null,
               onLeaveGroup: _confirmLeave,
             ),
             Expanded(child: _buildMessages()),

@@ -184,12 +184,17 @@ class _AudioCallLayout extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _StatusLine(controller: controller),
+              if (controller.isScreenSharing) ...[
+                const SizedBox(height: 20),
+                const ScreenShareBanner(),
+              ],
               const Spacer(flex: 3),
               CallControlsBar(
                 isMuted: controller.isMuted,
                 isVideoOff: controller.isVideoOff,
                 isVideoCall: controller.isVideoCall,
                 isSpeakerOn: controller.isSpeakerOn,
+                isScreenSharing: controller.isScreenSharing,
                 onToggleMute: controller.toggleMute,
                 onToggleSpeaker: controller.toggleSpeaker,
                 onEndCall: onEndCall,
@@ -197,6 +202,11 @@ class _AudioCallLayout extends StatelessWidget {
                     controller.isVideoCall ? controller.toggleVideo : null,
                 onUpgradeToVideo:
                     controller.isVideoCall ? null : controller.toggleVideo,
+                // Screen share is offered once a call is live (both voice and
+                // video), matching the web CallControls.
+                onToggleScreenShare: controller.hasActiveCall
+                    ? controller.toggleScreenShare
+                    : null,
               ),
               const Spacer(),
             ],
@@ -229,6 +239,7 @@ class _VideoCallLayout extends StatelessWidget {
             remoteView: controller.remoteVideoView as Widget?,
             localView: controller.localVideoView as Widget?,
             isLocalVideoOff: controller.isVideoOff,
+            isScreenSharing: controller.isScreenSharing,
           ),
 
         // Top gradient scrim + name/timer.
@@ -262,11 +273,15 @@ class _VideoCallLayout extends StatelessWidget {
                   isVideoOff: controller.isVideoOff,
                   isVideoCall: true,
                   isSpeakerOn: controller.isSpeakerOn,
+                  isScreenSharing: controller.isScreenSharing,
                   onToggleMute: controller.toggleMute,
                   onToggleSpeaker: controller.toggleSpeaker,
                   onEndCall: onEndCall,
                   onToggleVideo: controller.toggleVideo,
                   onFlipCamera: controller.flipCamera,
+                  onToggleScreenShare: controller.hasActiveCall
+                      ? controller.toggleScreenShare
+                      : null,
                 ),
               ),
             ),

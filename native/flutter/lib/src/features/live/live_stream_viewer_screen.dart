@@ -13,6 +13,7 @@ import 'widgets/live_common.dart';
 import 'widgets/live_gift_sheet.dart';
 import 'widgets/live_reaction_bar.dart';
 import 'widgets/live_stream_video.dart';
+import 'widgets/pulse_panel.dart';
 
 /// Full-screen viewer for a live video stream. Plays the HLS `playback_url`
 /// (via [LiveStreamVideo] on the existing `video_player` package, audio ON),
@@ -56,12 +57,24 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
   bool _loadingChat = true;
   Timer? _viewerPoll;
 
+  /// Host-published PULSE spotlight cards, seeded from the summary and refreshed
+  /// from `stream_features.host_cards` on bootstrap. The host mutates this list
+  /// via the PULSE panel; viewers see it read-only.
+  late List<HostCard> _hostCards = List.of(widget.stream.hostCards);
+
   StreamSubscription<LiveComment>? _commentSub;
   StreamSubscription<LiveReactionEvent>? _reactionSub;
   StreamSubscription<LiveGiftEvent>? _giftSub;
   StreamSubscription<void>? _viewerSub;
 
   String? get _selfId => _data.currentUserId;
+
+  /// True when the signed-in user owns this stream — unlocks the PULSE panel's
+  /// add / edit / remove controls. Viewers get a read-only panel.
+  bool get _isHost {
+    final self = _selfId;
+    return self != null && self.isNotEmpty && self == widget.stream.hostId;
+  }
 
   @override
   void initState() {
@@ -99,6 +112,25 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     _viewerPoll = Timer.periodic(
       const Duration(seconds: 12),
       (_) => _refreshViewerCount(),
+    );
+
+    // Refresh host PULSE cards from the DB (the summary may predate the latest
+    // edits, or arrive without stream_features on the browse projection).
+    final cards = await _data.fetchHostCards(widget.stream.id);
+    if (!mounted || cards.isEmpty && _hostCards.isEmpty) return;
+    setState(() => _hostCards = cards);
+  }
+
+  Future<void> _openPulse() async {
+    await showPulsePanel(
+      context,
+      streamId: widget.stream.id,
+      isHost: _isHost,
+      initialCards: _hostCards,
+      dataSource: _data,
+      onCardsChanged: (cards) {
+        if (mounted) setState(() => _hostCards = cards);
+      },
     );
   }
 
@@ -315,6 +347,12 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
           const SizedBox(width: 6),
           ViewerCountChip(count: _viewerCount),
           const SizedBox(width: 2),
+          // PULSE panel: the host can always curate cards; viewers see the entry
+          // only once at least one card is published.
+          if (_isHost || _hostCards.isNotEmpty) ...[
+            _PulseButton(cardCount: _hostCards.length, onTap: _openPulse),
+            const SizedBox(width: 2),
+          ],
           if (widget.stream.playbackUrl != null &&
               widget.stream.playbackUrl!.isNotEmpty)
             IconButton(
@@ -351,6 +389,74 @@ class _ChatOverlay extends StatelessWidget {
       ),
       margin: const EdgeInsets.symmetric(horizontal: 12),
       child: LiveChatList(lines: lines, loading: loading),
+    );
+  }
+}
+
+/// Header entry to the PULSE panel: a spark glyph with a card-count badge,
+/// mirroring the web `AICatchUpPanel` trigger (yellow spark + count pill).
+class _PulseButton extends StatelessWidget {
+  const _PulseButton({required this.cardCount, required this.onTap});
+
+  final int cardCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'PULSE',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: const BoxDecoration(
+                  color: LiveTheme.chip,
+                  shape: BoxShape.circle,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: LiveTheme.chipBorder),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Color(0xFFFACC15),
+                  size: 15,
+                ),
+              ),
+              if (cardCount > 0)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 15,
+                    height: 15,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFACC15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      cardCount > 9 ? '9+' : '$cardCount',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

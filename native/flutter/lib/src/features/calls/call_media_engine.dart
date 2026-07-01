@@ -25,10 +25,23 @@ import 'call_models.dart';
 ///    the media room / establish the peer connection and, when media is
 ///    flowing, transition [connectionState] to [CallMediaConnectionState.connected].
 ///  * Local control toggles ([setMuted], [setVideoEnabled], [setSpeakerOn],
-///    [flipCamera]) mutate the live media session.
+///    [flipCamera], [setScreenShareEnabled]) mutate the live media session.
 ///  * [localVideoView] / [remoteVideoView] return the platform video render
 ///    surfaces; the stub returns `null` so the UI shows placeholders.
 ///  * [disconnect] tears everything down; safe to call multiple times.
+///
+/// # Screen sharing (FLAGGED DEPENDENCY — no pixels captured here)
+///
+/// [setScreenShareEnabled] flips the engine's *intent* to share the local
+/// screen and is wired through [CallController] + the controls bar so the whole
+/// UX (toggle, active tint, "you're sharing your screen" surface) is exercisable
+/// end-to-end. The stub does NOT capture any pixels: real screen capture needs a
+/// WebRTC/LiveKit client SDK plus platform screen-capture permissions
+/// (`ReplayKit` on iOS, `MediaProjection` on Android, `getDisplayMedia` on web)
+/// — the SAME dependency the media transport itself needs, which is
+/// intentionally NOT added (no new pub dependency). A real engine publishes a
+/// screen-capture track here; the stub only records the flag and invalidates its
+/// render so the UI can show the sharing surface.
 abstract class CallMediaEngine {
   /// Emits whenever the media transport connection state changes.
   Stream<CallMediaConnectionState> get connectionStates;
@@ -55,6 +68,17 @@ abstract class CallMediaEngine {
 
   /// Switch between front/back camera.
   Future<void> flipCamera();
+
+  /// Whether the local screen is currently being shared (synchronous snapshot).
+  bool get isScreenSharing;
+
+  /// Start ([enabled] true) or stop ([enabled] false) sharing the local screen.
+  ///
+  /// A real engine acquires a screen-capture track (via the platform capture
+  /// permission) and publishes/unpublishes it; the stub only records the intent
+  /// and invalidates its render so the UI can show the sharing surface. See the
+  /// class-level "Screen sharing" note for the flagged dependency.
+  Future<void> setScreenShareEnabled(bool enabled);
 
   /// The local camera preview surface, or `null` when unavailable (audio call,
   /// camera off, or stub engine).
@@ -112,6 +136,7 @@ class StubCallMediaEngine implements CallMediaEngine {
   bool videoEnabled = false;
   bool speakerOn = true;
   bool usingFrontCamera = true;
+  bool _screenSharing = false;
 
   @override
   Stream<CallMediaConnectionState> get connectionStates =>
@@ -166,6 +191,18 @@ class StubCallMediaEngine implements CallMediaEngine {
     _renderController.add(null);
   }
 
+  @override
+  bool get isScreenSharing => _screenSharing;
+
+  @override
+  Future<void> setScreenShareEnabled(bool enabled) async {
+    if (_screenSharing == enabled) return;
+    _screenSharing = enabled;
+    // No pixels captured in the stub; just invalidate the render so the UI can
+    // swap in / out the "you're sharing your screen" surface.
+    _renderController.add(null);
+  }
+
   // No real surfaces in the stub — the UI shows placeholders.
   @override
   Widget? localVideoView() => null;
@@ -177,6 +214,7 @@ class StubCallMediaEngine implements CallMediaEngine {
   Future<void> disconnect() async {
     _connectTimer?.cancel();
     _connectTimer = null;
+    _screenSharing = false;
     _emit(CallMediaConnectionState.disconnected);
   }
 

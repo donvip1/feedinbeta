@@ -20,7 +20,11 @@ import '../../data/local/post_draft_repository.dart';
 import '../../data/local/profile_repository_contract.dart';
 import '../../data/local/upload_queue_repository.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
+import '../calls/call_controller.dart';
+import '../calls/call_screen.dart';
+import '../channels/screens/channels_screen.dart';
 import '../groups/screens/groups_screen.dart';
+import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../create/create_post_screen.dart';
 import '../messages/messages_screen.dart';
@@ -93,6 +97,11 @@ class _FeedShellState extends State<FeedShell> {
   late UserProfile _profile;
   late Future<int> _notificationUnreadCountFuture;
 
+  /// Shared, long-lived call controller: drives both outgoing calls placed from
+  /// a chat header and the app-wide incoming-call presenter below.
+  late final CallController _callController;
+  bool _incomingRouteOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +114,9 @@ class _FeedShellState extends State<FeedShell> {
     _connectRealtime();
     widget.foregroundSyncCoordinator.start();
     unawaited(_initPush());
+    _callController = CallController();
+    _callController.addListener(_handleCallControllerChange);
+    unawaited(_callController.init());
   }
 
   @override
@@ -113,7 +125,31 @@ class _FeedShellState extends State<FeedShell> {
     _pushTapSub?.cancel();
     widget.foregroundSyncCoordinator.stop();
     widget.realtimeService.disconnect();
+    _callController.removeListener(_handleCallControllerChange);
+    _callController.dispose();
     super.dispose();
+  }
+
+  /// App-wide incoming-call presenter: when the shared [CallController] surfaces
+  /// a ringing incoming call, push the full-screen [CallScreen] (which shows the
+  /// accept/decline UI). Guarded so only one incoming route is ever open; the
+  /// flag resets when the route pops (after the call ends and the controller
+  /// returns to idle, auto-popping the screen). Outgoing calls push their own
+  /// route via [CallScreen.start] and never set [incomingCall], so they don't
+  /// double-present here.
+  void _handleCallControllerChange() {
+    if (!mounted) return;
+    if (_callController.incomingCall != null && !_incomingRouteOpen) {
+      _incomingRouteOpen = true;
+      Navigator.of(context, rootNavigator: true)
+          .push(
+            MaterialPageRoute<void>(
+              fullscreenDialog: true,
+              builder: (_) => CallScreen(controller: _callController),
+            ),
+          )
+          .whenComplete(() => _incomingRouteOpen = false);
+    }
   }
 
   Future<void> _connectRealtime() async {
@@ -245,13 +281,37 @@ class _FeedShellState extends State<FeedShell> {
     );
   }
 
-  /// Groups (group conversations) — reachable from the Chats tab app bar.
+  /// Groups (group conversations) — reachable from the Chats tab app bar. A
+  /// group's "Go Live" action opens the group-scoped go-live sheet (plan.md §E).
   void _openGroups() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (routeCtx) => Scaffold(
           backgroundColor: Colors.black,
           body: GroupsScreen(
+            currentUserId: _profile.userId,
+            onBack: () => Navigator.of(routeCtx).pop(),
+            onGoLive: ({required conversationId, required groupTitle}) {
+              showGoLiveSheet(
+                routeCtx,
+                groupId: conversationId,
+                groupName: groupTitle,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Channels (Telegram-style broadcast channels) — reachable from the Chats
+  /// tab app bar, alongside Groups.
+  void _openChannels() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeCtx) => Scaffold(
+          backgroundColor: Colors.black,
+          body: ChannelsScreen(
             currentUserId: _profile.userId,
             onBack: () => Navigator.of(routeCtx).pop(),
           ),
@@ -276,6 +336,7 @@ class _FeedShellState extends State<FeedShell> {
         profile: _profile,
         realtimeVersion: _messagesRealtimeVersion,
         initialConversationId: _initialConversationId,
+        callController: _callController,
       ),
       const WalletScreen(),
       ProfileEditorScreen(
@@ -321,12 +382,18 @@ class _FeedShellState extends State<FeedShell> {
                   onPressed: () {},
                   icon: const Icon(Icons.search),
                 ),
-                if (_index == 1)
+                if (_index == 1) ...[
+                  IconButton(
+                    tooltip: 'Channels',
+                    onPressed: _openChannels,
+                    icon: const Icon(Icons.campaign_outlined),
+                  ),
                   IconButton(
                     tooltip: 'Groups',
                     onPressed: _openGroups,
                     icon: const Icon(Icons.groups_2_outlined),
                   ),
+                ],
                 if (_index == 3)
                   IconButton(
                     tooltip: 'Settings',
@@ -346,13 +413,18 @@ class _FeedShellState extends State<FeedShell> {
               onChanged: _refreshNotificationBadge,
             )
           : pages[_index],
-      floatingActionButton: (immersiveFeed || _showNotifications)
-          ? null
-          : FloatingActionButton(
+      // Create is a floating "+" shown ONLY on Home (immersive feed), centered
+      // above the nav (TikTok-style) so it never overlaps the right action rail.
+      floatingActionButton: (immersiveFeed && !_showNotifications)
+          ? FloatingActionButton(
               onPressed: _openCreate,
               tooltip: 'Create',
+              backgroundColor: const Color(0xFFFF3D9A),
+              foregroundColor: Colors.white,
               child: const Icon(Icons.add),
-            ),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: NavigationBar(
         height: 72,
         selectedIndex: _index,
@@ -437,7 +509,6 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   late Future<List<FeedPost>> _postsFuture;
-  late Future<List<LiveFeedItem>> _liveFuture;
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
@@ -457,7 +528,6 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _postsFuture = _initialLoad();
-    _liveFuture = widget.feedRepository.loadLiveItems();
     _loadPendingActionCount();
   }
 
@@ -480,7 +550,6 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
-      _liveFuture = widget.feedRepository.loadLiveItems();
       _message = 'New feed activity synced.';
     });
     await _loadPendingActionCount();
@@ -510,7 +579,6 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
-      _liveFuture = widget.feedRepository.loadLiveItems();
       _message = result.message ?? 'Feed refreshed.';
       _hasMorePosts = result.usedRemote;
     });
@@ -631,10 +699,10 @@ class _FeedScreenState extends State<FeedScreen> {
         if (posts == null) {
           content = _ImmersiveLoadingState(topPadding: overlayHeight);
         } else if (_tabIndex == 2) {
-          content = _LiveFeedList(
-            liveFuture: _liveFuture,
-            topPadding: overlayHeight,
-          );
+          // The immersive "Live" tab now hosts the richer live browse surface
+          // (streams + audio spaces + Go live), padded to clear the feed's
+          // overlaid tab bar.
+          content = LiveScreen(topPadding: overlayHeight);
         } else {
           final filteredPosts = _filterPosts(posts);
           content = filteredPosts.isEmpty
@@ -1062,153 +1130,6 @@ class _ImmersiveLoadingStateState extends State<_ImmersiveLoadingState>
   }
 }
 
-/// Looping left-to-right shimmer used by skeleton placeholders.
-class _Shimmer extends StatefulWidget {
-  const _Shimmer({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_Shimmer> createState() => _ShimmerState();
-}
-
-class _ShimmerState extends State<_Shimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
-        return ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (bounds) {
-            final dx = bounds.width * (_controller.value * 2 - 1);
-            return LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: const [
-                Color(0x14FFFFFF),
-                Color(0x33FFFFFF),
-                Color(0x14FFFFFF),
-              ],
-              stops: const [0.35, 0.5, 0.65],
-              transform: _SlideGradient(dx),
-            ).createShader(bounds);
-          },
-          child: child,
-        );
-      },
-    );
-  }
-}
-
-class _SlideGradient extends GradientTransform {
-  const _SlideGradient(this.dx);
-
-  final double dx;
-
-  @override
-  Matrix4 transform(Rect bounds, {TextDirection? textDirection}) {
-    return Matrix4.translationValues(dx, 0, 0);
-  }
-}
-
-/// Skeleton placeholder for a live card while the live list loads.
-class _LiveCardSkeleton extends StatelessWidget {
-  const _LiveCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: AspectRatio(
-        aspectRatio: 9 / 16,
-        child: _Shimmer(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _SkeletonBar(width: 120, height: 14),
-                  const SizedBox(height: 12),
-                  _SkeletonBar(width: double.infinity, height: 18),
-                  const SizedBox(height: 8),
-                  _SkeletonBar(width: 180, height: 18),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _SkeletonBar(width: 100, height: 12),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _SkeletonBar(width: double.infinity, height: 46, radius: 14),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SkeletonBar extends StatelessWidget {
-  const _SkeletonBar({
-    required this.width,
-    required this.height,
-    this.radius = 8,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
 class _FeedStatusBanner extends StatelessWidget {
   const _FeedStatusBanner({
     required this.message,
@@ -1244,579 +1165,6 @@ class _FeedStatusBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LiveFeedList extends StatelessWidget {
-  const _LiveFeedList({required this.liveFuture, required this.topPadding});
-
-  final Future<List<LiveFeedItem>> liveFuture;
-  final double topPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<LiveFeedItem>>(
-      future: liveFuture,
-      builder: (context, snapshot) {
-        final items = snapshot.data;
-        // Cap card height at ~70% of the viewport (web `max-h-[70vh]`) so the
-        // portrait 9:16 cards stay one-per-screen on tall/wide displays.
-        final maxCardHeight = MediaQuery.of(context).size.height * 0.7;
-        if (items == null) {
-          return ListView(
-            padding: EdgeInsets.fromLTRB(16, topPadding, 16, 24),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxCardHeight),
-                  child: const _LiveCardSkeleton(),
-                ),
-              ),
-            ],
-          );
-        }
-        if (items.isEmpty) {
-          return ListView(
-            padding: EdgeInsets.fromLTRB(16, topPadding, 16, 24),
-            children: const [_EmptyLiveState()],
-          );
-        }
-        return ListView.separated(
-          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 24),
-          itemCount: items.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 16),
-          itemBuilder: (context, index) => Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxCardHeight),
-              child: _LiveFeedCard(item: items[index]),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Tall, premium portrait live card matching the web `LiveFeedCard`: a 9:16
-/// thumbnail (or gradient fallback for spaces/streams) with a pulsing LIVE
-/// badge, a viewer-count pill, an optional topic chip, a host row with a
-/// ring-framed avatar, and a full-width join / watch button.
-class _LiveFeedCard extends StatelessWidget {
-  const _LiveFeedCard({required this.item});
-
-  final LiveFeedItem item;
-
-  bool get _isSpace => item.type == 'space';
-
-  @override
-  Widget build(BuildContext context) {
-    final hasThumb = item.thumbnailUrl != null && item.thumbnailUrl!.isNotEmpty;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: AspectRatio(
-        aspectRatio: 9 / 16,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0x80FF2D55), width: 2),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background: thumbnail or themed gradient with an animated
-              // pulse for spaces (audio) vs streams (video).
-              if (hasThumb)
-                Image.network(
-                  item.thumbnailUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _LiveCardBackdrop(isSpace: _isSpace),
-                )
-              else
-                _LiveCardBackdrop(isSpace: _isSpace),
-
-              // Legibility scrim.
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x4D000000),
-                      Color(0x66000000),
-                      Color(0xE6000000),
-                    ],
-                    stops: [0.0, 0.45, 1.0],
-                  ),
-                ),
-              ),
-
-              // LIVE + type badges, top-left.
-              Positioned(
-                left: 12,
-                top: 12,
-                child: Row(
-                  children: [
-                    const _PulsingLiveBadge(),
-                    const SizedBox(width: 6),
-                    _LiveTag(
-                      icon: _isSpace ? Icons.mic : Icons.podcasts,
-                      label: _isSpace ? 'Space' : 'Stream',
-                    ),
-                  ],
-                ),
-              ),
-
-              // Viewer count, top-right.
-              Positioned(
-                right: 12,
-                top: 12,
-                child: _LiveTag(
-                  icon: Icons.people_alt_outlined,
-                  label: _formatViewers(item.viewerCount),
-                ),
-              ),
-
-              // Title, host, and join button, bottom.
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (item.topic != null && item.topic!.trim().isNotEmpty) ...[
-                      _TopicChip(label: item.topic!.trim()),
-                      const SizedBox(height: 10),
-                    ],
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                        height: 1.15,
-                        shadows: [
-                          Shadow(color: Color(0x99000000), blurRadius: 8),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _LiveHostRow(hostName: item.hostName),
-                    const SizedBox(height: 14),
-                    _LiveJoinButton(isSpace: _isSpace),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Themed gradient backdrop for a thumbnail-less live card. Spaces get an
-/// animated audio-wave motif; streams get a soft pulsing broadcast glyph.
-class _LiveCardBackdrop extends StatefulWidget {
-  const _LiveCardBackdrop({required this.isSpace});
-
-  final bool isSpace;
-
-  @override
-  State<_LiveCardBackdrop> createState() => _LiveCardBackdropState();
-}
-
-class _LiveCardBackdropState extends State<_LiveCardBackdrop>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  // Per-bar phase offsets so the equaliser doesn't move in lockstep.
-  static const _barCount = 14;
-  late final List<double> _phases = [
-    for (var i = 0; i < _barCount; i++) (i * 0.37) % 1.0,
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient = widget.isSpace
-        ? const LinearGradient(
-            colors: [Color(0xFF2A1257), Color(0xFF6B1FB3), Color(0xFF3A0F66)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : const LinearGradient(
-            colors: [Color(0xFF3D0A1F), Color(0xFFBE185D), Color(0xFF7A1030)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          );
-
-    return DecoratedBox(
-      decoration: BoxDecoration(gradient: gradient),
-      child: Center(
-        child: widget.isSpace
-            ? AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      for (var i = 0; i < _barCount; i++) ...[
-                        _EqualizerBar(
-                          value: _controller.value,
-                          phase: _phases[i],
-                        ),
-                        if (i != _barCount - 1) const SizedBox(width: 4),
-                      ],
-                    ],
-                  );
-                },
-              )
-            : FadeTransition(
-                opacity: Tween(begin: 0.35, end: 0.7).animate(_controller),
-                child: const Icon(
-                  Icons.podcasts,
-                  size: 72,
-                  color: Color(0x66FFFFFF),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-class _EqualizerBar extends StatelessWidget {
-  const _EqualizerBar({required this.value, required this.phase});
-
-  final double value;
-  final double phase;
-
-  @override
-  Widget build(BuildContext context) {
-    // Triangle wave from the controller value offset by the bar's phase.
-    final t = (value + phase) % 1.0;
-    final amplitude = (t < 0.5 ? t : 1.0 - t) * 2; // 0..1
-    final height = 16 + amplitude * 56;
-    return Container(
-      width: 5,
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0x99FF3D9A),
-        borderRadius: BorderRadius.circular(999),
-      ),
-    );
-  }
-}
-
-/// Red "LIVE" badge with a softly pulsing dot, mirroring the web's
-/// `bg-red-500 animate-pulse` badge.
-class _PulsingLiveBadge extends StatefulWidget {
-  const _PulsingLiveBadge();
-
-  @override
-  State<_PulsingLiveBadge> createState() => _PulsingLiveBadgeState();
-}
-
-class _PulsingLiveBadgeState extends State<_PulsingLiveBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 950),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF2D55),
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: const [
-          BoxShadow(color: Color(0x66FF2D55), blurRadius: 10),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FadeTransition(
-            opacity: Tween(begin: 0.4, end: 1.0).animate(_controller),
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'LIVE',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Small translucent pill (icon + label) used for the type and viewer badges.
-class _LiveTag extends StatelessWidget {
-  const _LiveTag({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: Colors.white),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopicChip extends StatelessWidget {
-  const _TopicChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveHostRow extends StatelessWidget {
-  const _LiveHostRow({required this.hostName});
-
-  final String hostName;
-
-  @override
-  Widget build(BuildContext context) {
-    final trimmed = hostName.trim();
-    final initial = trimmed.isEmpty
-        ? 'H'
-        : trimmed.characters.first.toUpperCase();
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xB3FF2D55), width: 2),
-          ),
-          padding: const EdgeInsets.all(2),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFFFF3D9A), Color(0xFFFF7A45)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            trimmed.isEmpty ? 'Host' : trimmed,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              shadows: [Shadow(color: Color(0x99000000), blurRadius: 6)],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LiveJoinButton extends StatelessWidget {
-  const _LiveJoinButton({required this.isSpace});
-
-  final bool isSpace;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 46,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFF2D55),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x40FF2D55),
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSpace ? Icons.headphones : Icons.play_arrow,
-              size: 20,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isSpace ? 'Join Space' : 'Watch Live',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyLiveState extends StatelessWidget {
-  const _EmptyLiveState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 48),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            child: const Icon(Icons.sensors, color: Colors.white70, size: 40),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Nothing live right now',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'When someone starts a stream or audio space, it will show up here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, height: 1.4),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _formatViewers(int value) {
-  if (value >= 1000000) {
-    final v = (value / 1000000).toStringAsFixed(1);
-    return '${v.endsWith('.0') ? v.substring(0, v.length - 2) : v}M';
-  }
-  if (value >= 1000) {
-    final v = (value / 1000).toStringAsFixed(1);
-    return '${v.endsWith('.0') ? v.substring(0, v.length - 2) : v}K';
-  }
-  return value.toString();
 }
 
 class _CommentSheet extends StatefulWidget {

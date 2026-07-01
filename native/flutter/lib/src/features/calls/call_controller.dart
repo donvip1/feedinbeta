@@ -81,6 +81,12 @@ class CallController extends ChangeNotifier {
   bool _isSpeakerOn = true;
   bool get isSpeakerOn => _isSpeakerOn;
 
+  /// Whether the local user is currently sharing their screen. Reflects the
+  /// [CallMediaEngine]'s intent (the stub captures no pixels — real capture is a
+  /// flagged WebRTC/LiveKit dependency; see [call_media_engine.dart]).
+  bool _isScreenSharing = false;
+  bool get isScreenSharing => _isScreenSharing;
+
   int _elapsedSeconds = 0;
   int get elapsedSeconds => _elapsedSeconds;
 
@@ -172,6 +178,7 @@ class CallController extends ChangeNotifier {
     _isVideoOff = false;
     _isMuted = false;
     _isSpeakerOn = type.isVideo; // video defaults to speaker, voice to earpiece
+    _isScreenSharing = false;
     _elapsedSeconds = 0;
 
     CallSession? created;
@@ -211,6 +218,7 @@ class CallController extends ChangeNotifier {
     _isMuted = false;
     _isVideoOff = false;
     _isSpeakerOn = target.type.isVideo;
+    _isScreenSharing = false;
     _elapsedSeconds = 0;
     _cancelRingTimeout();
 
@@ -264,6 +272,19 @@ class CallController extends ChangeNotifier {
     await _media.flipCamera();
   }
 
+  /// Toggle sharing the local screen. Available on BOTH voice and video calls
+  /// (matches the web `CallControls`, which shows the screen-share button for
+  /// either call type). No-op unless a call is live/connecting.
+  ///
+  /// The stub engine records the intent but captures no pixels — real screen
+  /// capture is a flagged WebRTC/LiveKit dependency (see [call_media_engine.dart]).
+  Future<void> toggleScreenShare() async {
+    if (!hasActiveCall) return;
+    _isScreenSharing = !_isScreenSharing;
+    _safeNotify();
+    await _media.setScreenShareEnabled(_isScreenSharing);
+  }
+
   /// End the active call (local hang-up). Records elapsed duration when the
   /// call was connected, otherwise marks it missed (dialing) — matching the
   /// web behaviour where an unanswered outgoing call becomes a missed log.
@@ -280,6 +301,7 @@ class CallController extends ChangeNotifier {
     _cancelRingTimeout();
     _stopStatusPolling();
     _connectFailed = false;
+    _isScreenSharing = false;
 
     // Reflect the terminal status on the local session so the ended screen can
     // label it (an unanswered dial reads "No answer"; anything else "ended").
@@ -314,6 +336,7 @@ class CallController extends ChangeNotifier {
     _elapsedSeconds = 0;
     _errorMessage = null;
     _connectFailed = false;
+    _isScreenSharing = false;
     _setPhase(CallPhase.idle);
   }
 
@@ -403,6 +426,7 @@ class CallController extends ChangeNotifier {
     _cancelRingTimeout();
     _stopStatusPolling();
     _connectFailed = false;
+    _isScreenSharing = false;
     _session = _session?.copyWith(status: status);
     _setPhase(CallPhase.ended);
     unawaited(_media.disconnect());

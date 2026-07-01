@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../audio_message_support.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
@@ -81,9 +82,17 @@ class MediaMessageContent extends StatelessWidget {
       return _FileCard(media: media, isMine: message.isMine, onTap: onDownload);
     }
 
-    // Audio falls back to a compact chip; the rich voice UI lives elsewhere.
+    // Audio falls back to a compact chip; the rich voice UI lives elsewhere
+    // (VoiceNoteBubble, injected by the screen for audio notes).
     if (media.kind == ChatMediaKind.audio) {
       return _AudioChip(media: media, isMine: message.isMine);
+    }
+
+    // Music files fall back to a compact music chip; the rich track UI lives in
+    // MusicMessageBubble, injected by the screen. This keeps a music attachment
+    // from ever being mis-rendered as an image when no dedicated slot is wired.
+    if (media.kind == ChatMediaKind.music) {
+      return _MusicChip(media: media, isMine: message.isMine);
     }
 
     // Image / video: gated behind the download state machine for non-own media.
@@ -540,7 +549,7 @@ class _AudioChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final durationText = _formatDuration(media.audioDurationMs);
+    final durationText = formatMediaDuration(media.audioDurationMs);
     final tint = isMine ? Colors.white : ChatColors.primary;
     final sub = isMine ? const Color(0xCCFFFFFF) : ChatColors.mutedForeground;
 
@@ -580,13 +589,81 @@ class _AudioChip extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _formatDuration(int? ms) {
-    if (ms == null || ms <= 0) return '';
-    final totalSeconds = (ms / 1000).round();
-    final minutes = totalSeconds ~/ 60;
-    final seconds = totalSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+// ---------------------------------------------------------------------------
+// Music chip (minimal fallback; rich track UI lives in MusicMessageBubble)
+// ---------------------------------------------------------------------------
+
+class _MusicChip extends StatelessWidget {
+  const _MusicChip({required this.media, required this.isMine});
+
+  final MessageMedia media;
+  final bool isMine;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (media.musicTitle?.trim().isNotEmpty ?? false)
+        ? media.musicTitle!.trim()
+        : (media.fileName ?? 'Audio track');
+    final durationText = formatMediaDuration(media.audioDurationMs);
+    final tint = isMine ? Colors.white : ChatColors.primary;
+    final sub = isMine ? const Color(0xCCFFFFFF) : ChatColors.mutedForeground;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isMine ? const Color(0x1AFFFFFF) : ChatColors.primaryFaint,
+          borderRadius: const BorderRadius.all(Radius.circular(ChatRadii.md)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isMine
+                    ? const Color(0x33FFFFFF)
+                    : ChatColors.primaryFaint,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(Icons.music_note_rounded, size: 18, color: tint),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isMine ? Colors.white : ChatColors.foreground,
+                    ),
+                  ),
+                  if (durationText.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      durationText,
+                      style: TextStyle(fontSize: 11, color: sub),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -816,6 +893,8 @@ IconData _kindIcon(ChatMediaKind kind) {
       return Icons.movie_outlined;
     case ChatMediaKind.audio:
       return Icons.mic_none_rounded;
+    case ChatMediaKind.music:
+      return Icons.music_note_rounded;
     case ChatMediaKind.file:
       return Icons.insert_drive_file_outlined;
     case ChatMediaKind.callLog:
@@ -833,6 +912,8 @@ String _kindLabel(ChatMediaKind kind) {
       return 'Video';
     case ChatMediaKind.audio:
       return 'Voice message';
+    case ChatMediaKind.music:
+      return 'Music';
     case ChatMediaKind.file:
       return 'File';
     case ChatMediaKind.callLog:

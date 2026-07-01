@@ -16,6 +16,8 @@ class GroupChatHeader extends StatelessWidget {
     required this.onLeaveGroup,
     this.onlineCount = 0,
     this.onAddMembers,
+    this.onShowChannels,
+    this.onGoLive,
   });
 
   final String title;
@@ -25,6 +27,13 @@ class GroupChatHeader extends StatelessWidget {
   final VoidCallback onShowMembers;
   final VoidCallback onLeaveGroup;
   final VoidCallback? onAddMembers;
+
+  /// Opens the group's broadcast channels. Null hides the affordance (both the
+  /// quick action and the overflow item).
+  final VoidCallback? onShowChannels;
+
+  /// Starts a group-scoped livestream ("Go Live"). Null hides the affordance.
+  final VoidCallback? onGoLive;
 
   String get _statusText {
     final base = '$memberCount member${memberCount == 1 ? '' : 's'}';
@@ -94,6 +103,26 @@ class GroupChatHeader extends StatelessWidget {
               ),
             ),
           ),
+          // Quick "Go Live" action (group-scoped livestream).
+          if (onGoLive != null)
+            IconButton(
+              onPressed: onGoLive,
+              tooltip: 'Go Live',
+              icon: const Icon(
+                Icons.sensors_rounded,
+                color: GroupColors.destructive,
+              ),
+            ),
+          // Quick channels action.
+          if (onShowChannels != null)
+            IconButton(
+              onPressed: onShowChannels,
+              tooltip: 'Channels',
+              icon: const Icon(
+                Icons.campaign_outlined,
+                color: GroupColors.foreground,
+              ),
+            ),
           PopupMenuButton<_GroupHeaderAction>(
             icon: const Icon(
               Icons.more_vert,
@@ -107,6 +136,10 @@ class GroupChatHeader extends StatelessWidget {
                   onShowMembers();
                 case _GroupHeaderAction.addMembers:
                   onAddMembers?.call();
+                case _GroupHeaderAction.channels:
+                  onShowChannels?.call();
+                case _GroupHeaderAction.goLive:
+                  onGoLive?.call();
                 case _GroupHeaderAction.leave:
                   onLeaveGroup();
               }
@@ -122,6 +155,22 @@ class GroupChatHeader extends StatelessWidget {
                   child: _MenuRow(
                     icon: Icons.person_add_alt_1_outlined,
                     label: 'Add members',
+                  ),
+                ),
+              if (onShowChannels != null)
+                const PopupMenuItem(
+                  value: _GroupHeaderAction.channels,
+                  child: _MenuRow(
+                    icon: Icons.campaign_outlined,
+                    label: 'Channels',
+                  ),
+                ),
+              if (onGoLive != null)
+                const PopupMenuItem(
+                  value: _GroupHeaderAction.goLive,
+                  child: _MenuRow(
+                    icon: Icons.sensors_rounded,
+                    label: 'Go Live',
                   ),
                 ),
               const PopupMenuItem(
@@ -140,7 +189,7 @@ class GroupChatHeader extends StatelessWidget {
   }
 }
 
-enum _GroupHeaderAction { members, addMembers, leave }
+enum _GroupHeaderAction { members, addMembers, channels, goLive, leave }
 
 class _MenuRow extends StatelessWidget {
   const _MenuRow({

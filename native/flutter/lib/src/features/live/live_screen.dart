@@ -21,14 +21,63 @@ import 'widgets/live_discover_card.dart';
 /// Integration: construct with `const LiveScreen()` (it auto-detects the
 /// Supabase singleton) or inject a [LiveRemoteDataSource] for tests. Intended to
 /// hang off the feed's "Live" tab or a dedicated nav destination.
+///
+/// Group-scoped "Go Live" (plan.md §E / §B): pass an optional [groupId] (and
+/// optionally [groupName]) so the Groups feature can open this screen already
+/// scoped to a group — the "Go live" sheet then presents the stream as being
+/// started *in* that group. For a direct entry point that skips the browse
+/// surface and opens the sheet immediately, use [showGoLiveSheet].
 class LiveScreen extends StatefulWidget {
-  const LiveScreen({super.key, this.dataSource});
+  const LiveScreen({
+    super.key,
+    this.dataSource,
+    this.groupId,
+    this.groupName,
+    this.topPadding = 0,
+  });
 
   /// Injectable for tests; defaults to an auto-detecting live source.
   final LiveRemoteDataSource? dataSource;
 
+  /// Extra top padding applied to the scroll content, used when this screen is
+  /// embedded beneath an overlaid header (e.g. the feed's immersive tab bar) so
+  /// its own "Live" title + Go live button clear the overlay. When > 0 the
+  /// internal top [SafeArea] inset is skipped (the caller already accounts for
+  /// the status bar in [topPadding]). Defaults to 0 for standalone use.
+  final double topPadding;
+
+  /// Optional group this live surface is scoped to. When set, the "Go live"
+  /// entry frames the stream as belonging to the group. Additive: omit for the
+  /// global live browse experience.
+  final String? groupId;
+
+  /// Optional human-readable group label shown in the group-scoped go-live
+  /// sheet. Ignored when [groupId] is null.
+  final String? groupName;
+
   @override
   State<LiveScreen> createState() => _LiveScreenState();
+}
+
+/// Open the "Go live" sheet directly, scoped to an optional group, without
+/// navigating to the full live browse screen. This is the integration point the
+/// Groups feature calls from a group's "Go Live" action (plan.md §E).
+///
+/// Broadcasting is still flagged as not implemented (no camera / RTMP), so this
+/// surfaces the same clearly-labelled scaffold as the in-screen entry — now
+/// carrying the group context so a future broadcast backend can scope the
+/// created stream to [groupId].
+Future<void> showGoLiveSheet(
+  BuildContext context, {
+  String? groupId,
+  String? groupName,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: LiveTheme.surface,
+    shape: const RoundedRectangleBorder(borderRadius: LiveTheme.sheetRadius),
+    builder: (_) => _GoLiveSheet(groupId: groupId, groupName: groupName),
+  );
 }
 
 class _LiveScreenState extends State<LiveScreen> {
@@ -78,11 +127,10 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _onGoLive() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: LiveTheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: LiveTheme.sheetRadius),
-      builder: (_) => const _GoLiveSheet(),
+    showGoLiveSheet(
+      context,
+      groupId: widget.groupId,
+      groupName: widget.groupName,
     );
   }
 
@@ -91,6 +139,7 @@ class _LiveScreenState extends State<LiveScreen> {
     return ColoredBox(
       color: LiveTheme.background,
       child: SafeArea(
+        top: widget.topPadding <= 0,
         bottom: false,
         child: RefreshIndicator(
           onRefresh: _refresh,
@@ -100,11 +149,12 @@ class _LiveScreenState extends State<LiveScreen> {
             future: _future,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const _LiveLoadingState();
+                return _LiveLoadingState(topPadding: widget.topPadding);
               }
               final data = snapshot.data ?? const _LiveBrowseData();
               return _LiveBrowseGrid(
                 data: data,
+                topPadding: widget.topPadding,
                 onOpenStream: _openStream,
                 onOpenSpace: _openSpace,
                 onGoLive: _onGoLive,
@@ -132,18 +182,22 @@ class _LiveBrowseGrid extends StatelessWidget {
     required this.onOpenStream,
     required this.onOpenSpace,
     required this.onGoLive,
+    this.topPadding = 0,
   });
 
   final _LiveBrowseData data;
   final ValueChanged<LiveStreamSummary> onOpenStream;
   final ValueChanged<LiveSpaceSummary> onOpenSpace;
   final VoidCallback onGoLive;
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
+        if (topPadding > 0)
+          SliverToBoxAdapter(child: SizedBox(height: topPadding)),
         SliverToBoxAdapter(child: _Header(onGoLive: onGoLive)),
         if (data.isEmpty)
           const SliverFillRemaining(
@@ -277,13 +331,16 @@ class _CardGridSliver extends StatelessWidget {
 /// Skeleton browse grid shown while the first fetch is in flight, mirroring the
 /// card layout so the transition to real content is not a jarring pop.
 class _LiveLoadingState extends StatelessWidget {
-  const _LiveLoadingState();
+  const _LiveLoadingState({this.topPadding = 0});
+
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
       children: [
+        if (topPadding > 0) SizedBox(height: topPadding),
         _Header(onGoLive: () {}),
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
@@ -382,8 +439,18 @@ class _LiveEmptyState extends StatelessWidget {
 /// a camera + RTMP/WebRTC dependency and server-owned ingest configuration
 /// (stream key / playback URL). This sheet clearly flags that so the entry point
 /// exists for parity without shipping a broken broadcast flow.
+///
+/// When [groupId] is set, the sheet is framed as starting a stream *inside* a
+/// group (plan.md §E). The group scoping is carried through here so that, once a
+/// broadcast backend exists, the created `live_streams` row can be tied to the
+/// group — that column does not yet exist on the schema (see the module report).
 class _GoLiveSheet extends StatelessWidget {
-  const _GoLiveSheet();
+  const _GoLiveSheet({this.groupId, this.groupName});
+
+  final String? groupId;
+  final String? groupName;
+
+  bool get _scopedToGroup => groupId != null && groupId!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -422,11 +489,18 @@ class _GoLiveSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('Go live', style: LiveTheme.screenTitle),
+                Expanded(
+                  child: Text(
+                    _scopedToGroup ? 'Go live in group' : 'Go live',
+                    style: LiveTheme.screenTitle,
+                  ),
                 ),
               ],
             ),
+            if (_scopedToGroup) ...[
+              const SizedBox(height: 12),
+              _GroupScopeChip(groupName: groupName),
+            ],
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),
@@ -435,22 +509,30 @@ class _GoLiveSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: LiveTheme.chipBorder),
               ),
-              child: const Row(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.construction_rounded,
                     color: LiveTheme.brandOrange,
                     size: 20,
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Broadcasting from the app is coming soon. Going live '
-                      'needs camera capture and an RTMP/WebRTC broadcast '
-                      'dependency plus server-owned ingest config (stream key + '
-                      'playback URL), which is not part of this build.',
-                      style: TextStyle(
+                      _scopedToGroup
+                          ? 'Group livestreams are coming soon. Going live '
+                                'needs camera capture and an RTMP/WebRTC '
+                                'broadcast dependency plus server-owned ingest '
+                                'config (stream key + playback URL) and a '
+                                'group-scoped stream column, which are not part '
+                                'of this build.'
+                          : 'Broadcasting from the app is coming soon. Going '
+                                'live needs camera capture and an RTMP/WebRTC '
+                                'broadcast dependency plus server-owned ingest '
+                                'config (stream key + playback URL), which is '
+                                'not part of this build.',
+                      style: const TextStyle(
                         color: LiveTheme.onSurfaceMuted,
                         fontSize: 13,
                         height: 1.4,
@@ -475,6 +557,51 @@ class _GoLiveSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Small labelled chip confirming which group a go-live flow is scoped to.
+class _GroupScopeChip extends StatelessWidget {
+  const _GroupScopeChip({this.groupName});
+
+  final String? groupName;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = (groupName != null && groupName!.trim().isNotEmpty)
+        ? groupName!.trim()
+        : 'this group';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: LiveTheme.surfaceRaised,
+        borderRadius: LiveTheme.pillRadius,
+        border: Border.all(color: LiveTheme.chipBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.groups_rounded,
+            color: LiveTheme.brandPink,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Streaming to $label',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: LiveTheme.onSurface,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -122,6 +122,7 @@ MessageMedia? _messageMedia(LocalMessage message) {
     'video' => ChatMediaKind.video,
     'audio' => ChatMediaKind.audio,
     'voice' => ChatMediaKind.audio,
+    'music' => ChatMediaKind.music,
     _ => ChatMediaKind.file,
   };
 
@@ -133,6 +134,8 @@ MessageMedia? _messageMedia(LocalMessage message) {
     mimeType: message.mimeType,
     fileName: message.fileName,
     fileSizeBytes: message.fileSizeBytes,
+    audioDurationMs: message.durationMs,
+    musicTitle: message.musicTitle,
     downloadState: localPath == null
         ? MediaDownloadState.idle
         : MediaDownloadState.downloaded,

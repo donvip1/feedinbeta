@@ -278,7 +278,9 @@ class _ReplyPreviewBar extends StatelessWidget {
       case ChatMediaKind.video:
         return 'Video';
       case ChatMediaKind.audio:
-        return 'Audio';
+        return 'Audio note';
+      case ChatMediaKind.music:
+        return 'Music';
       case ChatMediaKind.file:
         return 'File';
       case ChatMediaKind.callLog:
@@ -327,6 +329,8 @@ class _ReplyThumbnail extends StatelessWidget {
       case ChatMediaKind.video:
         return Icons.videocam_outlined;
       case ChatMediaKind.audio:
+        return Icons.graphic_eq_rounded;
+      case ChatMediaKind.music:
         return Icons.music_note_outlined;
       case ChatMediaKind.file:
         return Icons.attach_file;

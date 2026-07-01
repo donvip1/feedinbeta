@@ -10,9 +10,12 @@ import '../../data/local/post_draft_repository.dart';
 import '../../data/local/upload_queue_repository.dart';
 import 'parity/create_tokens.dart';
 import 'parity/create_view_models.dart';
+import 'parity/story_extras_models.dart';
 import 'parity/widgets/post_composer_panel.dart';
+import 'parity/widgets/story_composer_sheet.dart';
 import 'parity/widgets/upload_queue_panel.dart';
 import 'post_draft.dart';
+import 'story_publisher.dart';
 
 /// Native Create surface, wired to the parity composer widgets.
 ///
@@ -51,6 +54,14 @@ enum _CreateMode { post, story }
 class _CreatePostScreenState extends State<CreatePostScreen> {
   static const _uuid = Uuid();
   final _picker = ImagePicker();
+
+  /// Publishes the "extra" story kinds (text / audio note / music) that the
+  /// shared draft + upload-queue model can't represent. No [StoryAudioSource]
+  /// is injected on this build, so `canUseAudio` is false and the composer
+  /// disables the audio/music kinds with a flagged-setup note; text stories
+  /// work end-to-end today. Wiring a recorder/file-picker seam here lights the
+  /// other two kinds up with no further UI changes.
+  final StoryPublisher _storyPublisher = StoryPublisher();
 
   _CreateMode _mode = _CreateMode.post;
 
@@ -509,6 +520,101 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // -------------------------------------------------------------------------
+  // Story extras (text / audio note / music) — published directly via
+  // [StoryPublisher], separate from the media-story upload queue.
+  // -------------------------------------------------------------------------
+
+  /// Opens the [StoryComposerSheet] for the text/audio/music story kinds.
+  void _openStoryComposer() {
+    final audioSource = _storyPublisher.audioSource;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: CreateColors.barrier,
+      builder: (sheetContext) => StoryComposerSheet(
+        audioAvailable: _storyPublisher.canUseAudio,
+        audioUnavailableNote:
+            'Audio notes and music files need an audio recorder / file '
+            'picker seam wired on this build. Text stories publish now.',
+        callbacks: StoryComposerCallbacks(
+          onClose: () => Navigator.of(sheetContext).maybePop(),
+          onPublishText: (text, background) => _publishStoryExtra(
+            sheetContext,
+            () => _storyPublisher.publishTextStory(
+              text: text,
+              background: background,
+            ),
+          ),
+          onPublishAudio: (attachment, background, text) => _publishStoryExtra(
+            sheetContext,
+            () => _storyPublisher.publishAudioStory(
+              attachment: attachment,
+              background: background,
+              text: text,
+            ),
+          ),
+          onPublishMusic: (attachment, background, text) => _publishStoryExtra(
+            sheetContext,
+            () => _storyPublisher.publishMusicStory(
+              attachment: attachment,
+              background: background,
+              text: text,
+            ),
+          ),
+          onRecordAudio: () => _resolveAudio(audioSource?.recordAudioNote()),
+          onPickMusic: () => _resolveAudio(audioSource?.pickAudioFile()),
+        ),
+      ),
+    );
+  }
+
+  /// Runs a recorder/picker seam future and validates the result (mime + 4-min
+  /// cap). Returns null when the seam is absent, cancelled, or rejected.
+  Future<AudioAttachment?> _resolveAudio(
+    Future<AudioAttachment?>? pending,
+  ) async {
+    if (pending == null) return null;
+    final picked = await pending;
+    if (picked == null) return null;
+    final validation = await _storyPublisher.validateAudio(picked);
+    if (!validation.isAccepted) {
+      _showSnack(validation.reason ?? 'That audio file cannot be used.');
+      return null;
+    }
+    if (validation.durationUnknown) {
+      _showSnack('Duration could not be verified; publishing anyway.');
+    }
+    return picked.copyWith(durationSeconds: validation.durationSeconds);
+  }
+
+  /// Runs a publish action, closes the sheet on success, and surfaces the
+  /// result. Refreshes the feed so the new story shows immediately.
+  Future<void> _publishStoryExtra(
+    BuildContext sheetContext,
+    Future<String> Function() action,
+  ) async {
+    // Capture the sheet's navigator before the async gap so we don't touch a
+    // BuildContext after awaiting.
+    final sheetNavigator = Navigator.of(sheetContext);
+    try {
+      final message = await action();
+      widget.onPostUploaded();
+      if (sheetNavigator.canPop()) {
+        sheetNavigator.pop();
+      }
+      if (!mounted) return;
+      setState(() {
+        _summary = QueueSummaryView(message: message);
+      });
+    } on StoryPublishException catch (error) {
+      _showSnack(error.message);
+    } catch (error) {
+      _showSnack('Could not publish story: $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -539,6 +645,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             const SizedBox(height: CreateSpacing.md),
             if (_mode == _CreateMode.story) ...[
               const _StoryModeNotice(),
+              const SizedBox(height: CreateSpacing.md),
+              _StoryFormatsCard(onOpen: _openStoryComposer),
               const SizedBox(height: CreateSpacing.md),
             ],
             PostComposerPanel(
@@ -761,6 +869,81 @@ class _StoryModeNotice extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Story formats card (text / audio note / music entry point)
+// ===========================================================================
+
+/// Tappable card in Story mode that opens the [StoryComposerSheet] for the
+/// non-media story kinds (text on a gradient, an audio note, or an attached
+/// music file). The classic photo/video story still uses the composer + queue
+/// below; this is the parity counterpart to the web `CreateStoryModal` extras.
+class _StoryFormatsCard extends StatelessWidget {
+  const _StoryFormatsCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: CreateRadii.card,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: CreateRadii.card,
+        child: Container(
+          padding: const EdgeInsets.all(CreateSpacing.md),
+          decoration: BoxDecoration(
+            color: CreateColors.card,
+            borderRadius: CreateRadii.card,
+            border: Border.all(color: CreateColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: CreateGradients.primaryAction,
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: CreateColors.primaryForeground,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: CreateSpacing.md),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Text, audio & music stories',
+                      style: CreateTextStyles.uploadStatus,
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'No photo? Write on a gradient, record a voice note, or '
+                      'attach your own track.',
+                      style: CreateTextStyles.helper,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: CreateSpacing.sm),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: CreateColors.mutedForeground,
+              ),
+            ],
+          ),
         ),
       ),
     );

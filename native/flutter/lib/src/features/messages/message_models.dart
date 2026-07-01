@@ -100,6 +100,8 @@ class LocalMessage {
     this.mimeType,
     this.fileName,
     this.fileSizeBytes,
+    this.durationMs,
+    this.musicTitle,
   });
 
   final String id;
@@ -119,7 +121,20 @@ class LocalMessage {
   final String? fileName;
   final int? fileSizeBytes;
 
-  LocalMessage copyWith({MessageDeliveryState? deliveryState}) {
+  /// Duration (ms) for audio-note / music attachments. Mirrors the backend
+  /// `message_attachments.duration_ms` column. Null for non-audio messages.
+  final int? durationMs;
+
+  /// Display title for a shared music/audio *file* (parity with the web music
+  /// bubble's track title). Null for recorded audio notes and non-audio types.
+  final String? musicTitle;
+
+  LocalMessage copyWith({
+    MessageDeliveryState? deliveryState,
+    int? durationMs,
+    String? musicTitle,
+    String? mediaUrl,
+  }) {
     return LocalMessage(
       id: id,
       conversationId: conversationId,
@@ -131,12 +146,14 @@ class LocalMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       messageType: messageType,
       readAtMillis: readAtMillis,
-      mediaUrl: mediaUrl,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
       localMediaPath: localMediaPath,
       thumbnailUrl: thumbnailUrl,
       mimeType: mimeType,
       fileName: fileName,
       fileSizeBytes: fileSizeBytes,
+      durationMs: durationMs ?? this.durationMs,
+      musicTitle: musicTitle ?? this.musicTitle,
     );
   }
 
@@ -160,6 +177,8 @@ class LocalMessage {
       mimeType: json['mimeType'] as String?,
       fileName: json['fileName'] as String?,
       fileSizeBytes: json['fileSizeBytes'] as int?,
+      durationMs: json['durationMs'] as int?,
+      musicTitle: json['musicTitle'] as String?,
     );
   }
 
@@ -181,6 +200,8 @@ class LocalMessage {
       'mimeType': mimeType,
       'fileName': fileName,
       'fileSizeBytes': fileSizeBytes,
+      'durationMs': durationMs,
+      'musicTitle': musicTitle,
     };
   }
 }

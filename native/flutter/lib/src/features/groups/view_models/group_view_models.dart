@@ -130,6 +130,70 @@ class GroupMessageView {
   }
 }
 
+/// One broadcast channel row inside a group (Telegram-style).
+@immutable
+class GroupChannelView {
+  const GroupChannelView({
+    required this.name,
+    required this.updatedAtMillis,
+    this.lastPostPreview = '',
+    this.lastPostSenderName,
+    this.postCount = 0,
+  });
+
+  final String name;
+  final int updatedAtMillis;
+  final String lastPostPreview;
+  final String? lastPostSenderName;
+  final int postCount;
+
+  String get initial {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '#';
+    return trimmed.substring(0, 1).toUpperCase();
+  }
+
+  /// "Alex: latest post" / "No posts yet" style preview line.
+  String get previewLine {
+    if (lastPostPreview.trim().isEmpty) {
+      return postCount == 0 ? 'No posts yet' : '$postCount posts';
+    }
+    final sender = lastPostSenderName;
+    if (sender != null && sender.isNotEmpty) {
+      return '$sender: $lastPostPreview';
+    }
+    return lastPostPreview;
+  }
+}
+
+/// One post inside a channel view.
+@immutable
+class GroupChannelPostView {
+  const GroupChannelPostView({
+    required this.id,
+    required this.senderId,
+    required this.senderName,
+    required this.body,
+    required this.createdAtMillis,
+    required this.isMine,
+    this.senderAvatarUrl,
+  });
+
+  final String id;
+  final String senderId;
+  final String senderName;
+  final String body;
+  final int createdAtMillis;
+  final bool isMine;
+  final String? senderAvatarUrl;
+
+  String get senderInitial {
+    final trimmed = senderName.trim();
+    if (trimmed.isEmpty) return '?';
+    return trimmed.substring(0, 1).toUpperCase();
+  }
+}
+
 /// A search result row in the add-members picker.
 @immutable
 class GroupCandidateView {
@@ -242,6 +306,31 @@ GroupCandidateView candidateToView(RemoteGroupCandidate candidate) {
         (candidate.username != null ? '@${candidate.username}' : 'User'),
     username: candidate.username,
     avatarUrl: candidate.avatarUrl,
+  );
+}
+
+GroupChannelView groupChannelToView(RemoteGroupChannel channel) {
+  return GroupChannelView(
+    name: channel.name,
+    updatedAtMillis: channel.updatedAtMillis,
+    lastPostPreview: channel.lastPostBody ?? '',
+    lastPostSenderName: channel.lastPostSenderName,
+    postCount: channel.postCount,
+  );
+}
+
+GroupChannelPostView groupChannelPostToView(
+  RemoteGroupChannelPost post, {
+  required String currentUserId,
+}) {
+  return GroupChannelPostView(
+    id: post.id,
+    senderId: post.senderId,
+    senderName: post.senderName,
+    senderAvatarUrl: post.senderAvatarUrl,
+    body: post.body,
+    createdAtMillis: post.createdAtMillis,
+    isMine: post.senderId == currentUserId,
   );
 }
 
