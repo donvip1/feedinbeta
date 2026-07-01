@@ -55,66 +55,101 @@ class ConversationListTile extends StatelessWidget {
   }
 
   Widget _buildArchiveBackground() {
-    return Container(
-      color: ChatColors.amberWarning,
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: ChatSpacing.xl),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.archive_outlined,
-            color: ChatColors.primaryForeground,
-            size: 22,
+    // Align the amber action to the card bounds (same outer margin + rounded
+    // clip as the row) so the affordance reveals *within* the rounded card, not
+    // the inter-card gutter.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ChatSpacing.md,
+        0,
+        ChatSpacing.md,
+        6,
+      ),
+      child: ClipRRect(
+        borderRadius: ChatRadii.row,
+        child: Container(
+          color: ChatColors.amberWarning,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: ChatSpacing.xl),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.archive_outlined,
+                color: ChatColors.primaryForeground,
+                size: 22,
+              ),
+              SizedBox(height: ChatSpacing.xs),
+              Text(
+                'Archive',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: ChatColors.primaryForeground,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: ChatSpacing.xs),
-          Text(
-            'Archive',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: ChatColors.primaryForeground,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildRow(BuildContext context) {
+    // Card-framed row matching the web `TikTokConversationItem`: every row is a
+    // rounded-xl card with a faint muted fill + hairline border, swapping to a
+    // primary wash + ring when selected. The whole card scales down slightly on
+    // press for the same tactile feel as the web `active:scale-[0.98]`.
     final showSelection = selected;
 
-    return Material(
-      color: showSelection ? ChatColors.primaryFaint : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: ChatSpacing.listItemMinHeight,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ChatSpacing.md,
+        0,
+        ChatSpacing.md,
+        6, // web mb-1.5 inter-card gap
+      ),
+      child: _PressScale(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: showSelection ? ChatColors.primaryFaint : ChatColors.rowCard,
+            borderRadius: ChatRadii.row,
+            border: Border.all(
+              color: showSelection
+                  ? ChatColors.rowCardSelectedBorder
+                  : ChatColors.rowCardBorder,
+            ),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: ChatSpacing.lg,
-            vertical: ChatSpacing.sm,
-          ),
-          decoration: showSelection
-              ? const BoxDecoration(
-                  border: Border(
-                    left: BorderSide(color: ChatColors.primarySoft, width: 3),
+          child: ClipRRect(
+            borderRadius: ChatRadii.row,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minHeight: ChatSpacing.listItemMinHeight,
                   ),
-                )
-              : null,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _Avatar(
-                other: conversation.other,
-                isOnline: conversation.isOnline,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ChatSpacing.md,
+                    vertical: ChatSpacing.md,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _Avatar(
+                        other: conversation.other,
+                        isOnline: conversation.isOnline,
+                      ),
+                      const SizedBox(width: ChatSpacing.md),
+                      Expanded(child: _content(context)),
+                      _trailing(),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: ChatSpacing.md),
-              Expanded(child: _content(context)),
-              _trailing(),
-            ],
+            ),
           ),
         ),
       ),
@@ -310,6 +345,38 @@ class ConversationListTile extends StatelessWidget {
   }
 }
 
+/// Wraps a row in a subtle scale-down-on-press animation, mirroring the web
+/// `active:scale-[0.98]` tactile feedback. It deliberately does NOT consume the
+/// tap (the inner [InkWell] keeps ownership of [onTap] + ripple); it only
+/// observes press state to drive the scale.
+class _PressScale extends StatefulWidget {
+  const _PressScale({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) => setState(() => _pressed = true),
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1,
+        duration: ChatMotion.fast,
+        curve: ChatMotion.emphasized,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// Inbox avatar with optional network image, initials fallback and an online
 /// presence dot anchored to the bottom-right.
 class _Avatar extends StatelessWidget {
@@ -333,7 +400,7 @@ class _Avatar extends StatelessWidget {
       child: Text(
         other.initial,
         style: const TextStyle(
-          fontSize: 16,
+          fontSize: 17,
           fontWeight: FontWeight.w700,
           color: ChatColors.primaryForeground,
         ),
@@ -365,15 +432,19 @@ class _Avatar extends StatelessWidget {
           avatar,
           if (isOnline)
             Positioned(
-              right: -1,
-              bottom: -1,
+              right: -2,
+              bottom: -2,
               child: Container(
-                width: ChatSpacing.onlineDot,
-                height: ChatSpacing.onlineDot,
+                width: ChatSpacing.inboxOnlineDot,
+                height: ChatSpacing.inboxOnlineDot,
                 decoration: BoxDecoration(
                   color: ChatColors.online,
                   shape: BoxShape.circle,
-                  border: Border.all(color: ChatColors.background, width: 2),
+                  // web border-[3px] reads against the row-card fill, not the bg.
+                  border: Border.all(color: ChatColors.rowCard, width: 3),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x33000000), blurRadius: 2),
+                  ],
                 ),
               ),
             ),

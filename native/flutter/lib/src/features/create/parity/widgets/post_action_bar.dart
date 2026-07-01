@@ -77,8 +77,9 @@ class PostActionBar extends StatelessWidget {
 }
 
 /// The primary "Post" pill. Opacity + label + tap-handler are all derived from
-/// props so the parent ([PostActionBar]) stays stateless.
-class _PostPill extends StatelessWidget {
+/// props so the parent ([PostActionBar]) stays stateless; a press-scale +
+/// pink glow give it the web composer's premium button feel.
+class _PostPill extends StatefulWidget {
   const _PostPill({
     required this.canSubmit,
     required this.isSubmitting,
@@ -90,35 +91,56 @@ class _PostPill extends StatelessWidget {
   final VoidCallback onSubmit;
 
   @override
+  State<_PostPill> createState() => _PostPillState();
+}
+
+class _PostPillState extends State<_PostPill> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     // Enabled only when not submitting AND submittable. Submitting and the
     // disabled (empty-caption) state both swallow taps.
-    final bool isEnabled = canSubmit && !isSubmitting;
+    final bool isEnabled = widget.canSubmit && !widget.isSubmitting;
 
     // Reduced opacity is the web disabled styling; submitting renders at full
     // opacity (the spinner conveys the busy state).
-    final double opacity = (!isSubmitting && !canSubmit) ? 0.5 : 1.0;
+    final double opacity = (!widget.isSubmitting && !widget.canSubmit)
+        ? 0.5
+        : 1.0;
 
     final pill = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: CreateSpacing.xl,
         vertical: CreateSpacing.md,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: CreateGradients.primaryAction,
         borderRadius: CreateRadii.chip,
+        // shadow-pink glow when the button is live (web parity).
+        boxShadow: isEnabled ? CreateShadows.pink : null,
       ),
-      child: isSubmitting ? _buildSubmittingLabel() : _buildIdleLabel(),
+      child: widget.isSubmitting ? _buildSubmittingLabel() : _buildIdleLabel(),
     );
 
     return Opacity(
       opacity: opacity,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: isEnabled ? onSubmit : null,
-          borderRadius: CreateRadii.chip,
-          child: pill,
+      child: AnimatedScale(
+        scale: _pressed && isEnabled ? 0.96 : 1.0,
+        duration: CreateMotion.fast,
+        curve: CreateMotion.emphasized,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: isEnabled ? widget.onSubmit : null,
+            onTapDown: isEnabled
+                ? (_) => setState(() => _pressed = true)
+                : null,
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            borderRadius: CreateRadii.chip,
+            child: pill,
+          ),
         ),
       ),
     );

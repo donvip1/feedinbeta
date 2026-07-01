@@ -184,20 +184,9 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
             // 1. Background media layer.
             Positioned.fill(child: _buildMedia()),
 
-            // 2. Top scrim for a future top bar.
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 140,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: FeedImmersiveTheme.topScrim,
-                  ),
-                ),
-              ),
-            ),
+            // 2. The shared top scrim is drawn once by FeedScreen's overlay
+            //    (above the pager), so the card omits its own to avoid the
+            //    over-darkened "double scrim" at the top of the media.
 
             // 3. Bottom scrim for overlay legibility.
             const Positioned(
@@ -217,19 +206,20 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
             // 4. Bottom-left text overlay.
             Positioned(
               left: 16,
-              right: 84,
+              right: 78,
               bottom: 28 + bottomInset,
               child: _buildOverlay(context),
             ),
 
             // 5. Right action rail.
             Positioned(
-              right: 10,
+              right: 8,
               bottom: 28 + bottomInset,
               child: FeedActionRail(
                 likesCount: widget.post.likesCount,
                 commentsCount: widget.post.commentsCount,
                 refeedsCount: widget.post.refeedsCount,
+                viewsCount: widget.post.viewsCount,
                 isLiked: widget.isLiked,
                 isSaved: widget.isSaved,
                 avatarText: widget.post.authorName,

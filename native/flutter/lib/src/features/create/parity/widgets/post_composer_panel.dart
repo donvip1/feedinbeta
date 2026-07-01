@@ -284,8 +284,11 @@ class _CaptionInputFieldState extends State<_CaptionInputField> {
 // Empty-state media tile
 // ===========================================================================
 
-/// Dashed, tappable 'Add photos or videos' empty-state tile shown when no
-/// media is selected. Tapping it asks the screen to open the picker.
+/// Dashed, tappable empty-state tile shown when no media is selected. Mirrors
+/// the web `MediaGalleryPicker` empty state — a primary-tinted circular icon
+/// badge over a title + helper line — so the composer's first impression
+/// matches the picker's premium treatment. Tapping it asks the screen to open
+/// the picker.
 class _AddMediaTile extends StatelessWidget {
   const _AddMediaTile({required this.onTap});
 
@@ -305,21 +308,23 @@ class _AddMediaTile extends StatelessWidget {
             radius: CreateRadii.md,
           ),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 120),
+            constraints: const BoxConstraints(minHeight: 148),
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: CreateSpacing.xl),
+            padding: const EdgeInsets.symmetric(
+              horizontal: CreateSpacing.lg,
+              vertical: CreateSpacing.xl,
+            ),
             child: const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 32,
-                  color: CreateColors.mutedForeground,
-                ),
-                SizedBox(height: CreateSpacing.sm),
+                _PrimaryIconBadge(icon: Icons.add_photo_alternate_outlined),
+                SizedBox(height: CreateSpacing.md),
+                Text('Add photos or videos', style: CreateTextStyles.title),
+                SizedBox(height: CreateSpacing.xs),
                 Text(
-                  'Add photos or videos',
-                  style: CreateTextStyles.composerHint,
+                  'Tap to capture or pick from your library',
+                  textAlign: TextAlign.center,
+                  style: CreateTextStyles.helper,
                 ),
               ],
             ),
@@ -330,7 +335,30 @@ class _AddMediaTile extends StatelessWidget {
   }
 }
 
-/// 'Add more (n/max)' text button beneath the carousel while under the limit.
+/// A 56px circular primary-tinted badge holding a brand-colored glyph. Mirrors
+/// the web picker's empty-state icon chip.
+class _PrimaryIconBadge extends StatelessWidget {
+  const _PrimaryIconBadge({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: CreateColors.primaryFaint,
+      ),
+      child: Icon(icon, size: 28, color: CreateColors.primary),
+    );
+  }
+}
+
+/// 'Add more (n/max)' bordered pill beneath the carousel while under the limit.
+/// Matches the web `MediaGalleryPicker` outlined "Add More" affordance and the
+/// picker sheet's add-more footer for a consistent media-tools language.
 class _AddMoreMediaButton extends StatelessWidget {
   const _AddMoreMediaButton({
     required this.count,
@@ -344,24 +372,37 @@ class _AddMoreMediaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: onTap,
-        style: TextButton.styleFrom(
-          foregroundColor: CreateColors.primary,
-          padding: const EdgeInsets.symmetric(
-            horizontal: CreateSpacing.sm,
-            vertical: CreateSpacing.xs,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: CreateRadii.field,
+      child: InkWell(
+        borderRadius: CreateRadii.field,
+        onTap: onTap,
+        child: Container(
+          height: CreateSpacing.tapTarget,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: CreateRadii.field,
+            border: Border.all(color: CreateColors.border),
           ),
-          minimumSize: const Size(0, CreateSpacing.tapTarget),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        icon: const Icon(Icons.add, size: 18),
-        label: Text(
-          'Add more ($count/$max)',
-          style: CreateTextStyles.pillLabel.copyWith(
-            color: CreateColors.primary,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 18,
+                color: CreateColors.primary,
+              ),
+              const SizedBox(width: CreateSpacing.sm),
+              Text(
+                'Add more ($count/$max)',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: CreateColors.primary,
+                ),
+              ),
+            ],
           ),
         ),
       ),

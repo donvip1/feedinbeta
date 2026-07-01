@@ -7,11 +7,13 @@
 /// easy to unit-test.
 ///
 /// Where a field/count is not yet available locally (followers/following user
-/// lists, friends, view history) the mapper
-/// produces an honest empty/unavailable view rather than inventing a backend
-/// call — matching the project's offline-first first-pass parity goal.
+/// lists, friends) the mapper produces an honest empty/unavailable view rather
+/// than inventing a backend call — matching the project's offline-first
+/// first-pass parity goal. View history is resolved live from the
+/// `get_view_history` RPC and mapped here from [ViewedPost] rows.
 library;
 
+import '../../../data/remote/post_views_remote_data_source.dart';
 import '../../../data/remote/social_graph_remote_data_source.dart';
 import '../../feed/feed_post.dart';
 import '../user_profile.dart';
@@ -171,9 +173,40 @@ class ProfilePresenter {
     );
   }
 
-  /// Native has no view-history contract/RPC wired yet, so render the real
-  /// empty state instead of fabricating recently viewed posts.
-  static const ViewHistoryView viewHistory = ViewHistoryView(canClear: false);
+  /// View History card state while the `get_view_history` RPC is loading.
+  static const ViewHistoryView viewHistoryLoading = ViewHistoryView(
+    isLoading: true,
+  );
+
+  /// Map resolved recently-viewed [ViewedPost] rows into the View History card
+  /// view-model. [canClear] gates the clear-all control (own history only); it
+  /// is additionally suppressed when there is nothing to clear.
+  static ViewHistoryView viewHistoryLoaded(
+    List<ViewedPost> posts, {
+    bool canClear = true,
+  }) {
+    return ViewHistoryView(
+      items: [for (final post in posts) viewHistoryItem(post)],
+      canClear: canClear && posts.isNotEmpty,
+    );
+  }
+
+  /// Map a single [ViewedPost] into a View History row, classifying the author
+  /// reference for the leading avatar + name/@username.
+  static ViewHistoryItemView viewHistoryItem(ViewedPost post) {
+    return ViewHistoryItemView(
+      postId: post.postId,
+      viewedAtMillis: post.viewedAtMillis,
+      content: post.content,
+      mediaUrl: post.mediaUrl,
+      author: ProfileUserRef(
+        id: post.authorId ?? post.postId,
+        displayName: post.authorName,
+        username: post.authorUsername,
+        avatarUrl: post.authorAvatarUrl,
+      ),
+    );
+  }
 
   /// Parse the profile's free-form `location` into city/country halves so the
   /// header can compose 'city, country'. Splits on the first comma; the whole

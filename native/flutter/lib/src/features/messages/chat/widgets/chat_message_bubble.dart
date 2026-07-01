@@ -278,7 +278,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
         : BoxDecoration(
             color: ChatColors.incomingBubble,
             borderRadius: radius,
-            border: Border.all(color: ChatColors.incomingBubbleBorder),
+            border: Border.all(color: ChatColors.incomingBubbleBorderSoft),
           );
 
     // The body foreground colour drives text + meta tints.
@@ -309,7 +309,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: ChatColors.primaryFaint,
-        borderRadius: BorderRadius.all(Radius.circular(ChatRadii.lg + 3)),
+        borderRadius: BorderRadius.all(
+          Radius.circular(ChatRadii.bubbleRadius + 3),
+        ),
         boxShadow: ChatShadows.glow,
       ),
       child: bubble,

@@ -21,6 +21,7 @@ import 'chat/widgets/conversation_list_tile.dart';
 import 'chat/widgets/media_message_content.dart';
 import 'chat/widgets/message_action_sheet.dart';
 import 'chat/widgets/new_conversation_sheet.dart';
+import 'chat/widgets/typing_indicator_bubble.dart';
 import 'message_models.dart';
 import 'message_recipient.dart';
 
@@ -153,8 +154,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   child: conversations.isEmpty
                       ? const _EmptyChatsState()
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: ChatSpacing.sm,
+                          // Cards carry their own horizontal margin + inter-card
+                          // gap; the list only adds a small top/bottom breathing
+                          // room so the first/last card isn't flush to an edge.
+                          padding: const EdgeInsets.only(
+                            top: ChatSpacing.xs,
+                            bottom: ChatSpacing.lg,
                           ),
                           itemCount: conversations.length,
                           itemBuilder: (context, index) {
@@ -345,6 +350,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String get _currentUserKey => widget.profile.userId.isNotEmpty
       ? widget.profile.userId
       : widget.profile.displayName;
+
+  /// First word of the resolved conversation title, used to personalise the
+  /// in-thread typing caption ("{name} is typing…"). Null when unknown.
+  String? _firstName(String? title) {
+    final trimmed = title?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    final first = trimmed.split(RegExp(r'\s+')).first;
+    return first.isEmpty ? null : first;
+  }
 
   /// Header model built from local state. The other-user identity is derived
   /// from the resolved conversation title (no profile in the local store yet);
@@ -680,6 +694,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 },
               ),
             ),
+            // In-thread typing/activity bubble, pinned just above the composer
+            // (web renders `TypingIndicator` at the foot of the message list).
+            // Renders nothing while the activity is `none`, so it is a no-op
+            // until the live typing signal is populated on [_otherActivity].
+            TypingIndicatorBubble(
+              activity: _otherActivity,
+              userName: _firstName(_title),
+            ),
             ChatComposer(
               controller: _messageController,
               replyPreview: _replyTarget,
@@ -883,29 +905,26 @@ class _EmptyChatsState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(ChatSpacing.xl),
+        padding: const EdgeInsets.all(ChatSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.forum_outlined,
-              size: 48,
-              color: ChatColors.mutedForeground,
-            ),
-            SizedBox(height: ChatSpacing.md),
+          children: const [
+            _GradientGlyph(icon: Icons.forum_rounded),
+            SizedBox(height: ChatSpacing.lg),
             Text(
               'No conversations yet',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
                 color: ChatColors.foreground,
               ),
             ),
-            SizedBox(height: ChatSpacing.xs),
+            SizedBox(height: ChatSpacing.sm),
             Text(
-              'Tap the pencil to search for a user and start your first chat.',
+              'Tap the pencil to search for someone and start your first chat.',
               textAlign: TextAlign.center,
               style: ChatTextStyles.previewMuted,
             ),
@@ -921,10 +940,64 @@ class _EmptyConversationState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Send a message to start the conversation.',
-        style: ChatTextStyles.previewMuted,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ChatSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            _GradientGlyph(icon: Icons.waving_hand_rounded),
+            SizedBox(height: ChatSpacing.lg),
+            Text(
+              'Say hello',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: ChatColors.foreground,
+              ),
+            ),
+            SizedBox(height: ChatSpacing.sm),
+            Text(
+              'Send a message to start the conversation.',
+              textAlign: TextAlign.center,
+              style: ChatTextStyles.previewMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Soft gradient-ringed glyph used by the messaging empty states. Mirrors the
+/// web empty-state treatment: a pink-washed circle with a glowing primary icon.
+class _GradientGlyph extends StatelessWidget {
+  const _GradientGlyph({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 84,
+      height: 84,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: ChatColors.primaryFaint,
+        boxShadow: ChatShadows.glow,
+      ),
+      child: Container(
+        width: 60,
+        height: 60,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: ChatGradients.sendAction,
+          boxShadow: ChatShadows.pink,
+        ),
+        child: Icon(icon, size: 28, color: ChatColors.primaryForeground),
       ),
     );
   }

@@ -77,9 +77,6 @@ class _PrivacyPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color background = isSelected
-        ? CreateColors.primary
-        : CreateColors.muted;
     final Color iconColor = isSelected
         ? CreateColors.primaryForeground
         : CreateColors.mutedForeground;
@@ -88,15 +85,25 @@ class _PrivacyPill extends StatelessWidget {
         : CreateTextStyles.pillLabel;
 
     return Material(
-      color: background,
+      type: MaterialType.transparency,
       borderRadius: CreateRadii.chip,
       child: InkWell(
         onTap: onTap,
         borderRadius: CreateRadii.chip,
-        child: Padding(
+        // An animated fill (gradient when selected) gives the pill a smoother
+        // selection transition than a hard color swap, matching the web feel.
+        child: AnimatedContainer(
+          duration: CreateMotion.fast,
+          curve: CreateMotion.emphasized,
           padding: const EdgeInsets.symmetric(
             horizontal: CreateSpacing.md,
             vertical: CreateSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            gradient: isSelected ? CreateGradients.primaryAction : null,
+            color: isSelected ? null : CreateColors.muted,
+            borderRadius: CreateRadii.chip,
+            boxShadow: isSelected ? CreateShadows.pink : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

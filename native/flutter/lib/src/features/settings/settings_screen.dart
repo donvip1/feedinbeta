@@ -8,6 +8,8 @@ import '../../core/sync/upload_queue_service.dart';
 import '../../data/local/preferences_repository_contract.dart';
 import '../../shared/storage_budget.dart';
 import 'app_preferences.dart';
+import 'settings_theme.dart';
+import 'settings_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -142,221 +144,354 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: storageBudgets.length + 3,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Text(
-            'Device storage',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          );
-        }
+    return ColoredBox(
+      color: SettingsColors.background,
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            SettingsSpacing.lg,
+            SettingsSpacing.lg,
+            SettingsSpacing.lg,
+            SettingsSpacing.xl,
+          ),
+          children: [
+            const Text('Settings', style: SettingsTextStyles.screenTitle),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildPrivacyMediaCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildDeviceStorageCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildMaintenanceCard(),
+            const SizedBox(height: SettingsSpacing.lg),
+            _buildBudgetsCard(),
+          ],
+        ),
+      ),
+    );
+  }
 
-        if (index == storageBudgets.length + 1) {
-          return Card(
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.lock_outline),
-                  title: const Text('Private account'),
-                  value: _preferences.privateAccount,
-                  onChanged: (value) {
-                    unawaited(
-                      _updatePreferences(
-                        _preferences.copyWith(privateAccount: value),
-                      ),
-                    );
-                  },
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.mark_chat_unread_outlined),
-                  title: const Text('Message requests'),
-                  value: _preferences.allowMessageRequests,
-                  onChanged: (value) {
-                    unawaited(
-                      _updatePreferences(
-                        _preferences.copyWith(
-                          allowMessageRequests: value,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.play_circle_outline),
-                  title: const Text('Autoplay videos'),
-                  value: _preferences.mediaAutoplay,
-                  onChanged: (value) {
-                    unawaited(
-                      _updatePreferences(
-                        _preferences.copyWith(mediaAutoplay: value),
-                      ),
-                    );
-                  },
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.wifi),
-                  title: const Text('Cache media on Wi-Fi only'),
-                  value: _preferences.saveMediaOnWifiOnly,
-                  onChanged: (value) {
-                    unawaited(
-                      _updatePreferences(
-                        _preferences.copyWith(
-                          saveMediaOnWifiOnly: value,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+  /// Privacy & Media toggles (web PrivacySettingsPanel grouping + tinted rows).
+  Widget _buildPrivacyMediaCard() {
+    return SettingsCard(
+      icon: Icons.shield_outlined,
+      title: 'Privacy & media',
+      description: 'Control your visibility and how media loads on this device.',
+      children: [
+        const SettingsDivider(),
+        SettingsToggleRow(
+          icon: Icons.lock_outline,
+          title: 'Private account',
+          description: 'Only approved followers can see your activity',
+          value: _preferences.privateAccount,
+          sensitive: true,
+          onChanged: (value) => unawaited(
+            _updatePreferences(_preferences.copyWith(privateAccount: value)),
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsToggleRow(
+          icon: Icons.mark_chat_unread_outlined,
+          title: 'Message requests',
+          description: 'Let people you don\'t follow message you',
+          value: _preferences.allowMessageRequests,
+          onChanged: (value) => unawaited(
+            _updatePreferences(
+              _preferences.copyWith(allowMessageRequests: value),
             ),
-          );
-        }
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsToggleRow(
+          icon: Icons.play_circle_outline,
+          title: 'Autoplay videos',
+          description: 'Play videos automatically as you scroll',
+          value: _preferences.mediaAutoplay,
+          onChanged: (value) => unawaited(
+            _updatePreferences(_preferences.copyWith(mediaAutoplay: value)),
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsToggleRow(
+          icon: Icons.wifi,
+          title: 'Cache media on Wi-Fi only',
+          description: 'Save mobile data by caching media on Wi-Fi',
+          value: _preferences.saveMediaOnWifiOnly,
+          onChanged: (value) => unawaited(
+            _updatePreferences(
+              _preferences.copyWith(saveMediaOnWifiOnly: value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-        if (index == storageBudgets.length + 2) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FutureBuilder<LocalStorageSnapshot>(
-                future: _storageSnapshotFuture,
-                builder: (context, snapshot) {
-                  final storage = snapshot.data;
-                  if (storage == null) {
-                    return const LinearProgressIndicator();
-                  }
+  /// Device storage: local-record stats + realtime banner + cleanup actions
+  /// (web CacheSettings titled card + destructive cleanup actions).
+  Widget _buildDeviceStorageCard() {
+    return SettingsCard(
+      icon: Icons.sd_storage_outlined,
+      title: 'Device storage',
+      description: 'Local records cached on this device.',
+      children: [
+        const SettingsDivider(),
+        Padding(
+          padding: const EdgeInsets.all(SettingsSpacing.lg),
+          child: FutureBuilder<LocalStorageSnapshot>(
+            future: _storageSnapshotFuture,
+            builder: (context, snapshot) {
+              final storage = snapshot.data;
+              if (storage == null) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: SettingsSpacing.md),
+                  child: LinearProgressIndicator(
+                    color: SettingsColors.primary,
+                    backgroundColor: SettingsColors.muted,
+                  ),
+                );
+              }
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Local records',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          Chip(label: Text('Feed ${storage.feedPosts}')),
-                          Chip(label: Text('Queued ${storage.pendingActions}')),
-                          Chip(label: Text('Chats ${storage.conversations}')),
-                          Chip(label: Text('Messages ${storage.messages}')),
-                          Chip(
-                            label: Text('Alerts ${storage.notifications}'),
-                          ),
-                          Chip(label: Text('Profiles ${storage.profileRecords}')),
-                          Chip(
-                            label: Text(
-                              'Media ${storage.mediaFiles} / ${storage.mediaMegabytes.toStringAsFixed(1)} MB',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Chip(
-                        avatar: Icon(
-                          widget.realtimeConnected
-                              ? Icons.sensors
-                              : Icons.sensors_off,
-                        ),
-                        label: Text(
-                          widget.realtimeConnected
-                              ? 'Realtime connected'
-                              : 'Realtime offline',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          ActionChip(
-                            avatar: const Icon(Icons.cleaning_services),
-                            label: const Text('Clear feed cache'),
-                            onPressed: _clearFeedCache,
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.playlist_remove),
-                            label: const Text('Clear queue'),
-                            onPressed: _clearPendingActions,
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.delete_sweep),
-                            label: const Text('Clear messages'),
-                            onPressed: _clearMessages,
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.notifications_off),
-                            label: const Text('Clear alerts'),
-                            onPressed: _clearNotifications,
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.video_file),
-                            label: const Text('Clear media'),
-                            onPressed: _clearMediaCache,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                },
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.sync),
-                    label: Text(_isSyncing ? 'Syncing...' : 'Sync now'),
-                    onPressed: _isSyncing ? null : _syncNow,
+                  Wrap(
+                    spacing: SettingsSpacing.sm,
+                    runSpacing: SettingsSpacing.sm,
+                    children: [
+                      SettingsStat(
+                        label: 'Feed',
+                        value: '${storage.feedPosts}',
+                      ),
+                      SettingsStat(
+                        label: 'Queued',
+                        value: '${storage.pendingActions}',
+                      ),
+                      SettingsStat(
+                        label: 'Chats',
+                        value: '${storage.conversations}',
+                      ),
+                      SettingsStat(
+                        label: 'Messages',
+                        value: '${storage.messages}',
+                      ),
+                      SettingsStat(
+                        label: 'Alerts',
+                        value: '${storage.notifications}',
+                      ),
+                      SettingsStat(
+                        label: 'Profiles',
+                        value: '${storage.profileRecords}',
+                      ),
+                      SettingsStat(
+                        label: 'Media',
+                        value:
+                            '${storage.mediaFiles} / ${storage.mediaMegabytes.toStringAsFixed(1)} MB',
+                      ),
+                    ],
                   ),
-                  ActionChip(
-                    avatar: const Icon(Icons.cloud_upload_outlined),
-                    label: Text(_isUploading ? 'Uploading...' : 'Upload drafts'),
-                    onPressed: _isUploading ? null : _uploadDrafts,
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.storage_outlined),
-                    label: Text(
-                      _isCheckingStorage ? 'Checking...' : 'Check storage',
-                    ),
-                    onPressed: _isCheckingStorage ? null : _checkStorage,
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.logout),
-                    label: const Text('Sign out'),
-                    onPressed: widget.onSignOut,
+                  const SizedBox(height: SettingsSpacing.md),
+                  SettingsStatusBanner(
+                    icon: widget.realtimeConnected
+                        ? Icons.sensors
+                        : Icons.sensors_off,
+                    message: widget.realtimeConnected
+                        ? 'Realtime connected'
+                        : 'Realtime offline',
+                    tone: widget.realtimeConnected
+                        ? SettingsBannerTone.online
+                        : SettingsBannerTone.offline,
                   ),
                 ],
+              );
+            },
+          ),
+        ),
+        const SettingsDivider(),
+        Padding(
+          padding: const EdgeInsets.all(SettingsSpacing.lg),
+          child: Wrap(
+            spacing: SettingsSpacing.sm,
+            runSpacing: SettingsSpacing.sm,
+            children: [
+              SettingsActionButton(
+                label: 'Clear feed cache',
+                icon: Icons.cleaning_services,
+                variant: SettingsButtonVariant.destructive,
+                onPressed: _clearFeedCache,
+              ),
+              SettingsActionButton(
+                label: 'Clear queue',
+                icon: Icons.playlist_remove,
+                variant: SettingsButtonVariant.destructive,
+                onPressed: _clearPendingActions,
+              ),
+              SettingsActionButton(
+                label: 'Clear messages',
+                icon: Icons.delete_sweep,
+                variant: SettingsButtonVariant.destructive,
+                onPressed: _clearMessages,
+              ),
+              SettingsActionButton(
+                label: 'Clear alerts',
+                icon: Icons.notifications_off,
+                variant: SettingsButtonVariant.destructive,
+                onPressed: _clearNotifications,
+              ),
+              SettingsActionButton(
+                label: 'Clear media',
+                icon: Icons.video_file,
+                variant: SettingsButtonVariant.destructive,
+                onPressed: _clearMediaCache,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Maintenance & account: sync / upload / diagnostics / sign-out, plus the
+  /// last operation's status message as a banner.
+  Widget _buildMaintenanceCard() {
+    return SettingsCard(
+      icon: Icons.tune,
+      title: 'Maintenance & account',
+      description: 'Sync data, run diagnostics, or sign out.',
+      children: [
+        const SettingsDivider(),
+        Padding(
+          padding: const EdgeInsets.all(SettingsSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SettingsActionButton(
+                label: _isSyncing ? 'Syncing...' : 'Sync now',
+                icon: Icons.sync,
+                variant: SettingsButtonVariant.primary,
+                expanded: true,
+                busy: _isSyncing,
+                onPressed: _isSyncing ? null : _syncNow,
+              ),
+              const SizedBox(height: SettingsSpacing.sm),
+              SettingsActionButton(
+                label: _isUploading ? 'Uploading...' : 'Upload drafts',
+                icon: Icons.cloud_upload_outlined,
+                expanded: true,
+                busy: _isUploading,
+                onPressed: _isUploading ? null : _uploadDrafts,
+              ),
+              const SizedBox(height: SettingsSpacing.sm),
+              SettingsActionButton(
+                label: _isCheckingStorage ? 'Checking...' : 'Check storage',
+                icon: Icons.storage_outlined,
+                expanded: true,
+                busy: _isCheckingStorage,
+                onPressed: _isCheckingStorage ? null : _checkStorage,
+              ),
+              const SizedBox(height: SettingsSpacing.sm),
+              SettingsActionButton(
+                label: 'Sign out',
+                icon: Icons.logout,
+                variant: SettingsButtonVariant.destructive,
+                expanded: true,
+                onPressed: widget.onSignOut,
               ),
               if (_syncMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _syncMessage!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                const SizedBox(height: SettingsSpacing.md),
+                SettingsStatusBanner(
+                  icon: Icons.info_outline,
+                  message: _syncMessage!,
+                  tone: SettingsBannerTone.info,
                 ),
               ],
             ],
-          );
-        }
-
-        final budget = storageBudgets[index - 1];
-        return Card(
-          child: ListTile(
-            title: Text(budget.name),
-            subtitle: Text('${budget.megabytes} MB budget'),
-            trailing: Text(budget.autoCleanup ? 'Auto cleanup' : 'Retained'),
           ),
-        );
-      },
+        ),
+      ],
+    );
+  }
+
+  /// Storage budgets reference (web 'Cache Strategy' explainer card).
+  Widget _buildBudgetsCard() {
+    final rows = <Widget>[];
+    for (var i = 0; i < storageBudgets.length; i++) {
+      if (i > 0) rows.add(const SettingsDivider());
+      rows.add(_BudgetRow(budget: storageBudgets[i]));
+    }
+
+    return SettingsCard(
+      icon: Icons.donut_large_outlined,
+      title: 'Storage budgets',
+      description: 'Per-cache limits and auto-cleanup policy.',
+      children: [const SettingsDivider(), ...rows],
+    );
+  }
+}
+
+/// A single storage-budget row: name + budget over a retained/auto-clean pill.
+class _BudgetRow extends StatelessWidget {
+  const _BudgetRow({required this.budget});
+
+  final StorageBudget budget;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SettingsSpacing.lg,
+        vertical: SettingsSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(budget.name, style: SettingsTextStyles.rowTitle),
+                const SizedBox(height: SettingsSpacing.xs),
+                Text(
+                  '${budget.megabytes} MB budget',
+                  style: SettingsTextStyles.rowDescription,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: SettingsSpacing.md),
+          _BudgetPolicyPill(autoCleanup: budget.autoCleanup),
+        ],
+      ),
+    );
+  }
+}
+
+/// 'Auto cleanup' (online tint) vs 'Retained' (muted) policy pill.
+class _BudgetPolicyPill extends StatelessWidget {
+  const _BudgetPolicyPill({required this.autoCleanup});
+
+  final bool autoCleanup;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = autoCleanup
+        ? SettingsColors.online
+        : SettingsColors.mutedForeground;
+    final bg = autoCleanup ? SettingsColors.onlineSoft : SettingsColors.mutedSoft;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SettingsSpacing.md,
+        vertical: SettingsSpacing.xs,
+      ),
+      decoration: BoxDecoration(color: bg, borderRadius: SettingsRadii.chip),
+      child: Text(
+        autoCleanup ? 'Auto cleanup' : 'Retained',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
     );
   }
 }

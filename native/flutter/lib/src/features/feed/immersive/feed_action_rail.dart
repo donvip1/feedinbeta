@@ -6,15 +6,17 @@ import 'feed_immersive_theme.dart';
 ///
 /// Mirrors the web `ImmersivePostCard` sidebar: a tappable avatar followed by
 /// like / comment / refeed / save / share controls stacked vertically and
-/// centered. All glyphs render white with [FeedImmersiveTheme.textShadow] for
-/// legibility over arbitrary media; the like heart switches to
-/// [FeedImmersiveTheme.likeActive] when active.
+/// centered. Each glyph sits inside a translucent circular chip
+/// (`bg-black/40 backdrop-blur-sm` in the web app); the chip tints to the
+/// brand accent when its control is active (liked / saved) and the like heart
+/// switches to [FeedImmersiveTheme.likeActive].
 class FeedActionRail extends StatelessWidget {
   const FeedActionRail({
     super.key,
     required this.likesCount,
     required this.commentsCount,
     required this.refeedsCount,
+    required this.viewsCount,
     required this.isLiked,
     required this.isSaved,
     required this.avatarText,
@@ -30,6 +32,7 @@ class FeedActionRail extends StatelessWidget {
   final int likesCount;
   final int commentsCount;
   final int refeedsCount;
+  final int viewsCount;
   final bool isLiked;
   final bool isSaved;
   final String avatarText;
@@ -56,8 +59,8 @@ class FeedActionRail extends StatelessWidget {
         _RailButton(
           icon: isLiked ? Icons.favorite : Icons.favorite_border,
           color: isLiked ? FeedImmersiveTheme.likeActive : Colors.white,
+          chipColor: isLiked ? FeedImmersiveTheme.likeChip : null,
           active: isLiked,
-          iconSize: 32,
           label: _compactCount(likesCount),
           onTap: onLike,
         ),
@@ -70,7 +73,6 @@ class FeedActionRail extends StatelessWidget {
         const SizedBox(height: FeedImmersiveTheme.railGap),
         _RailButton(
           icon: Icons.repeat,
-          iconSize: 32,
           label: _compactCount(refeedsCount),
           onTap: onRefeed,
         ),
@@ -78,12 +80,22 @@ class FeedActionRail extends StatelessWidget {
         _RailButton(
           icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
           color: isSaved ? FeedImmersiveTheme.saveActive : Colors.white,
+          chipColor: isSaved ? FeedImmersiveTheme.saveChip : null,
           active: isSaved,
           label: 'Save',
           onTap: onSave,
         ),
         const SizedBox(height: FeedImmersiveTheme.railGap),
         _RailButton(icon: Icons.ios_share, label: 'Share', onTap: onShare),
+        // Views is a passive metric (no tap target), mirroring the web rail's
+        // Eye counter; rendered muted so it reads as informational.
+        if (viewsCount > 0) ...[
+          const SizedBox(height: FeedImmersiveTheme.railGap),
+          _RailMetric(
+            icon: Icons.visibility_outlined,
+            label: _compactCount(viewsCount),
+          ),
+        ],
       ],
     );
   }
@@ -227,7 +239,9 @@ class _AvatarFallback extends StatelessWidget {
 
 /// A single icon + label entry in the action rail.
 ///
-/// Provides three layered micro-interactions:
+/// The glyph sits inside a translucent circular chip (matching the web app's
+/// `bg-black/40` rounded buttons) which tints to [chipColor] when the control
+/// is [active]. Provides three layered micro-interactions:
 /// * a subtle press-in scale-down while the finger is held (`active:scale-95`
 ///   in the web app),
 /// * a springy "pop" on release, and
@@ -239,7 +253,7 @@ class _RailButton extends StatefulWidget {
     required this.label,
     required this.onTap,
     this.color = Colors.white,
-    this.iconSize = FeedImmersiveTheme.railIconSize,
+    this.chipColor,
     this.active = false,
   });
 
@@ -247,10 +261,13 @@ class _RailButton extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final Color color;
-  final double iconSize;
+
+  /// Background tint for the icon chip when [active]; null falls back to the
+  /// default translucent black chip.
+  final Color? chipColor;
 
   /// Whether the control is in its highlighted state (liked / saved). Drives
-  /// the color cross-fade and a one-shot pop when it flips to true.
+  /// the chip + color cross-fade and a one-shot pop when it flips to true.
   final bool active;
 
   @override
@@ -311,6 +328,9 @@ class _RailButtonState extends State<_RailButton>
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = widget.active && widget.chipColor != null
+        ? widget.chipColor!
+        : FeedImmersiveTheme.railChip;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _handleTap,
@@ -326,23 +346,87 @@ class _RailButtonState extends State<_RailButton>
             curve: Curves.easeOut,
             child: ScaleTransition(
               scale: _popScale,
+              // Translucent circular chip behind the glyph, tinting to the
+              // active accent on like / save.
               child: TweenAnimationBuilder<Color?>(
                 duration: FeedImmersiveTheme.motionFast,
                 curve: FeedImmersiveTheme.settleCurve,
-                tween: ColorTween(end: widget.color),
-                builder: (context, color, child) => Icon(
-                  widget.icon,
-                  size: widget.iconSize,
-                  color: color ?? widget.color,
-                  shadows: FeedImmersiveTheme.textShadow,
+                tween: ColorTween(end: chipColor),
+                builder: (context, chip, _) => Container(
+                  width: FeedImmersiveTheme.railChipSize,
+                  height: FeedImmersiveTheme.railChipSize,
+                  decoration: BoxDecoration(
+                    color: chip ?? chipColor,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x40000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: TweenAnimationBuilder<Color?>(
+                    duration: FeedImmersiveTheme.motionFast,
+                    curve: FeedImmersiveTheme.settleCurve,
+                    tween: ColorTween(end: widget.color),
+                    builder: (context, color, child) => Icon(
+                      widget.icon,
+                      size: FeedImmersiveTheme.railIconSize,
+                      color: color ?? widget.color,
+                      shadows: FeedImmersiveTheme.textShadow,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(widget.label, style: FeedImmersiveTheme.countLabel),
         ],
       ),
+    );
+  }
+}
+
+/// A passive (non-tappable) metric entry in the rail, e.g. the views counter.
+/// Mirrors the web rail's Eye chip + count; rendered muted so it reads as
+/// informational rather than an action.
+class _RailMetric extends StatelessWidget {
+  const _RailMetric({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: FeedImmersiveTheme.railChipSize,
+          height: FeedImmersiveTheme.railChipSize,
+          decoration: const BoxDecoration(
+            color: FeedImmersiveTheme.railChip,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: FeedImmersiveTheme.railIconSize - 2,
+            color: FeedImmersiveTheme.onMediaMuted,
+            shadows: FeedImmersiveTheme.textShadow,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: FeedImmersiveTheme.countLabel.copyWith(
+            color: FeedImmersiveTheme.onMediaMuted,
+          ),
+        ),
+      ],
     );
   }
 }

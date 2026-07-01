@@ -524,6 +524,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
           children: [
             const Text('Create', style: CreateTextStyles.headline),
+            const SizedBox(height: CreateSpacing.xs),
+            Text(
+              _mode == _CreateMode.post
+                  ? 'Share a photo, video, or thought.'
+                  : 'Share a moment for the next 24 hours.',
+              style: CreateTextStyles.helper,
+            ),
             const SizedBox(height: CreateSpacing.md),
             _ModeToggle(
               mode: _mode,
@@ -578,27 +585,60 @@ class _ModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A sliding segmented control: a single gradient "thumb" animates between
+    // the two halves, mirroring the web composer's tab feel with stronger
+    // motion than a hard fill swap.
     return Container(
       padding: const EdgeInsets.all(CreateSpacing.xs),
       decoration: BoxDecoration(
         color: CreateColors.muted,
         borderRadius: CreateRadii.chip,
       ),
-      child: Row(
-        children: [
-          _ModeSegment(
-            label: 'Post',
-            icon: Icons.play_arrow_rounded,
-            isSelected: mode == _CreateMode.post,
-            onTap: () => onChanged(_CreateMode.post),
-          ),
-          _ModeSegment(
-            label: 'Story',
-            icon: Icons.auto_stories_outlined,
-            isSelected: mode == _CreateMode.story,
-            onTap: () => onChanged(_CreateMode.story),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final segmentWidth = (constraints.maxWidth) / 2;
+          final isPost = mode == _CreateMode.post;
+          return SizedBox(
+            height: CreateSpacing.tapTarget - 8,
+            child: Stack(
+              children: [
+                // The animated gradient thumb behind the active segment.
+                AnimatedAlign(
+                  duration: CreateMotion.normal,
+                  curve: CreateMotion.emphasized,
+                  alignment: isPost
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  child: Container(
+                    width: segmentWidth,
+                    height: double.infinity,
+                    decoration: const BoxDecoration(
+                      gradient: CreateGradients.primaryAction,
+                      borderRadius: CreateRadii.chip,
+                      boxShadow: CreateShadows.pink,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    _ModeSegment(
+                      label: 'Post',
+                      icon: Icons.add_photo_alternate_outlined,
+                      isSelected: isPost,
+                      onTap: () => onChanged(_CreateMode.post),
+                    ),
+                    _ModeSegment(
+                      label: 'Story',
+                      icon: Icons.amp_stories_outlined,
+                      isSelected: !isPost,
+                      onTap: () => onChanged(_CreateMode.story),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -619,9 +659,6 @@ class _ModeSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = isSelected
-        ? CreateColors.primaryForeground
-        : CreateColors.mutedForeground;
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -629,23 +666,28 @@ class _ModeSegment extends StatelessWidget {
         child: InkWell(
           borderRadius: CreateRadii.chip,
           onTap: onTap,
-          child: Container(
-            height: CreateSpacing.tapTarget - 8,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: isSelected ? CreateGradients.primaryAction : null,
-              borderRadius: CreateRadii.chip,
-            ),
+          child: Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 18, color: foreground),
+                AnimatedSwitcher(
+                  duration: CreateMotion.fast,
+                  child: Icon(
+                    icon,
+                    key: ValueKey(isSelected),
+                    size: 18,
+                    color: isSelected
+                        ? CreateColors.primaryForeground
+                        : CreateColors.mutedForeground,
+                  ),
+                ),
                 const SizedBox(width: CreateSpacing.sm),
-                Text(
-                  label,
+                AnimatedDefaultTextStyle(
+                  duration: CreateMotion.fast,
                   style: isSelected
                       ? CreateTextStyles.pillLabelSelected
                       : CreateTextStyles.pillLabel,
+                  child: Text(label),
                 ),
               ],
             ),
@@ -665,25 +707,61 @@ class _StoryModeNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(CreateSpacing.md),
-      decoration: BoxDecoration(
-        color: CreateColors.primaryFaint,
-        borderRadius: CreateRadii.card,
-        border: Border.all(color: CreateColors.primarySoft),
+    return TweenAnimationBuilder<double>(
+      duration: CreateMotion.normal,
+      curve: CreateMotion.emphasized,
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 8),
+          child: child,
+        ),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.auto_stories_outlined, color: CreateColors.primary),
-          const SizedBox(width: CreateSpacing.md),
-          Expanded(
-            child: Text(
-              'Story drafts publish to the 24-hour stories surface through '
-              'the same offline upload queue.',
-              style: CreateTextStyles.helper,
+      child: Container(
+        padding: const EdgeInsets.all(CreateSpacing.md),
+        decoration: BoxDecoration(
+          color: CreateColors.primaryFaint,
+          borderRadius: CreateRadii.card,
+          border: Border.all(color: CreateColors.primarySoft),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Gradient story-ring badge (parity with the web share/story accent).
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: CreateGradients.shareAction,
+              ),
+              child: const Icon(
+                Icons.amp_stories_outlined,
+                color: CreateColors.onMedia,
+                size: 20,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: CreateSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Share a 24-hour story',
+                    style: CreateTextStyles.storyLabel,
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Videos max 2 minutes • Expires in 24 hours • Publishes '
+                    'through the same offline upload queue.',
+                    style: CreateTextStyles.helper,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -727,33 +805,40 @@ class _CaptureMethodSheet extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
                 CreateSpacing.lg,
-                CreateSpacing.sm,
+                CreateSpacing.xs,
                 CreateSpacing.lg,
                 CreateSpacing.sm,
               ),
-              child: Text('Add Media', style: CreateTextStyles.sectionLabel),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Add media', style: CreateTextStyles.title),
+              ),
             ),
             _CaptureRow(
               icon: Icons.photo_camera_outlined,
               label: 'Take Photo',
+              description: 'Capture a new photo',
               onTap: () => onMethod(CaptureMethod.takePhoto),
             ),
             _CaptureRow(
               icon: Icons.videocam_outlined,
               label: 'Record Video',
+              description: 'Shoot a new clip',
               onTap: () => onMethod(CaptureMethod.recordVideo),
             ),
             _CaptureRow(
               icon: Icons.photo_library_outlined,
               label: 'Photo Library',
+              description: 'Pick photos and videos',
               onTap: () => onMethod(CaptureMethod.photoLibrary),
             ),
             _CaptureRow(
               icon: Icons.video_library_outlined,
               label: 'Choose Video',
+              description: 'Pick a clip from your library',
               onTap: () => onMethod(CaptureMethod.videoLibrary),
             ),
             const Divider(height: 1, color: CreateColors.border),
@@ -769,43 +854,83 @@ class _CaptureMethodSheet extends StatelessWidget {
   }
 }
 
+/// A single capture-method row. When a [description] is supplied it renders the
+/// premium web `NativeCreationSheet` treatment: a primary-tinted icon tile, a
+/// label + helper line, and a trailing chevron. The plain Cancel row passes no
+/// description and renders as a centered, muted action.
 class _CaptureRow extends StatelessWidget {
   const _CaptureRow({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.description,
   });
 
   final IconData icon;
   final String label;
+  final String? description;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasDescription = description != null;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: CreateSpacing.tapTarget),
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: CreateSpacing.lg,
-            vertical: CreateSpacing.md,
+            vertical: hasDescription ? CreateSpacing.sm + 2 : CreateSpacing.md,
           ),
-          child: Row(
-            children: [
-              Icon(icon, size: 22, color: CreateColors.foreground),
-              const SizedBox(width: CreateSpacing.lg),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: CreateColors.foreground,
+          child: hasDescription
+              ? Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: CreateColors.primaryFaint,
+                      ),
+                      child: Icon(icon, size: 22, color: CreateColors.primary),
+                    ),
+                    const SizedBox(width: CreateSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: CreateColors.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(description!, style: CreateTextStyles.helper),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: CreateColors.mutedForeground,
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: CreateColors.mutedForeground,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

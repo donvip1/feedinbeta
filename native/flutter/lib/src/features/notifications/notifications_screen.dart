@@ -193,6 +193,22 @@ class _ScreenHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Brand-tinted bell mark (web NotificationsPanel header `Bell`).
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: NotificationColors.primarySoft,
+              borderRadius: NotificationRadii.tile,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.notifications,
+              size: 20,
+              color: NotificationColors.primary,
+            ),
+          ),
+          const SizedBox(width: NotificationSpacing.md),
           const Expanded(
             child: Text(
               'Notifications',

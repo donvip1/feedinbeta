@@ -777,24 +777,28 @@ class _CaptureMethodSheet extends StatelessWidget {
         _CaptureRow(
           icon: Icons.photo_camera_outlined,
           label: 'Take Photo',
+          description: 'Capture a new photo',
           onTap: () => onMethod(CaptureMethod.takePhoto),
         ),
       if (_showVideoRows)
         _CaptureRow(
           icon: Icons.videocam_outlined,
           label: 'Record Video',
+          description: 'Shoot a new clip',
           onTap: () => onMethod(CaptureMethod.recordVideo),
         ),
       if (_showImageRows)
         _CaptureRow(
           icon: Icons.photo_library_outlined,
           label: 'Photo Library',
+          description: 'Pick photos and videos',
           onTap: () => onMethod(CaptureMethod.photoLibrary),
         ),
       if (_showVideoRows)
         _CaptureRow(
           icon: Icons.video_library_outlined,
           label: 'Choose Video',
+          description: 'Pick a clip from your library',
           onTap: () => onMethod(CaptureMethod.videoLibrary),
         ),
     ];
@@ -813,21 +817,23 @@ class _CaptureMethodSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _SheetGrabber(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
                 CreateSpacing.lg,
-                CreateSpacing.sm,
+                CreateSpacing.xs,
                 CreateSpacing.lg,
                 CreateSpacing.sm,
               ),
-              child: Text('Add Media', style: CreateTextStyles.sectionLabel),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Add media', style: CreateTextStyles.title),
+              ),
             ),
             ...rows,
             const Divider(height: 1, color: CreateColors.border),
             _CaptureRow(
               icon: Icons.close,
               label: 'Cancel',
-              isDestructive: false,
               onTap: () => Navigator.of(context).maybePop(),
             ),
           ],
@@ -856,48 +862,82 @@ class _SheetGrabber extends StatelessWidget {
   }
 }
 
+/// A single capture-method row. With a [description] it renders the premium
+/// web `NativeCreationSheet` treatment (primary-tinted icon tile + label +
+/// helper + chevron); without one it renders a centered muted action (Cancel).
 class _CaptureRow extends StatelessWidget {
   const _CaptureRow({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.isDestructive = false,
+    this.description,
   });
 
   final IconData icon;
   final String label;
+  final String? description;
   final VoidCallback onTap;
-  final bool isDestructive;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive
-        ? CreateColors.destructive
-        : CreateColors.foreground;
+    final hasDescription = description != null;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: CreateSpacing.tapTarget),
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: CreateSpacing.lg,
-            vertical: CreateSpacing.md,
+            vertical: hasDescription ? CreateSpacing.sm + 2 : CreateSpacing.md,
           ),
-          child: Row(
-            children: [
-              Icon(icon, size: 22, color: color),
-              const SizedBox(width: CreateSpacing.lg),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+          child: hasDescription
+              ? Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: CreateColors.primaryFaint,
+                      ),
+                      child: Icon(icon, size: 22, color: CreateColors.primary),
+                    ),
+                    const SizedBox(width: CreateSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: CreateColors.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(description!, style: CreateTextStyles.helper),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: CreateColors.mutedForeground,
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: CreateColors.mutedForeground,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

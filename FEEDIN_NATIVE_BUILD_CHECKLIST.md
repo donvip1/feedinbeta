@@ -128,16 +128,18 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Added storage snapshot for profile/feed/queue/chat/message/notification/media counts.
 - [x] Added cleanup controls for feed cache, queued actions, messages, notifications, and media.
 - [x] Added Settings diagnostic check for Supabase Storage bucket `post-media`.
-- [ ] Add Firebase Cloud Messaging after `google-services.json` is provided.
+- [x] Added Firebase Cloud Messaging: `firebase_core`/`firebase_messaging`, `google-services` Gradle plugin, `POST_NOTIFICATIONS` permission, `minSdk` 23, Firebase init + background handler in `main`, and a `PushNotificationService`.
 - [x] Confirmed native notification table/RPC shape and added push subscription/FCM token backend contracts.
-- [ ] Store FCM tokens server-side from Flutter after Firebase config is provided.
-- [ ] Add production push notification payload handling.
+- [x] Store FCM tokens server-side from Flutter — registered via `register_push_subscription` on login (verified live: a real `android`/`fcm`/active token landed in `push_subscriptions`).
+- [x] Added push notification payload handling: foreground messages → in-app inbox; tap routing (foreground/background/cold-start) → existing deep-link handler.
+- [ ] Optional polish: foreground heads-up display via `flutter_local_notifications` + a notification channel (background/terminated "notification" payloads already display via the OS).
 - [x] Added friends/follow social graph backend contract.
 - [x] Expanded native profile with cover/banner, avatar, counts, premium indicator, location, website, and richer edit fields.
 - [x] Added native profile posts grid backed by the real feed repository.
 - [x] Completed profile parity scaffolding for posts grid, followers/following modal states, view-history contract, verification/role badges, and social links.
 - [x] Wired live follower/following row fetch into Flutter profile connections modal.
-- [ ] Wire view-history RPC into Flutter after migrations are pushed.
+- [x] Wired view-history RPC into Flutter: `record_post_view` on the active immersive feed post and `get_view_history` (plus clear-all) in the profile View History card.
+- [ ] Test view-history record/read/clear against live Supabase with a real user session.
 
 ## Phase 6: Native UI/Product Parity
 
@@ -155,7 +157,7 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Rebuilt Notifications backend contract for remote notification table, FCM payload shape, and typed actions.
 - [x] Wired Flutter message attachment upload/download materialization for native photo/video chat media.
 - [x] Connected Flutter to remote Notifications fetch/read/delete materialization.
-- [ ] Add FCM token registration/payload handling after Firebase config is provided.
+- [x] Added FCM token registration + payload/tap handling (verified on a real device — token registered to `push_subscriptions`).
 - [ ] Wire call navigation after call product flows are finalized.
 - [x] Added production empty states for feed tabs, live, chats, conversations, notifications, and create drafts.
 - [x] Removed remaining visible demo/offline-preview/scaffold text from Supabase-configured builds.
@@ -210,7 +212,9 @@ Never put a service-role key, database password, payment secret, AI key, or admi
 - [x] Added local `SUPABASE_DB_PASSWORD`.
 - [x] Added local IPv4 Transaction Pooler connection string as `SUPABASE_DB_URL`.
 - [x] Ran migration push with the encoded pooler DB URL.
-- [x] Ran `supabase db push`; all active migrations applied successfully.
+- [x] 2026-06-30: live test exposed that only the 9 base schema migrations (`20260624*`) had actually reached the remote; the 9 native-parity migrations (`20260627143000` → `20260629120000`) were never applied (migration history had diverged — remote orphan `20260627141800` blocked push after the local files were consolidated/renamed).
+- [x] Repaired the orphan history row (`migration repair --status reverted 20260627141800`), made two notification policies idempotent (added `drop policy if exists` before `create policy "Users can create notifications for self"` in `20260628050000` and `20260629120000`), and re-ran `supabase db push` — all 9 native-parity migrations now applied. Verified live: profile social/role/plan columns, `follows`, `post_view_history`, `message_read_receipts`, `public_profiles`, and the `record_post_view`/`get_view_history` RPCs all present.
+- [ ] Fix the malformed `SUPABASE_DB_URL` in local `.env` (password special chars are not URL-encoded; use `SUPABASE_DB_PASSWORD` + an encoded URL, or percent-encode the password in the URI).
 
 Option A, Supabase access token:
 

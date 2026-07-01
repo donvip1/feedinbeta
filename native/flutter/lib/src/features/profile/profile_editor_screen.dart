@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/local/profile_repository_contract.dart';
+import '../../data/remote/post_views_remote_data_source.dart';
 import '../../data/remote/social_graph_remote_data_source.dart';
 import '../feed/feed_post.dart';
 import 'parity/profile_presenter.dart';
@@ -11,6 +12,7 @@ import 'parity/profile_tokens.dart';
 import 'parity/profile_view_models.dart';
 import 'parity/widgets/connections_modal.dart';
 import 'parity/widgets/posts_grid.dart';
+import 'parity/widgets/profile_avatar.dart';
 import 'parity/widgets/role_plan_badges.dart';
 import 'parity/widgets/social_links_card.dart';
 import 'parity/widgets/verified_badge.dart';
@@ -25,6 +27,7 @@ class ProfileEditorScreen extends StatefulWidget {
     required this.feedRepository,
     required this.onSaved,
     this.socialGraphDataSource,
+    this.postViewsDataSource,
   });
 
   final UserProfile profile;
@@ -36,6 +39,10 @@ class ProfileEditorScreen extends StatefulWidget {
   /// hosts that do not inject it still build; falls back to an auto-detecting
   /// instance that reads the Supabase singleton.
   final SocialGraphRemoteDataSource? socialGraphDataSource;
+
+  /// Live access to the post view-history contract for the View History card.
+  /// Optional; falls back to an auto-detecting instance like the follow graph.
+  final PostViewsRemoteDataSource? postViewsDataSource;
 
   @override
   State<ProfileEditorScreen> createState() => _ProfileEditorScreenState();
@@ -55,6 +62,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   late final TextEditingController _youtubeController;
   late Future<List<FeedPost>> _postsFuture;
   late final SocialGraphRemoteDataSource _socialGraph;
+  late final PostViewsRemoteDataSource _postViews;
   bool _isSaving = false;
   String? _message;
   String? _errorMessage;
@@ -97,6 +105,8 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     _socialGraph =
         widget.socialGraphDataSource ??
         SocialGraphRemoteDataSource.autoDetect();
+    _postViews =
+        widget.postViewsDataSource ?? PostViewsRemoteDataSource.autoDetect();
   }
 
   @override
@@ -314,10 +324,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                 onOpen: _openLink,
               ),
               const SizedBox(height: 16),
-              ViewHistoryCard(
-                view: ProfilePresenter.viewHistory,
-                onOpenPost: (_) {},
-              ),
+              _ViewHistorySection(postViews: _postViews),
               const SizedBox(height: 24),
               _ProfilePostsGrid(postsFuture: _postsFuture, isOwnProfile: true),
             ],
@@ -362,6 +369,76 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   }
 }
 
+/// Stateful host for the View History card: loads the viewer's recently-viewed
+/// posts from `get_view_history`, renders the presentational [ViewHistoryCard],
+/// and supports clearing the history. Like the connections sheet, all backend
+/// access lives here and the card stays purely presentational.
+class _ViewHistorySection extends StatefulWidget {
+  const _ViewHistorySection({required this.postViews});
+
+  final PostViewsRemoteDataSource postViews;
+
+  @override
+  State<_ViewHistorySection> createState() => _ViewHistorySectionState();
+}
+
+class _ViewHistorySectionState extends State<_ViewHistorySection> {
+  // null while loading; an (empty) list once resolved.
+  List<ViewedPost>? _history;
+  bool _failed = false;
+  bool _clearing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await widget.postViews.fetchViewHistory();
+      if (!mounted) return;
+      setState(() {
+        _history = rows;
+        _failed = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _history = const [];
+        _failed = true;
+      });
+    }
+  }
+
+  Future<void> _clear() async {
+    if (_clearing) return;
+    setState(() => _clearing = true);
+    try {
+      await widget.postViews.clearHistory();
+      if (!mounted) return;
+      setState(() => _history = const []);
+    } catch (_) {
+      // Leave the existing rows in place on failure.
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final history = _history;
+    final view = history == null
+        ? ProfilePresenter.viewHistoryLoading
+        : ProfilePresenter.viewHistoryLoaded(history, canClear: !_failed);
+    return ViewHistoryCard(
+      view: view,
+      onOpenPost: (_) {},
+      onClear: _clearing ? null : _clear,
+    );
+  }
+}
+
 class _ProfilePostsGrid extends StatelessWidget {
   const _ProfilePostsGrid({
     required this.postsFuture,
@@ -380,16 +457,25 @@ class _ProfilePostsGrid extends StatelessWidget {
         final view = posts == null
             ? const PostsGridView(isLoading: true)
             : ProfilePresenter.postsGrid(posts, isOwnProfile: isOwnProfile);
+        final count = view.tiles.length;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Posts',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            Row(
+              children: [
+                const Icon(
+                  Icons.grid_view_rounded,
+                  size: 18,
+                  color: ProfileColors.primary,
+                ),
+                const SizedBox(width: ProfileSpacing.sm),
+                Text(
+                  count > 0 ? 'Posts ($count)' : 'Posts',
+                  style: ProfileTextStyles.sectionTitle,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ProfileSpacing.md),
             PostsGrid(
               view: view,
               onAction: (tile, action) {
@@ -420,127 +506,149 @@ class _ProfileHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final coverUrl = profile.coverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    final badges = ProfilePresenter.badges(profile);
+    final verifiedTier = ProfilePresenter.verifiedTier(profile);
+    final location = profile.location?.trim() ?? '';
+    final website = profile.websiteUrl?.trim() ?? '';
+
+    // Outer diameter of the avatar including its background-colored ring.
+    const avatarRing =
+        ProfileSpacing.avatarDiameter + ProfileSpacing.avatarBorderWidth * 2;
+    // Vertical offset of the avatar's top edge (web -mt-20 pull-up over cover).
+    const avatarTop = ProfileSpacing.coverHeight - ProfileSpacing.avatarOverlap;
+    // Band tall enough to fully contain the overlapping avatar (no clipping
+    // onto the identity block below).
+    const bandHeight = avatarTop + avatarRing;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // --- Cover band (web h-64) with a bottom fade into the background and
+        //     the avatar overlapping its lower edge (web -mt-20, centered). ---
         SizedBox(
-          height: 210,
+          height: bandHeight,
           child: Stack(
             clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
             children: [
-              Positioned.fill(
-                child: coverUrl == null || coverUrl.isEmpty
-                    ? const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFFF3D9A),
-                              Color(0xFF2563EB),
-                              Color(0xFF101521),
-                            ],
+              SizedBox(
+                height: ProfileSpacing.coverHeight,
+                width: double.infinity,
+                child: hasCover
+                    ? Image.network(
+                        coverUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: ProfileGradients.coverPlaceholder,
                           ),
                         ),
                       )
-                    : Image.network(coverUrl, fit: BoxFit.cover),
+                    : const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: ProfileGradients.coverPlaceholder,
+                        ),
+                      ),
               ),
-              Positioned.fill(
-                child: DecoratedBox(
+              // Fade the bottom of the cover into the page background so the
+              // overlapping avatar reads cleanly (web from-transparent to-bg).
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: ProfileSpacing.coverHeight,
+                child: const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Theme.of(context).scaffoldBackgroundColor,
-                      ],
+                      colors: [Colors.transparent, ProfileColors.background],
+                      stops: [0.55, 1.0],
                     ),
                   ),
                 ),
               ),
               Positioned(
-                left: 16,
-                bottom: -42,
+                top: avatarTop,
                 child: _ProfileAvatar(profile: profile),
               ),
             ],
           ),
         ),
+        // --- Centered identity block (web text-center). ---
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 50, 16, 0),
+          padding: const EdgeInsets.fromLTRB(
+            ProfileSpacing.lg,
+            ProfileSpacing.md,
+            ProfileSpacing.lg,
+            0,
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Flexible(
                     child: Text(
-                      profile.displayName,
+                      profile.displayName.trim().isEmpty
+                          ? 'Unknown'
+                          : profile.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w900),
+                      textAlign: TextAlign.center,
+                      style: ProfileTextStyles.displayName,
                     ),
                   ),
-                  if (ProfilePresenter.verifiedTier(profile) !=
-                      VerifiedTier.none) ...[
-                    const SizedBox(width: 6),
-                    VerifiedBadge(
-                      tier: ProfilePresenter.verifiedTier(profile),
-                      size: BadgeSize.md,
-                    ),
+                  if (verifiedTier != VerifiedTier.none) ...[
+                    const SizedBox(width: ProfileSpacing.xs),
+                    VerifiedBadge(tier: verifiedTier, size: BadgeSize.md),
                   ],
                 ],
               ),
-              if (ProfilePresenter.badges(profile).hasRowBadges) ...[
-                const SizedBox(height: 8),
-                RolePlanBadges(badges: ProfilePresenter.badges(profile)),
-              ],
               const SizedBox(height: 2),
               Text(
-                '@${profile.handle}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+                '@${profile.handle.trim().isEmpty ? 'user' : profile.handle}',
+                textAlign: TextAlign.center,
+                style: ProfileTextStyles.handle,
+              ),
+              if (badges.hasRowBadges) ...[
+                const SizedBox(height: ProfileSpacing.sm),
+                // web: <div className="flex justify-center"> around the badges.
+                Align(
+                  alignment: Alignment.center,
+                  child: RolePlanBadges(badges: badges),
                 ),
-              ),
-              if (profile.bio.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(profile.bio),
               ],
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  if (profile.location?.isNotEmpty ?? false)
-                    _MetaPill(
-                      icon: Icons.place_outlined,
-                      label: profile.location!,
-                    ),
-                  if (profile.websiteUrl?.isNotEmpty ?? false)
-                    _MetaPill(icon: Icons.link, label: profile.websiteUrl!),
-                ],
+              const SizedBox(height: ProfileSpacing.lg),
+              _ProfileCountsRow(
+                profile: profile,
+                onOpenConnections: (tab) => _openConnections(context, tab),
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _ProfileStat(
-                    value: profile.followersCount,
-                    label: 'Followers',
-                    onTap: () =>
-                        _openConnections(context, ConnectionsTab.followers),
-                  ),
-                  _ProfileStat(
-                    value: profile.followingCount,
-                    label: 'Following',
-                    onTap: () =>
-                        _openConnections(context, ConnectionsTab.following),
-                  ),
-                  _ProfileStat(value: profile.totalViews, label: 'Views'),
-                ],
-              ),
+              if (profile.bio.trim().isNotEmpty) ...[
+                const SizedBox(height: ProfileSpacing.lg),
+                Text(
+                  profile.bio,
+                  textAlign: TextAlign.center,
+                  style: ProfileTextStyles.bio,
+                ),
+              ],
+              if (location.isNotEmpty || website.isNotEmpty) ...[
+                const SizedBox(height: ProfileSpacing.md),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: ProfileSpacing.md,
+                  runSpacing: ProfileSpacing.sm,
+                  children: [
+                    if (location.isNotEmpty)
+                      _MetaPill(icon: Icons.place_outlined, label: location),
+                    if (website.isNotEmpty)
+                      _MetaPill(icon: Icons.language, label: website),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -753,6 +861,8 @@ class _SocialLinkField extends StatelessWidget {
   }
 }
 
+/// 128px header avatar with the web 4px background-colored ring + drop shadow,
+/// wrapping the shared [ProfileAvatar] gradient-initials fallback.
 class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({required this.profile});
 
@@ -760,31 +870,61 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = profile.avatarUrl;
+    final initial = profile.displayName.trim().isEmpty
+        ? 'U'
+        : profile.displayName.trim().characters.first.toUpperCase();
     return Container(
-      width: 92,
-      height: 92,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          width: 5,
-        ),
+        color: ProfileColors.background, // web border-background ring color
+        boxShadow: ProfileShadows.avatar,
       ),
-      child: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundImage: avatarUrl == null || avatarUrl.isEmpty
-            ? null
-            : NetworkImage(avatarUrl),
-        child: Text(
-          profile.displayName.characters.first.toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 28),
-        ),
+      padding: const EdgeInsets.all(ProfileSpacing.avatarBorderWidth),
+      child: ProfileAvatar(
+        diameter: ProfileSpacing.avatarDiameter,
+        initial: initial,
+        imageUrl: profile.avatarUrl,
       ),
     );
   }
 }
 
+/// Centered Followers / Following / Views counts row (web text-center stats).
+/// Followers and Following open the live connections sheet; Views is static.
+class _ProfileCountsRow extends StatelessWidget {
+  const _ProfileCountsRow({
+    required this.profile,
+    required this.onOpenConnections,
+  });
+
+  final UserProfile profile;
+  final ValueChanged<ConnectionsTab> onOpenConnections;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _ProfileStat(
+          value: profile.followersCount,
+          label: 'Followers',
+          onTap: () => onOpenConnections(ConnectionsTab.followers),
+        ),
+        const SizedBox(width: ProfileSpacing.xl),
+        _ProfileStat(
+          value: profile.followingCount,
+          label: 'Following',
+          onTap: () => onOpenConnections(ConnectionsTab.following),
+        ),
+        const SizedBox(width: ProfileSpacing.xl),
+        _ProfileStat(value: profile.totalViews, label: 'Views'),
+      ],
+    );
+  }
+}
+
+/// One centered stat (bold value over a muted label). Tappable stats get a soft
+/// rounded ripple matching the web hover:opacity affordance.
 class _ProfileStat extends StatelessWidget {
   const _ProfileStat({required this.value, required this.label, this.onTap});
 
@@ -795,43 +935,34 @@ class _ProfileStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          _compact(value),
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+        Text(compactCount(value), style: ProfileTextStyles.statValue),
+        const SizedBox(height: 2),
+        Text(label, style: ProfileTextStyles.statLabel),
       ],
     );
-    return Expanded(
-      child: onTap == null
-          ? content
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: content,
-              ),
-            ),
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: ProfileRadii.tile,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: ProfileRadii.tile,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ProfileSpacing.sm,
+            vertical: ProfileSpacing.xs,
+          ),
+          child: content,
+        ),
+      ),
     );
-  }
-
-  String _compact(int value) {
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
-    return value.toString();
   }
 }
 
+/// Muted icon + label meta chip (location / website) used under the header.
 class _MetaPill extends StatelessWidget {
   const _MetaPill({required this.icon, required this.label});
 
@@ -843,16 +974,14 @@ class _MetaPill extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        Icon(icon, size: 16, color: ProfileColors.mutedForeground),
+        const SizedBox(width: ProfileSpacing.xs + 2),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ProfileTextStyles.meta,
           ),
         ),
       ],

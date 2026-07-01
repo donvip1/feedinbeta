@@ -16,6 +16,16 @@ class FeedImmersiveTheme {
   static const Color likeActive = Color(0xFFFF2D55);
   static const Color saveActive = brandPink;
 
+  // --- Action rail chip surfaces ---
+  /// Default translucent backing behind each rail glyph (web `bg-black/40`).
+  static const Color railChip = Color(0x66000000);
+
+  /// Chip tint when the like control is active (web `bg-pink-500/90`).
+  static const Color likeChip = Color(0xE6FF2D55);
+
+  /// Chip tint when the save control is active.
+  static const Color saveChip = Color(0xE6FF3D9A);
+
   // --- On-media text/icon colors ---
   static const Color onMedia = Colors.white;
   static const Color onMediaMuted = Color(0xB3FFFFFF); // white @ 70%
@@ -100,8 +110,11 @@ class FeedImmersiveTheme {
 
   // --- Sizing tokens ---
   static const double avatarSize = 48;
-  static const double railGap = 18;
-  static const double railIconSize = 28;
+  static const double railGap = 16;
+  static const double railIconSize = 26;
+
+  /// Diameter of the circular chip behind each rail glyph.
+  static const double railChipSize = 46;
 
   // --- Motion tokens ---
   /// Quick tap "pop" on rail/icon press.

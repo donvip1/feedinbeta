@@ -1,6 +1,7 @@
 import 'package:feedin/src/app/feedin_app.dart';
 import 'package:feedin/src/app/feedin_services.dart';
 import 'package:feedin/src/core/config/feedin_config.dart';
+import 'package:feedin/src/core/notifications/push_notification_service.dart';
 import 'package:feedin/src/core/realtime/feedin_realtime_service.dart';
 import 'package:feedin/src/core/storage/local_storage_maintenance.dart';
 import 'package:feedin/src/core/storage/storage_diagnostics_service.dart';
@@ -49,6 +50,7 @@ void main() {
       storageDiagnosticsService: const _FakeStorageDiagnosticsService(),
       realtimeService: FeedinRealtimeService(isConfigured: false),
       storageMaintenance: const _FakeStorageMaintenance(),
+      pushNotificationService: PushNotificationService(isConfigured: false),
     );
 
     await tester.pumpWidget(

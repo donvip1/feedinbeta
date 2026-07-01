@@ -56,6 +56,14 @@ class ChatColors {
   // The other-user bubble surface (card with a subtle border).
   static const Color incomingBubble = card;
   static const Color incomingBubbleBorder = border;
+
+  // Inbox card-row surfaces. The web `TikTokConversationItem` frames every row
+  // as a rounded card: a faint `bg-muted/20` fill with a `border-border/40`
+  // hairline, swapping to a primary wash + ring when selected.
+  static const Color rowCard = Color(0x331D283A); // muted @ 20%
+  static const Color rowCardBorder = Color(0x661D283A); // border @ 40%
+  static const Color rowCardSelectedBorder = Color(0x33F04299); // primary @ 20%
+  static const Color incomingBubbleBorderSoft = Color(0x801D283A); // border/50
 }
 
 /// Linear gradients matching the web `--gradient-*` tokens.
@@ -108,24 +116,33 @@ class ChatRadii {
   static const double sm = 8;
   static const double pill = 999;
   static const double sheet = 16; // mobile bottom sheet rounded-t-2xl
-  static const double grouped = 4; // tight corner for grouped bubbles
+  static const double grouped = 6; // tail corner for grouped bubbles (rounded-md)
+  static const double bubbleRadius = 16; // web rounded-2xl
+  static const double rowCard = 12; // web inbox row rounded-xl
 
-  static const BorderRadius bubble = BorderRadius.all(Radius.circular(lg));
+  static const BorderRadius bubble = BorderRadius.all(
+    Radius.circular(bubbleRadius),
+  );
   static const BorderRadius card = BorderRadius.all(Radius.circular(lg));
+  static const BorderRadius row = BorderRadius.all(Radius.circular(rowCard));
   static const BorderRadius chip = BorderRadius.all(Radius.circular(pill));
   static const BorderRadius sheetTop = BorderRadius.only(
     topLeft: Radius.circular(sheet),
     topRight: Radius.circular(sheet),
   );
 
-  /// Grouped-bubble radii: a sender's bubble keeps a tight corner on the
-  /// "tail" side for the first/last of a run. [isMine] decides the tail side.
+  /// Grouped-bubble radii matching the web `ModernMessageBubble`: the bubble is
+  /// `rounded-2xl` (16) everywhere except the single tail corner nearest the
+  /// sender, which softens to [grouped] (6, web `rounded-md`). The own side
+  /// always pins the bottom-right tail; incoming pins the bottom-left. Mid-run
+  /// bubbles additionally soften the *top* tail corner so a vertical run reads
+  /// as one connected column.
   static BorderRadius groupedBubble({
     required bool isMine,
     required bool isFirstInGroup,
     required bool isLastInGroup,
   }) {
-    const big = Radius.circular(lg);
+    const big = Radius.circular(bubbleRadius);
     const small = Radius.circular(grouped);
     if (isMine) {
       return BorderRadius.only(
@@ -188,9 +205,10 @@ class ChatSpacing {
   static const double listItemMinHeight = 52;
   static const double headerHeight = 56; // h-14
   static const double avatarSm = 28; // 7x7 bubble avatar (~28px)
-  static const double avatarMd = 40; // inbox row avatar
+  static const double avatarMd = 44; // inbox row avatar (web w-11 h-11)
   static const double avatarLg = 48; // header avatar
-  static const double onlineDot = 12;
+  static const double onlineDot = 12; // header presence dot
+  static const double inboxOnlineDot = 16; // inbox row dot (web w-4 h-4)
   static const double bubbleMaxWidthFraction = 0.75; // maxWidth 75%
   static const double scrollAwayThreshold = 150; // px before FAB shows
 }

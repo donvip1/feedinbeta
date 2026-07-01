@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config carries API keys — keep it out of git (like .env / keystores).
+**/google-services.json
+**/GoogleService-Info.plist

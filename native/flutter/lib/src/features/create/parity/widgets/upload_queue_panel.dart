@@ -57,7 +57,15 @@ class UploadQueuePanel extends StatelessWidget {
     } else {
       for (var i = 0; i < items.length; i++) {
         if (i > 0) children.add(const SizedBox(height: CreateSpacing.sm));
-        children.add(_QueueRow(item: items[i], callbacks: callbacks));
+        // Staggered fade/slide-in per row (web parity: animationDelay per item).
+        children.add(
+          _QueueRowEntrance(
+            // Key on identity so rows don't re-animate on unrelated rebuilds.
+            key: ValueKey(items[i].draftId),
+            index: i,
+            child: _QueueRow(item: items[i], callbacks: callbacks),
+          ),
+        );
       }
     }
 
@@ -65,6 +73,69 @@ class UploadQueuePanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: children,
+    );
+  }
+}
+
+// ===========================================================================
+// Row entrance animation
+// ===========================================================================
+
+/// Wraps a queue row in a one-shot fade + slide-up entrance, with a small
+/// per-index delay so a freshly-loaded list cascades in (web parity with the
+/// staggered `animationDelay` on the creation rows).
+class _QueueRowEntrance extends StatefulWidget {
+  const _QueueRowEntrance({
+    super.key,
+    required this.index,
+    required this.child,
+  });
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_QueueRowEntrance> createState() => _QueueRowEntranceState();
+}
+
+class _QueueRowEntranceState extends State<_QueueRowEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: CreateMotion.normal,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // Cap the cascade so long lists don't crawl in.
+    final delayMs = (widget.index.clamp(0, 6)) * 45;
+    Future<void>.delayed(Duration(milliseconds: delayMs), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: CreateMotion.emphasized,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.12),
+          end: Offset.zero,
+        ).animate(curved),
+        child: widget.child,
+      ),
     );
   }
 }
@@ -111,45 +182,59 @@ class _SummaryBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isError = summary.isError;
+    // Success uses an emerald tint to echo the web "Post created!" done state;
+    // errors use the destructive tint.
     final background = isError
         ? const Color(0x1AEF4343) // destructive @ 10%
-        : CreateColors.primaryFaint;
+        : const Color(0x1A10B981); // success @ 10%
     final borderColor = isError
         ? const Color(0x66EF4343)
-        : CreateColors.primarySoft;
-    final foreground = isError ? CreateColors.destructive : CreateColors.primary;
+        : const Color(0x6610B981);
+    final foreground = isError
+        ? CreateColors.destructive
+        : CreateColors.success;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: CreateSpacing.md,
-        vertical: CreateSpacing.sm,
+    // One-shot pop-in (web parity: animate-scale-in on the done check).
+    return TweenAnimationBuilder<double>(
+      duration: CreateMotion.normal,
+      curve: CreateMotion.spring,
+      tween: Tween(begin: 0.96, end: 1),
+      builder: (context, scale, child) => Opacity(
+        opacity: scale.clamp(0.0, 1.0),
+        child: Transform.scale(scale: scale, child: child),
       ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: CreateRadii.field,
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            isError ? Icons.error_outline : Icons.check_circle_outline,
-            size: 18,
-            color: foreground,
-          ),
-          const SizedBox(width: CreateSpacing.sm),
-          Expanded(
-            child: Text(
-              summary.message,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: foreground,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: CreateSpacing.md,
+          vertical: CreateSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: CreateRadii.field,
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle,
+              size: 18,
+              color: foreground,
+            ),
+            const SizedBox(width: CreateSpacing.sm),
+            Expanded(
+              child: Text(
+                summary.message,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: foreground,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -173,10 +258,7 @@ class _EmptyQueueCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.post_add_outlined,
-            color: CreateColors.primary,
-          ),
+          const Icon(Icons.post_add_outlined, color: CreateColors.primary),
           const SizedBox(width: CreateSpacing.md),
           Expanded(
             child: Text(
@@ -228,11 +310,7 @@ class _QueueRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                _leadingIcon,
-                size: 22,
-                color: CreateColors.mutedForeground,
-              ),
+              Icon(_leadingIcon, size: 22, color: CreateColors.mutedForeground),
               const SizedBox(width: CreateSpacing.md),
               Expanded(
                 child: Column(
@@ -377,7 +455,9 @@ class _StatusPill extends StatelessWidget {
 }
 
 /// Indeterminate (or determinate when [progress] is known) brand-colored bar
-/// shown while a row is uploading.
+/// shown while a row is uploading. The determinate fill is gradient-filled and
+/// animates toward its target (web parity: `transition-all duration-300` on the
+/// upload progress bar).
 class _UploadProgressBar extends StatelessWidget {
   const _UploadProgressBar({this.progress});
 
@@ -387,25 +467,48 @@ class _UploadProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final value = progress == null ? null : (progress!.clamp(0, 100) / 100);
+    final p = progress;
     return Row(
       children: [
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(CreateRadii.pill),
-            child: LinearProgressIndicator(
-              value: value,
-              minHeight: 4,
-              backgroundColor: CreateColors.muted,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                CreateColors.primary,
-              ),
+            child: SizedBox(
+              height: 6,
+              child: p == null
+                  ? const LinearProgressIndicator(
+                      minHeight: 6,
+                      backgroundColor: CreateColors.muted,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        CreateColors.primary,
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final fraction = (p.clamp(0, 100)) / 100;
+                        return Stack(
+                          children: [
+                            const Positioned.fill(
+                              child: ColoredBox(color: CreateColors.muted),
+                            ),
+                            AnimatedContainer(
+                              duration: CreateMotion.slow,
+                              curve: CreateMotion.emphasized,
+                              width: constraints.maxWidth * fraction,
+                              decoration: const BoxDecoration(
+                                gradient: CreateGradients.primaryAction,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
             ),
           ),
         ),
-        if (progress != null) ...[
+        if (p != null) ...[
           const SizedBox(width: CreateSpacing.sm),
-          Text('$progress%', style: CreateTextStyles.uploadPercent),
+          Text('$p%', style: CreateTextStyles.uploadPercent),
         ],
       ],
     );
