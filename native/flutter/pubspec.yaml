@@ -53,10 +53,13 @@ dependencies:
   record: ^6.1.1
   just_audio: ^0.10.5
   file_picker: ^10.3.4
-  # Real-time 1:1 audio/video calling media transport (WebRTC) + runtime camera
-  # / microphone permissions.
+  # Real-time 1:1 audio/video calling media transport + runtime camera / mic
+  # permissions. LiveKit (SFU + managed TURN) is the primary transport, matching
+  # the web app's LiveKitCallManager; flutter_webrtc is its underlying engine and
+  # also backs a raw-WebRTC fallback engine.
   flutter_webrtc: ^0.14.1
   permission_handler: ^12.0.1
+  livekit_client: ^2.4.0
 
 dev_dependencies:
   flutter_test:

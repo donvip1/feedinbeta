@@ -22,7 +22,7 @@ import '../../data/local/upload_queue_repository.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_screen.dart';
-import '../calls/webrtc_call_media_engine.dart';
+import '../calls/livekit_call_media_engine.dart';
 import '../channels/screens/channels_screen.dart';
 import '../groups/screens/groups_screen.dart';
 import '../live/live_screen.dart';
@@ -115,10 +115,12 @@ class _FeedShellState extends State<FeedShell> {
     _connectRealtime();
     widget.foregroundSyncCoordinator.start();
     unawaited(_initPush());
-    // Real WebRTC media transport for 1:1 calls (mic/camera, SDP/ICE over the
-    // call_signals table). STUN-only by default — cross-network calls behind
-    // symmetric NAT need a server-minted TURN entry injected via iceServers.
-    _callController = CallController(mediaEngine: WebRtcCallMediaEngine());
+    // Real 1:1 call media over LiveKit (SFU + managed TURN), matching the web
+    // app. The engine fetches a short-lived token from the server-owned
+    // `livekit-token` edge function (the app holds no LiveKit secret) and joins
+    // room `call-<callId>`. Requires that function + LIVEKIT_* secrets deployed
+    // on the project; until then the call UI shows "connection failed" + retry.
+    _callController = CallController(mediaEngine: LiveKitCallMediaEngine());
     _callController.addListener(_handleCallControllerChange);
     unawaited(_callController.init());
   }
