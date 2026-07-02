@@ -277,6 +277,42 @@ class CallsRemoteDataSource {
     });
   }
 
+  /// Realtime stream of signals for [callId] addressed to the current user
+  /// (excludes the user's own signals). Empty stream when unconfigured.
+  ///
+  /// Backed by Supabase realtime on `call_signals`. The underlying stream
+  /// re-emits the FULL matching row set on every change, so we de-dupe by row
+  /// id (tracking a seen-id set) and emit each new signal exactly once, and we
+  /// filter out rows this user sent so the media engine never processes its own
+  /// offer/answer/candidate. RLS already restricts rows to the two call
+  /// participants, so no recipient filter is needed here.
+  Stream<CallSignal> watchCallSignals(String callId) {
+    final client = _client;
+    if (client == null) return const Stream.empty();
+    final selfId = currentUserId;
+    final seenIds = <String>{};
+
+    return client
+        .from(_callSignalsTable)
+        .stream(primaryKey: ['id'])
+        .eq('call_id', callId)
+        .expand((rows) {
+          final fresh = <CallSignal>[];
+          for (final row in rows) {
+            final map = Map<String, Object?>.from(row);
+            final id = map['id']?.toString();
+            // Skip rows we've already surfaced (the stream re-emits the whole
+            // set on each change) and our own signals.
+            if (id == null || !seenIds.add(id)) continue;
+            if (selfId != null && map['sender_id']?.toString() == selfId) {
+              continue;
+            }
+            fresh.add(CallSignal.fromJson(map));
+          }
+          return fresh;
+        });
+  }
+
   // ---------------------------------------------------------------------------
   // Mapping helpers
   // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ import '../../data/local/upload_queue_repository.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_screen.dart';
+import '../calls/webrtc_call_media_engine.dart';
 import '../channels/screens/channels_screen.dart';
 import '../groups/screens/groups_screen.dart';
 import '../live/live_screen.dart';
@@ -114,7 +115,10 @@ class _FeedShellState extends State<FeedShell> {
     _connectRealtime();
     widget.foregroundSyncCoordinator.start();
     unawaited(_initPush());
-    _callController = CallController();
+    // Real WebRTC media transport for 1:1 calls (mic/camera, SDP/ICE over the
+    // call_signals table). STUN-only by default — cross-network calls behind
+    // symmetric NAT need a server-minted TURN entry injected via iceServers.
+    _callController = CallController(mediaEngine: WebRtcCallMediaEngine());
     _callController.addListener(_handleCallControllerChange);
     unawaited(_callController.init());
   }

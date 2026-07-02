@@ -53,6 +53,10 @@ dependencies:
   record: ^6.1.1
   just_audio: ^0.10.5
   file_picker: ^10.3.4
+  # Real-time 1:1 audio/video calling media transport (WebRTC) + runtime camera
+  # / microphone permissions.
+  flutter_webrtc: ^0.14.1
+  permission_handler: ^12.0.1
 
 dev_dependencies:
   flutter_test:
