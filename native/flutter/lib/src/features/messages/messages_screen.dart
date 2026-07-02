@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:file_picker/file_picker.dart';
+
 import '../../core/sync/conversation_starter.dart';
 import '../../core/sync/sync_service.dart';
 import '../../data/local/local_messages_repository_contract.dart';
@@ -14,6 +16,7 @@ import '../calls/call_controller.dart';
 import '../calls/call_models.dart';
 import '../calls/call_screen.dart';
 import '../profile/user_profile.dart';
+import 'chat/audio_backends_impl.dart';
 import 'chat/audio_message_support.dart';
 import 'chat/chat_mappers.dart';
 import 'chat/chat_theme.dart';
@@ -677,15 +680,55 @@ class _ConversationScreenState extends State<ConversationScreen> {
   /// available runs through [_queueAudioAttachment] with a validated
   /// [StagedAudioMedia] of kind [StagedAudioKind.music].
   Future<void> _shareMusicFile() async {
-    // FLAGGED: no audio file picker dependency (file_picker) is available. When
-    // one is added, pick the file here, build a StagedAudioMedia via
-    // AudioMediaValidator.validateMusicFile(...), then call
-    // _queueAudioAttachment(staged). The bubble/mapper/storage wiring below is
-    // already complete and needs no further change.
-    _toast(
-      'Sharing a music file needs the audio file picker (file_picker) to be '
-      'added.',
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+        withData: false,
+      );
+    } catch (_) {
+      if (mounted) _toast('Could not open the audio picker.');
+      return;
+    }
+    final picked = result?.files.singleOrNull;
+    final path = picked?.path;
+    if (picked == null || path == null || path.isEmpty || !mounted) return;
+
+    // Duration isn't reported by the picker — decode it so the 4-minute cap is
+    // enforced, and to render the track length in the bubble.
+    final durationMs = await probeAudioDurationMs(path);
+    if (!mounted) return;
+
+    final mime = AudioMediaValidator.resolveMime(fileName: picked.name);
+    final validation = AudioMediaValidator.validateMusicFile(
+      mimeType: mime,
+      fileName: picked.name,
+      fileSizeBytes: picked.size,
+      durationMs: durationMs,
     );
+    if (!validation.isValid) {
+      _toast(validation.error ?? 'That audio file cannot be shared.');
+      return;
+    }
+
+    final title = _trackTitleFromName(picked.name);
+    await _queueAudioAttachment(
+      StagedAudioMedia(
+        kind: StagedAudioKind.music,
+        localPath: path,
+        mimeType: mime ?? 'audio/mpeg',
+        fileName: picked.name,
+        fileSizeBytes: picked.size,
+        durationMs: durationMs,
+        title: title,
+      ),
+    );
+  }
+
+  static String _trackTitleFromName(String name) {
+    final dot = name.lastIndexOf('.');
+    final base = dot > 0 ? name.substring(0, dot) : name;
+    return base.trim().isEmpty ? 'Audio track' : base.trim();
   }
 
   /// Records an in-chat audio note through the recorder seam and, on send,

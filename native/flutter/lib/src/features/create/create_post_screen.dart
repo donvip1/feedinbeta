@@ -10,6 +10,7 @@ import '../../data/local/post_draft_repository.dart';
 import '../../data/local/upload_queue_repository.dart';
 import 'parity/create_tokens.dart';
 import 'parity/create_view_models.dart';
+import 'parity/story_audio_source_impl.dart';
 import 'parity/story_extras_models.dart';
 import 'parity/widgets/post_composer_panel.dart';
 import 'parity/widgets/story_composer_sheet.dart';
@@ -56,12 +57,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _picker = ImagePicker();
 
   /// Publishes the "extra" story kinds (text / audio note / music) that the
-  /// shared draft + upload-queue model can't represent. No [StoryAudioSource]
-  /// is injected on this build, so `canUseAudio` is false and the composer
-  /// disables the audio/music kinds with a flagged-setup note; text stories
-  /// work end-to-end today. Wiring a recorder/file-picker seam here lights the
-  /// other two kinds up with no further UI changes.
-  final StoryPublisher _storyPublisher = StoryPublisher();
+  /// shared draft + upload-queue model can't represent. A [DeviceStoryAudioSource]
+  /// (record + file_picker + just_audio) is injected, so `canUseAudio` is true
+  /// and the composer enables the audio-note and music-file kinds alongside
+  /// text stories.
+  late final StoryPublisher _storyPublisher = StoryPublisher(
+    audioSource: DeviceStoryAudioSource(contextProvider: () => context),
+  );
 
   _CreateMode _mode = _CreateMode.post;
 

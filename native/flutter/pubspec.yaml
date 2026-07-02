@@ -47,6 +47,12 @@ dependencies:
   workmanager: ^0.9.0+3
   firebase_core: ^4.11.0
   firebase_messaging: ^16.4.1
+  # Audio + file features: in-chat voice notes / audio-note stories (record),
+  # seek-accurate playback for music/voice bubbles (just_audio), and picking an
+  # audio file for chat music + music stories (file_picker).
+  record: ^6.1.1
+  just_audio: ^0.10.5
+  file_picker: ^10.3.4
 
 dev_dependencies:
   flutter_test:

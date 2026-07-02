@@ -7,10 +7,15 @@ import 'src/core/bootstrap/local_storage_bootstrap.dart';
 import 'src/core/config/feedin_config.dart';
 import 'src/core/notifications/push_notification_service.dart';
 import 'src/core/sync/background_sync_scheduler.dart';
+import 'src/features/messages/chat/audio_backends_impl.dart';
 import 'src/app/feedin_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Light up the in-chat voice-note recorder + audio/music playback bubbles by
+  // registering the concrete record/just_audio backends into their seams.
+  registerAudioBackends();
 
   const config = FeedinConfig.fromEnvironment;
 
