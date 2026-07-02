@@ -215,10 +215,15 @@ but were inert on device. This phase closes those gaps.
       `RECORD_AUDIO` added to the manifest.
 - [x] Fixed local build: pinned Flutter's JDK to the Android Studio JBR 21
       (system JDK 25 was breaking Gradle at settings evaluation).
-- [ ] Real-time calling media: `flutter_webrtc` + `permission_handler`; replace
-      the stub `CallMediaEngine` with a WebRTC engine using SDP/ICE signaling
-      over the existing `call_signals` table. STUN by default; TURN server for
-      cross-network is flagged (needs a server-owned TURN credential).
+- [x] Real-time calling media (LiveKit, web parity): `LiveKitCallMediaEngine`
+      (`livekit_client`) is the CallController transport — fetches a token from
+      the server-owned `livekit-token` edge function (room `call-<id>`), joins
+      LiveKit's SFU (managed TURN), publishes mic/camera, renders remote video.
+      App holds no LiveKit secret. Deployed `livekit-token` to the native project
+      (feedin-live) + set LIVEKIT_URL/API_KEY/API_SECRET secrets there; endpoint
+      verified 404->401 (auth-gated). A raw-WebRTC engine (`flutter_webrtc`,
+      SDP/ICE over `call_signals`, realtime enabled) is kept as a fallback.
+      Pending: exercise a real 2-device call.
 - [ ] Wallet real money moves (buy credits / subscriptions / payouts): needs
       the server-owned checkout (Stripe/edge functions). UI shows "backend
       unavailable" until deployed.
