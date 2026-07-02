@@ -170,9 +170,13 @@ This is the single source of truth for the feedIn Flutter native rebuild. Keep t
 - [x] Added ignored `key.properties`/keystore rules and tracked `key.properties.example`.
 - [x] Added feedIn adaptive launcher icon resources.
 - [ ] Test background sync on a real Android phone after Supabase auth is active.
-- [ ] Create release keystore locally.
-- [ ] Build release app bundle.
-- [ ] Set up Play Console internal testing.
+- [x] Create release keystore locally (`android/app/feedin-release.jks` +
+      `android/key.properties`, both gitignored). BACK THESE UP — needed for
+      every future update (Play App Signing makes the upload key recoverable).
+- [x] Build signed release APK (91 MB) + app bundle (66 MB), signed with the
+      feedIn release key (verified `CN=feedIn`).
+- [ ] Set up Play Console internal testing (needs your Play Developer account;
+      upload `build/app/outputs/bundle/release/app-release.aab`).
 - [ ] Add iOS Firebase config and iOS release setup later.
 
 ## Phase 8: Native Feature Expansion (active — 2026-07-01)
@@ -300,7 +304,8 @@ Option B also needs the IPv4 pooler URL on this network:
 
 ### Supabase Auth Redirect
 
-- [ ] Add `feedin://auth-callback` to the Supabase Auth redirect allow-list.
+- [x] Add `feedin://auth-callback` to the Supabase Auth redirect allow-list
+      (verified present in the project's `uri_allow_list` via the Management API).
 
 Steps:
 
