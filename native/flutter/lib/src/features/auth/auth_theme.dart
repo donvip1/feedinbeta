@@ -44,6 +44,24 @@ class AuthColors {
   static const Color destructiveSoft = Color(0x1AEF4343); // destructive @ 10%
   static const Color onlineSoft = Color(0x1A10B981); // online @ 10%
   static const Color mutedSoft = Color(0x66131C2B); // muted/50 fill
+
+  // --- Brand gradient palette (copied from FeedImmersiveTheme) ---
+  // The app's pink→orange brand used full-bleed behind the auth screens.
+  static const Color brandPink = Color(0xFFFF3D9A);
+  static const Color brandOrange = Color(0xFFFF7A45);
+
+  // On-brand ink used for text/icons floating over the gradient.
+  static const Color onBrand = Color(0xFFFFFFFF);
+  static const Color onBrandMuted = Color(0xCCFFFFFF); // white @ 80%
+  static const Color onBrandFaint = Color(0x99FFFFFF); // white @ 60%
+
+  // Frosted surfaces that float over the gradient (borderless, glassy).
+  static const Color glassFill = Color(0x1FFFFFFF); // white @ 12%
+  static const Color glassFillStrong = Color(0x33FFFFFF); // white @ 20%
+  static const Color glassLine = Color(0x40FFFFFF); // white @ 25% divider
+  static const Color glassLineFaint = Color(0x24FFFFFF); // white @ 14% divider
+  static const Color onBrandError = Color(0xFFFFE1E1); // soft error ink
+  static const Color onBrandErrorFill = Color(0x33FF3D3D); // error wash
 }
 
 /// Gradients — the web `bg-gradient-primary` brand fill.
@@ -61,6 +79,14 @@ class AuthGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFFF04299), Color(0xFFE963BC)],
+  );
+
+  /// Full-bleed pink→orange brand gradient behind the auth screens.
+  /// Matches the app brand (FeedImmersiveTheme.brandGradient).
+  static const LinearGradient brand = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AuthColors.brandPink, AuthColors.brandOrange],
   );
 }
 
@@ -176,5 +202,51 @@ class AuthTextStyles {
     fontWeight: FontWeight.w600,
     letterSpacing: 0.6,
     color: AuthColors.mutedForeground,
+  );
+
+  // --- On-brand styles (white ink floating over the gradient) ---
+
+  /// Brand wordmark shown over the gradient.
+  static const TextStyle brandOnGradient = TextStyle(
+    fontSize: 34,
+    fontWeight: FontWeight.w900,
+    letterSpacing: -0.5,
+    color: AuthColors.onBrand,
+  );
+
+  /// Screen headline ('Welcome back') over the gradient.
+  static const TextStyle headlineOnBrand = TextStyle(
+    fontSize: 26,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.3,
+    color: AuthColors.onBrand,
+  );
+
+  /// Muted subhead over the gradient.
+  static const TextStyle subheadOnBrand = TextStyle(
+    fontSize: 15,
+    height: 1.35,
+    color: AuthColors.onBrandMuted,
+  );
+
+  /// Text typed into a borderless field over the gradient.
+  static const TextStyle fieldOnBrand = TextStyle(
+    fontSize: 16,
+    color: AuthColors.onBrand,
+  );
+
+  /// Primary button label (brand-pink ink on the white CTA).
+  static const TextStyle primaryButtonOnBrand = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0.1,
+    color: AuthColors.brandPink,
+  );
+
+  /// Google / frosted button label.
+  static const TextStyle glassButton = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    color: AuthColors.onBrand,
   );
 }

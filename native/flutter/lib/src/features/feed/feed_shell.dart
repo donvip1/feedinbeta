@@ -32,7 +32,7 @@ import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
 import '../notifications/parity/widgets/notification_bell_badge.dart';
 import '../notifications/notifications_screen.dart';
-import '../profile/profile_editor_screen.dart';
+import '../profile/profile_screen.dart';
 import '../profile/user_profile.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
@@ -345,18 +345,22 @@ class _FeedShellState extends State<FeedShell> {
         callController: _callController,
       ),
       const WalletScreen(),
-      ProfileEditorScreen(
+      ProfileScreen(
         profile: _profile,
         profileRepository: widget.profileRepository,
         feedRepository: widget.feedRepository,
-        onSaved: (profile) => setState(() => _profile = profile),
+        onEditSaved: (profile) => setState(() => _profile = profile),
+        onOpenSettings: _openSettings,
       ),
     ];
 
     // The feed (immersive) and Wallet both draw their own chrome, so the shared
     // AppBar is hidden while either is on screen.
     final immersiveFeed = _index == 0 && !_showNotifications;
-    final hideAppBar = immersiveFeed || (_index == 2 && !_showNotifications);
+    // Feed (immersive), Wallet (index 2) and the redesigned Profile (index 3)
+    // each draw their own chrome/header, so the shared AppBar is hidden there.
+    final hideAppBar = immersiveFeed ||
+        ((_index == 2 || _index == 3) && !_showNotifications);
 
     return Scaffold(
       backgroundColor: immersiveFeed ? Colors.black : null,
@@ -400,12 +404,6 @@ class _FeedShellState extends State<FeedShell> {
                     icon: const Icon(Icons.groups_2_outlined),
                   ),
                 ],
-                if (_index == 3)
-                  IconButton(
-                    tooltip: 'Settings',
-                    onPressed: _openSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                  ),
                 _NotificationBellAction(
                   unreadCountFuture: _notificationUnreadCountFuture,
                   onTap: _toggleNotifications,

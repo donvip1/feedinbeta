@@ -4,24 +4,40 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../app/feedin_services.dart';
+import '../../core/permissions/onboarding_state.dart';
+import '../../core/permissions/permission_handler_service.dart';
 import '../feed/feed_shell.dart';
+import '../onboarding/permission_onboarding_screen.dart';
 import '../profile/profile_completion_screen.dart';
 import '../profile/user_profile.dart';
 import 'auth_theme.dart';
 import 'data/auth_repository.dart';
-
-enum AuthMode { signIn, signUp }
+import 'login_screen.dart';
+import 'signup_screen.dart';
+import 'widgets/auth_background.dart';
+import 'widgets/auth_message.dart';
+import 'widgets/auth_mode_switch.dart';
+import 'widgets/brand_text_field.dart';
+import 'widgets/google_auth_button.dart';
+import 'widgets/primary_auth_button.dart';
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.services});
+  const AuthGate({super.key, required this.services, this.onGoogleSignIn});
 
   final FeedinServices services;
+
+  /// Injectable Google sign-in seam. `google_sign_in` is not wired yet, so when
+  /// this is null the button falls back to [defaultGoogleSignInHandler] (a
+  /// "coming soon" snackbar). Provide a real [GoogleSignInHandler] here later
+  /// and the login/signup layout stays exactly the same.
+  final GoogleSignInHandler? onGoogleSignIn;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<AuthGate> {
+  final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -36,15 +52,27 @@ class _AuthGateState extends State<AuthGate> {
   String? _message;
   String? _errorMessage;
 
+  /// Whether the first-run permission onboarding still needs to be shown once
+  /// the user is authenticated. Loaded once from [OnboardingState].
+  bool _needsPermissionOnboarding = false;
+
   @override
   void initState() {
     super.initState();
     _listenForPasswordRecovery();
     _restoreSession();
+    _loadOnboardingFlag();
+  }
+
+  Future<void> _loadOnboardingFlag() async {
+    final seen = await OnboardingState.hasSeenOnboarding();
+    if (!mounted) return;
+    setState(() => _needsPermissionOnboarding = !seen);
   }
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _newPasswordController.dispose();
@@ -85,6 +113,15 @@ class _AuthGateState extends State<AuthGate> {
         setState(() => _isCheckingSession = false);
       }
     }
+  }
+
+  void _switchMode(AuthMode mode) {
+    if (_mode == mode) return;
+    setState(() {
+      _mode = mode;
+      _message = null;
+      _errorMessage = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -147,11 +184,11 @@ class _AuthGateState extends State<AuthGate> {
         email: _emailController.text,
       );
       if (!mounted) return;
-      setState(
-        () => _message = widget.services.authRepository.isConfigured
-            ? 'Password reset email sent if the account exists.'
-            : 'Add Supabase keys before password reset can send email.',
-      );
+      final confirmation = widget.services.authRepository.isConfigured
+          ? 'Password reset email sent if the account exists.'
+          : 'Add Supabase keys before password reset can send email.';
+      setState(() => _message = confirmation);
+      _showSnack(confirmation);
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = _formatError(error));
@@ -208,6 +245,21 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
+  void _enterLocalMode() {
+    setState(() {
+      _user = const AuthUser.demo();
+      _profile = null;
+    });
+  }
+
+  void _showSnack(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(behavior: SnackBarBehavior.floating, content: Text(text)),
+      );
+  }
+
   String _formatError(Object error) {
     final raw = error.toString();
     return raw
@@ -219,16 +271,15 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     if (_isCheckingSession) {
       return const Scaffold(
-        backgroundColor: AuthColors.background,
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AuthColors.primary),
+        body: AuthBackground(
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AuthColors.onBrand),
+            ),
           ),
         ),
       );
     }
-
-    final user = _user;
 
     if (_isRecoveringPassword) {
       return _PasswordRecoveryScaffold(
@@ -239,6 +290,8 @@ class _AuthGateState extends State<AuthGate> {
         onSubmit: _updatePassword,
       );
     }
+
+    final user = _user;
 
     if (user != null) {
       final profile = _profile;
@@ -267,6 +320,21 @@ class _AuthGateState extends State<AuthGate> {
         );
       }
 
+      // First-run permission onboarding, shown once after the profile exists and
+      // before the app shell. Skipped on unconfigured/offline (demo) builds so
+      // the local-preview path stays frictionless and the widget test is unaffected.
+      if (_needsPermissionOnboarding &&
+          widget.services.authRepository.isConfigured) {
+        return PermissionOnboardingScreen(
+          service: PermissionHandlerService(),
+          onComplete: (result) async {
+            await OnboardingState.markSeen(result);
+            if (!mounted) return;
+            setState(() => _needsPermissionOnboarding = false);
+          },
+        );
+      }
+
       return FeedShell(
         displayName: profile.displayName,
         profile: profile,
@@ -289,746 +357,254 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
+    return _buildUnauthenticated();
+  }
+
+  Widget _buildUnauthenticated() {
     final isConfigured = widget.services.authRepository.isConfigured;
     final isSignIn = _mode == AuthMode.signIn;
+    final handler = widget.onGoogleSignIn ?? defaultGoogleSignInHandler;
+    void onGoogleSignIn() => handler(context);
+
+    final Widget activeScreen = isSignIn
+        ? LoginScreen(
+            key: const ValueKey('login'),
+            emailController: _emailController,
+            passwordController: _passwordController,
+            isConfigured: isConfigured,
+            busy: _isSubmitting,
+            errorMessage: _errorMessage,
+            infoMessage: _message,
+            onSubmit: _submit,
+            onForgotPassword: _sendPasswordReset,
+            onGoogleSignIn: onGoogleSignIn,
+            onSwitchToSignUp: () => _switchMode(AuthMode.signUp),
+          )
+        : SignupScreen(
+            key: const ValueKey('signup'),
+            displayNameController: _displayNameController,
+            emailController: _emailController,
+            passwordController: _passwordController,
+            isConfigured: isConfigured,
+            busy: _isSubmitting,
+            errorMessage: _errorMessage,
+            infoMessage: _message,
+            onSubmit: _submit,
+            onGoogleSignIn: onGoogleSignIn,
+            onSwitchToSignIn: () => _switchMode(AuthMode.signIn),
+          );
+
+    // Animated login/signup swap — a smooth slide+fade between the two forms.
+    final Widget animatedForm = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.035),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: activeScreen,
+    );
+
+    final offlineEntry = isConfigured
+        ? null
+        : _OfflineEntry(enabled: !_isSubmitting, onLocalEntry: _enterLocalMode);
 
     return Scaffold(
-      backgroundColor: AuthColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 760;
-            final content = [
-              const _OnboardingBrandPanel(),
-              _AuthFormPanel(
-                isConfigured: isConfigured,
-                isSignIn: isSignIn,
-                mode: _mode,
-                emailController: _emailController,
-                passwordController: _passwordController,
-                isSubmitting: _isSubmitting,
-                message: _message,
-                errorMessage: _errorMessage,
-                onModeChanged: (mode) {
-                  setState(() {
-                    _mode = mode;
-                    _message = null;
-                    _errorMessage = null;
-                  });
-                },
-                onSubmit: _submit,
-                onPasswordReset: _sendPasswordReset,
-                onLocalEntry: isConfigured
-                    ? null
-                    : () => setState(() {
-                        _user = const AuthUser.demo();
-                        _profile = null;
-                      }),
-              ),
-            ];
-
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 980),
-                  child: isWide
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(child: content[0]),
-                            const SizedBox(width: 28),
-                            Expanded(child: content[1]),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            content[0],
-                            const SizedBox(height: 18),
-                            content[1],
-                          ],
-                        ),
+      body: AuthBackground(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Wide screens (tablet/desktop) get a two-panel split so the tall
+              // form never runs off a short viewport; phones get one column.
+              final isWide = constraints.maxWidth >= 720;
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isWide ? 940 : 440,
+                    ),
+                    child: isWide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: _BrandPanel(offlineEntry: offlineEntry),
+                              ),
+                              const SizedBox(width: 48),
+                              Expanded(child: animatedForm),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _BrandHeader(),
+                              const SizedBox(height: AuthSpacing.lg),
+                              animatedForm,
+                              if (offlineEntry != null) ...[
+                                const SizedBox(height: AuthSpacing.lg),
+                                offlineEntry,
+                              ],
+                            ],
+                          ),
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _OnboardingBrandPanel extends StatelessWidget {
-  const _OnboardingBrandPanel();
+/// Wide-layout left panel: brand mark, tagline, and (offline builds only) the
+/// local-mode entry — the marketing side of the split auth screen.
+class _BrandPanel extends StatelessWidget {
+  const _BrandPanel({required this.offlineEntry});
+
+  final Widget? offlineEntry;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Gradient logo mark + wordmark.
-        Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                gradient: AuthGradients.brandMark,
-                borderRadius: AuthRadii.field,
-                boxShadow: AuthShadows.glow,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.bolt,
-                color: AuthColors.primaryForeground,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: AuthSpacing.md),
-            const Text('feedIn', style: AuthTextStyles.brand),
-          ],
-        ),
-        const SizedBox(height: AuthSpacing.xl),
+        const _BrandHeader(),
+        const SizedBox(height: AuthSpacing.xxl),
         const Text(
           'Create, connect, and share\nwithout losing your flow.',
-          style: AuthTextStyles.tagline,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.18,
+            letterSpacing: -0.3,
+            color: AuthColors.onBrand,
+          ),
         ),
-        const SizedBox(height: AuthSpacing.xl),
-        Wrap(
-          spacing: AuthSpacing.sm,
-          runSpacing: AuthSpacing.sm,
-          children: const [
-            _OnboardingChip(icon: Icons.play_circle_outline, label: 'Video'),
-            _OnboardingChip(icon: Icons.chat_bubble_outline, label: 'Chats'),
-            _OnboardingChip(icon: Icons.cloud_done_outlined, label: 'Sync'),
-          ],
+        const SizedBox(height: AuthSpacing.md),
+        const Text(
+          'Your feed, messages, and profile — all in one place.',
+          style: AuthTextStyles.subheadOnBrand,
         ),
+        if (offlineEntry != null) ...[
+          const SizedBox(height: AuthSpacing.xxl),
+          offlineEntry!,
+        ],
       ],
     );
   }
 }
 
-class _OnboardingChip extends StatelessWidget {
-  const _OnboardingChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AuthSpacing.md,
-        vertical: AuthSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: AuthColors.primarySoft,
-        borderRadius: AuthRadii.chip,
-        border: Border.all(color: AuthColors.primary.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AuthColors.primary),
-          const SizedBox(width: AuthSpacing.xs),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AuthColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthFormPanel extends StatelessWidget {
-  const _AuthFormPanel({
-    required this.isConfigured,
-    required this.isSignIn,
-    required this.mode,
-    required this.emailController,
-    required this.passwordController,
-    required this.isSubmitting,
-    required this.message,
-    required this.errorMessage,
-    required this.onModeChanged,
-    required this.onSubmit,
-    required this.onPasswordReset,
-    required this.onLocalEntry,
-  });
-
-  final bool isConfigured;
-  final bool isSignIn;
-  final AuthMode mode;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final bool isSubmitting;
-  final String? message;
-  final String? errorMessage;
-  final ValueChanged<AuthMode> onModeChanged;
-  final VoidCallback onSubmit;
-  final VoidCallback onPasswordReset;
-  final VoidCallback? onLocalEntry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AuthColors.card,
-        borderRadius: AuthRadii.card,
-        border: Border.all(color: AuthColors.border),
-        boxShadow: AuthShadows.card,
-      ),
-      padding: const EdgeInsets.all(AuthSpacing.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            isSignIn ? 'Welcome back' : 'Create your account',
-            style: AuthTextStyles.headline,
-          ),
-          const SizedBox(height: AuthSpacing.xs),
-          Text(
-            isSignIn
-                ? 'Sign in to continue your feed, messages, and profile.'
-                : 'Start with your email and finish your profile next.',
-            style: AuthTextStyles.subhead,
-          ),
-          const SizedBox(height: AuthSpacing.xl),
-          _AuthModeToggle(
-            mode: mode,
-            enabled: !isSubmitting,
-            onModeChanged: onModeChanged,
-          ),
-          const SizedBox(height: AuthSpacing.xl),
-          const _AuthFieldLabel('Email'),
-          const SizedBox(height: AuthSpacing.sm),
-          _AuthTextField(
-            controller: emailController,
-            hintText: 'you@example.com',
-            icon: Icons.alternate_email,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: AuthSpacing.lg),
-          const _AuthFieldLabel('Password'),
-          const SizedBox(height: AuthSpacing.sm),
-          _AuthPasswordField(
-            controller: passwordController,
-            hintText: 'Enter your password',
-            textInputAction: TextInputAction.done,
-            onSubmitted: () {
-              if (isConfigured && !isSubmitting) onSubmit();
-            },
-          ),
-          if (isSignIn) ...[
-            const SizedBox(height: AuthSpacing.sm),
-            Align(
-              alignment: Alignment.centerRight,
-              child: _AuthLinkButton(
-                label: 'Forgot password?',
-                onPressed: isSubmitting ? null : onPasswordReset,
-              ),
-            ),
-          ],
-          const SizedBox(height: AuthSpacing.lg),
-          _AuthPrimaryButton(
-            label: isSubmitting
-                ? 'Please wait...'
-                : isSignIn
-                ? 'Sign In'
-                : 'Create Account',
-            busy: isSubmitting,
-            onPressed: isConfigured && !isSubmitting ? onSubmit : null,
-          ),
-          if (onLocalEntry != null) ...[
-            const SizedBox(height: AuthSpacing.lg),
-            const _AuthDivider(label: 'Or preview'),
-            const SizedBox(height: AuthSpacing.lg),
-            _AuthOutlinedButton(
-              label: 'Open local mode',
-              icon: Icons.phone_android,
-              onPressed: isSubmitting ? null : onLocalEntry,
-            ),
-          ],
-          const SizedBox(height: AuthSpacing.lg),
-          if (errorMessage != null) ...[
-            _AuthNotice(
-              message: errorMessage!,
-              tone: _AuthNoticeTone.error,
-              icon: Icons.error_outline,
-            ),
-            const SizedBox(height: AuthSpacing.md),
-          ],
-          if (message != null) ...[
-            _AuthNotice(
-              message: message!,
-              tone: _AuthNoticeTone.success,
-              icon: Icons.check_circle_outline,
-            ),
-            const SizedBox(height: AuthSpacing.md),
-          ],
-          _AuthNotice(
-            message: isConfigured
-                ? 'Secure login is connected.'
-                : 'Add mobile credentials to enable secure login.',
-            tone: isConfigured
-                ? _AuthNoticeTone.success
-                : _AuthNoticeTone.neutral,
-            icon: isConfigured ? Icons.verified_user : Icons.key_off,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A small uppercase-ish field label above an input (web `Label`).
-class _AuthFieldLabel extends StatelessWidget {
-  const _AuthFieldLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, style: AuthTextStyles.label);
-  }
-}
-
-/// Sign in / Sign up pill toggle (web tab control look).
-class _AuthModeToggle extends StatelessWidget {
-  const _AuthModeToggle({
-    required this.mode,
-    required this.enabled,
-    required this.onModeChanged,
-  });
-
-  final AuthMode mode;
-  final bool enabled;
-  final ValueChanged<AuthMode> onModeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AuthSpacing.xs),
-      decoration: BoxDecoration(
-        color: AuthColors.mutedSoft,
-        borderRadius: AuthRadii.field,
-        border: Border.all(color: AuthColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _AuthModeSegment(
-              label: 'Sign in',
-              icon: Icons.login,
-              selected: mode == AuthMode.signIn,
-              onTap: enabled ? () => onModeChanged(AuthMode.signIn) : null,
-            ),
-          ),
-          const SizedBox(width: AuthSpacing.xs),
-          Expanded(
-            child: _AuthModeSegment(
-              label: 'Sign up',
-              icon: Icons.person_add_alt_1,
-              selected: mode == AuthMode.signUp,
-              onTap: enabled ? () => onModeChanged(AuthMode.signUp) : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthModeSegment extends StatelessWidget {
-  const _AuthModeSegment({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = selected
-        ? AuthColors.primaryForeground
-        : AuthColors.mutedForeground;
-    return Material(
-      color: selected ? AuthColors.primary : Colors.transparent,
-      borderRadius: AuthRadii.field,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AuthRadii.field,
-        child: Container(
-          height: 40,
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: AuthSpacing.sm),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: fg,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Branded text input with a leading icon (web icon-prefixed `Input`).
-class _AuthTextField extends StatelessWidget {
-  const _AuthTextField({
-    required this.controller,
-    required this.hintText,
-    required this.icon,
-    this.keyboardType,
-    this.textInputAction,
-  });
-
-  final TextEditingController controller;
-  final String hintText;
-  final IconData icon;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      style: AuthTextStyles.field,
-      cursorColor: AuthColors.primary,
-      decoration: _authInputDecoration(
-        hintText: hintText,
-        prefixIcon: Icon(icon, size: 18, color: AuthColors.mutedForeground),
-      ),
-    );
-  }
-}
-
-/// Branded password input with a show/hide eye toggle (web pattern).
-class _AuthPasswordField extends StatefulWidget {
-  const _AuthPasswordField({
-    required this.controller,
-    required this.hintText,
-    this.textInputAction,
-    this.onSubmitted,
-  });
-
-  final TextEditingController controller;
-  final String hintText;
-  final TextInputAction? textInputAction;
-  final VoidCallback? onSubmitted;
-
-  @override
-  State<_AuthPasswordField> createState() => _AuthPasswordFieldState();
-}
-
-class _AuthPasswordFieldState extends State<_AuthPasswordField> {
-  bool _obscured = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: widget.controller,
-      obscureText: _obscured,
-      textInputAction: widget.textInputAction,
-      onSubmitted: (_) => widget.onSubmitted?.call(),
-      style: AuthTextStyles.field,
-      cursorColor: AuthColors.primary,
-      decoration: _authInputDecoration(
-        hintText: widget.hintText,
-        prefixIcon: const Icon(
-          Icons.lock_outline,
-          size: 18,
-          color: AuthColors.mutedForeground,
-        ),
-        suffixIcon: IconButton(
-          onPressed: () => setState(() => _obscured = !_obscured),
-          icon: Icon(
-            _obscured ? Icons.visibility_off : Icons.visibility,
-            size: 18,
-            color: AuthColors.mutedForeground,
-          ),
-          tooltip: _obscured ? 'Show password' : 'Hide password',
-          splashRadius: 18,
-        ),
-      ),
-    );
-  }
-}
-
-/// Shared input decoration for the branded auth fields.
-InputDecoration _authInputDecoration({
-  required String hintText,
-  required Widget prefixIcon,
-  Widget? suffixIcon,
-}) {
-  const border = OutlineInputBorder(
-    borderRadius: AuthRadii.field,
-    borderSide: BorderSide(color: AuthColors.border),
-  );
-  return InputDecoration(
-    isDense: true,
-    filled: true,
-    fillColor: AuthColors.input,
-    hintText: hintText,
-    hintStyle: const TextStyle(
-      color: AuthColors.mutedForeground,
-      fontSize: 15,
-    ),
-    prefixIcon: prefixIcon,
-    suffixIcon: suffixIcon,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: AuthSpacing.md,
-      vertical: AuthSpacing.lg,
-    ),
-    border: border,
-    enabledBorder: border,
-    focusedBorder: const OutlineInputBorder(
-      borderRadius: AuthRadii.field,
-      borderSide: BorderSide(color: AuthColors.primary, width: 1.5),
-    ),
-  );
-}
-
-/// Full-width gradient primary button with brand glow + busy spinner.
-class _AuthPrimaryButton extends StatelessWidget {
-  const _AuthPrimaryButton({
-    required this.label,
-    required this.onPressed,
-    this.busy = false,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final bool busy;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null && !busy;
-    return Opacity(
-      opacity: enabled ? 1 : 0.55,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: AuthGradients.primary,
-          borderRadius: AuthRadii.field,
-          boxShadow: enabled ? AuthShadows.glow : null,
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: AuthRadii.field,
-            onTap: enabled ? onPressed : null,
-            child: Container(
-              height: AuthSpacing.buttonHeight,
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (busy) ...[
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AuthColors.primaryForeground,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AuthSpacing.sm),
-                  ],
-                  Text(label, style: AuthTextStyles.button),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Full-width neutral outlined button (local-mode entry).
-class _AuthOutlinedButton extends StatelessWidget {
-  const _AuthOutlinedButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return Opacity(
-      opacity: enabled ? 1 : 0.55,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AuthColors.mutedSoft,
-          borderRadius: AuthRadii.field,
-          border: Border.all(color: AuthColors.border),
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: AuthRadii.field,
-            onTap: onPressed,
-            child: Container(
-              height: AuthSpacing.buttonHeight,
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 18, color: AuthColors.foreground),
-                  const SizedBox(width: AuthSpacing.sm),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AuthColors.foreground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A tinted link-style text button (web `variant="link"`).
-class _AuthLinkButton extends StatelessWidget {
-  const _AuthLinkButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: AuthColors.primary,
-        disabledForegroundColor: AuthColors.mutedForeground,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AuthSpacing.sm,
-          vertical: AuthSpacing.xs,
-        ),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(label, style: AuthTextStyles.link),
-    );
-  }
-}
-
-/// 'Or continue with' style separator with centered caption.
-class _AuthDivider extends StatelessWidget {
-  const _AuthDivider({required this.label});
-
-  final String label;
+/// Brand mark + wordmark that anchors the auth screens. Rendered once, above
+/// the animated login/signup swap, so the brand never duplicates.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: AuthColors.border, height: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AuthSpacing.md),
-          child: Text(label.toUpperCase(), style: AuthTextStyles.divider),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AuthColors.glassFillStrong,
+            borderRadius: BorderRadius.circular(AuthRadii.md),
+            border: Border.all(color: AuthColors.glassLine),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(Icons.bolt, color: AuthColors.onBrand, size: 26),
         ),
-        const Expanded(child: Divider(color: AuthColors.border, height: 1)),
+        const SizedBox(width: AuthSpacing.md),
+        const Text('feedIn', style: AuthTextStyles.brandOnGradient),
       ],
     );
   }
 }
 
-/// Visual tone for a status notice.
-enum _AuthNoticeTone { neutral, success, error }
+/// The offline preview entry. Only shown when secure login isn't configured;
+/// keeps the exact "Open local mode" label the widget test taps.
+class _OfflineEntry extends StatelessWidget {
+  const _OfflineEntry({required this.enabled, required this.onLocalEntry});
 
-class _AuthNotice extends StatelessWidget {
-  const _AuthNotice({
-    required this.message,
-    required this.tone,
-    required this.icon,
-  });
-
-  final String message;
-  final _AuthNoticeTone tone;
-  final IconData icon;
+  final bool enabled;
+  final VoidCallback onLocalEntry;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = switch (tone) {
-      _AuthNoticeTone.success => (AuthColors.onlineSoft, AuthColors.online),
-      _AuthNoticeTone.error => (
-        AuthColors.destructiveSoft,
-        AuthColors.destructive,
-      ),
-      _AuthNoticeTone.neutral => (
-        AuthColors.mutedSoft,
-        AuthColors.mutedForeground,
-      ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AuthSpacing.md,
-        vertical: AuthSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: AuthRadii.field,
-        border: Border.all(color: fg.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: fg),
-          const SizedBox(width: AuthSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AuthTextStyles.notice.copyWith(color: fg),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          "Secure login isn't configured on this build.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.3,
+            color: AuthColors.onBrandFaint,
+          ),
+        ),
+        const SizedBox(height: AuthSpacing.md),
+        Opacity(
+          opacity: enabled ? 1 : 0.6,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AuthColors.glassFill,
+              borderRadius: BorderRadius.circular(AuthRadii.pill),
+              border: Border.all(color: AuthColors.glassLineFaint),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AuthRadii.pill),
+                onTap: enabled ? onLocalEntry : null,
+                child: SizedBox(
+                  height: AuthSpacing.buttonHeight,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.phone_android,
+                        size: 18,
+                        color: AuthColors.onBrand,
+                      ),
+                      SizedBox(width: AuthSpacing.sm),
+                      Text('Open local mode', style: AuthTextStyles.glassButton),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
+/// Minimal password-recovery step, floating over the brand gradient. Reached
+/// only from a Supabase `passwordRecovery` deep link.
 class _PasswordRecoveryScaffold extends StatelessWidget {
   const _PasswordRecoveryScaffold({
     required this.controller,
@@ -1047,80 +623,68 @@ class _PasswordRecoveryScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AuthColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AuthSpacing.xl),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AuthColors.card,
-                  borderRadius: AuthRadii.card,
-                  border: Border.all(color: AuthColors.border),
-                  boxShadow: AuthShadows.card,
-                ),
-                padding: const EdgeInsets.all(AuthSpacing.xl),
+      body: AuthBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        color: AuthColors.primarySoft,
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AuthColors.glassFillStrong,
                         shape: BoxShape.circle,
+                        border: Border.all(color: AuthColors.glassLine),
                       ),
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.lock_reset,
-                        color: AuthColors.primary,
+                        color: AuthColors.onBrand,
                         size: 26,
                       ),
                     ),
                     const SizedBox(height: AuthSpacing.lg),
                     const Text(
                       'Reset password',
-                      textAlign: TextAlign.center,
-                      style: AuthTextStyles.headline,
+                      style: AuthTextStyles.headlineOnBrand,
                     ),
-                    const SizedBox(height: AuthSpacing.xs),
+                    const SizedBox(height: AuthSpacing.sm),
                     const Text(
                       'Choose a new password to finish recovery.',
-                      textAlign: TextAlign.center,
-                      style: AuthTextStyles.subhead,
+                      style: AuthTextStyles.subheadOnBrand,
+                    ),
+                    const SizedBox(height: AuthSpacing.xxl),
+                    BrandTextField(
+                      controller: controller,
+                      label: 'New password',
+                      hintText: 'At least 6 characters',
+                      icon: Icons.lock_outline,
+                      obscurable: true,
+                      enabled: !isSubmitting,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: isSubmitting ? null : onSubmit,
                     ),
                     const SizedBox(height: AuthSpacing.xl),
-                    _AuthPasswordField(
-                      controller: controller,
-                      hintText: 'New password',
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: () {
-                        if (!isSubmitting) onSubmit();
-                      },
-                    ),
-                    const SizedBox(height: AuthSpacing.lg),
-                    _AuthPrimaryButton(
-                      label: isSubmitting ? 'Saving...' : 'Update password',
+                    PrimaryAuthButton(
+                      label: 'Update Password',
                       busy: isSubmitting,
                       onPressed: isSubmitting ? null : onSubmit,
                     ),
                     if (errorMessage != null) ...[
                       const SizedBox(height: AuthSpacing.lg),
-                      _AuthNotice(
-                        message: errorMessage!,
-                        tone: _AuthNoticeTone.error,
-                        icon: Icons.error_outline,
+                      AuthMessage(
+                        text: errorMessage!,
+                        tone: AuthMessageTone.error,
                       ),
                     ],
                     if (message != null) ...[
                       const SizedBox(height: AuthSpacing.lg),
-                      _AuthNotice(
-                        message: message!,
-                        tone: _AuthNoticeTone.success,
-                        icon: Icons.check_circle_outline,
-                      ),
+                      AuthMessage(text: message!, tone: AuthMessageTone.info),
                     ],
                   ],
                 ),

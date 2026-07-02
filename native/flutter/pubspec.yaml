@@ -60,6 +60,10 @@ dependencies:
   flutter_webrtc: ^0.14.1
   permission_handler: ^12.0.1
   livekit_client: ^2.4.0
+  # Android SDK-level check for the photos-vs-storage permission split.
+  device_info_plus: ^11.5.0
+  # Lightweight first-run flag storage (permission onboarding seen).
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:
