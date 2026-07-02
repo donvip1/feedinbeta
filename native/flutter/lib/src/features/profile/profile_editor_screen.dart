@@ -23,6 +23,7 @@ import 'parity/widgets/role_plan_badges.dart';
 import 'parity/widgets/social_links_card.dart';
 import 'parity/widgets/verified_badge.dart';
 import 'parity/widgets/view_history_card.dart';
+import 'username/username_change_field.dart';
 import 'user_profile.dart';
 
 class ProfileEditorScreen extends StatefulWidget {
@@ -304,14 +305,13 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _handleController,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Handle',
-                  prefixText: '@',
-                  border: OutlineInputBorder(),
-                ),
+              UsernameChangeField(
+                initialUsername: _handleController.text,
+                onChanged: (username) {
+                  // Keep the editor's handle in sync so a later local save
+                  // does not overwrite the server-changed username.
+                  _handleController.text = username;
+                },
               ),
               const SizedBox(height: 12),
               TextField(
