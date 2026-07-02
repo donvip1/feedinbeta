@@ -194,6 +194,44 @@ navigation + DI, builds, and live-tests on device.
 
 Server-owned constraint retained: payment processing, payouts, admin, and AI provider calls stay in server-owned code; the native app calls RPC/table contracts only.
 
+## Phase 9: Wiring To Function (active — 2026-07-02)
+
+Phase 8 shipped the feature UIs + data layers, but several were built against
+dependency/backend *seams* (no plugins / missing tables) so they looked done
+but were inert on device. This phase closes those gaps.
+
+- [x] Shell/DI integration: Live tab -> richer `LiveScreen`; Calls wired into
+      chat header (shared `CallController` + app-wide incoming-call presenter);
+      Channels + group Go-Live wired into nav.
+- [x] Pushed backend contracts to live: `live_streams.stream_features`
+      (+ `group_conversation_id`) for PULSE cards; `channels` /
+      `channel_subscribers` / `channel_posts` (RLS + subscriber-count trigger +
+      realtime); public `story-audio` bucket. Verified live with two real users:
+      channel create/subscribe/post + RLS (owner passes, non-owner blocked);
+      PULSE host write passes, non-host blocked.
+- [x] Wired real audio + file backends: `record` (in-chat voice notes +
+      audio-note stories, AAC/.m4a, mic-perm, 4-min cap), `just_audio`
+      (seek-accurate playback), `file_picker` (chat music + music stories).
+      `RECORD_AUDIO` added to the manifest.
+- [x] Fixed local build: pinned Flutter's JDK to the Android Studio JBR 21
+      (system JDK 25 was breaking Gradle at settings evaluation).
+- [ ] Real-time calling media: `flutter_webrtc` + `permission_handler`; replace
+      the stub `CallMediaEngine` with a WebRTC engine using SDP/ICE signaling
+      over the existing `call_signals` table. STUN by default; TURN server for
+      cross-network is flagged (needs a server-owned TURN credential).
+- [ ] Wallet real money moves (buy credits / subscriptions / payouts): needs
+      the server-owned checkout (Stripe/edge functions). UI shows "backend
+      unavailable" until deployed.
+- [ ] On-device UI pass of the newly-wired features with 2 real accounts.
+
+### Credential / config follow-ups
+- [x] 2026-07-02: pushed 3 new migrations directly via `psql` (Supabase CLI not
+      installed locally) and recorded them in `supabase_migrations.schema_migrations`.
+- [x] Removed the stale/malformed `SUPABASE_DB_URL` from local `.env`
+      (`SUPABASE_DB_PASSWORD` + the IPv4 pooler host is what's used).
+- [ ] Add `feedin://auth-callback` to the Supabase Auth redirect allow-list
+      (blocks mobile password reset until done).
+
 ## User To-Do List
 
 These are the items that need your account access or private files. Do not send private keys in chat.
