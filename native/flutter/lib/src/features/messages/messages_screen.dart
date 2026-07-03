@@ -17,6 +17,7 @@ import '../calls/call_models.dart';
 import '../calls/call_screen.dart';
 import '../profile/user_profile.dart';
 import 'chat/audio_backends_impl.dart';
+import 'chat/message_interactions_data_source.dart';
 import 'chat/audio_message_support.dart';
 import 'chat/chat_mappers.dart';
 import 'chat/chat_theme.dart';
@@ -359,6 +360,7 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   final _messageController = TextEditingController();
   final _picker = ImagePicker();
+  final _interactions = MessageInteractionsDataSource.autoDetect();
   late Future<List<LocalMessage>> _messagesFuture;
   String? _title;
   ReplyPreview? _replyTarget;
@@ -527,9 +529,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
       builder: (sheetContext) {
         return MessageActionSheet(
           message: message,
-          onReact: (_) {
+          onReact: (emoji) {
             Navigator.of(sheetContext).pop();
-            _pendingBackend('Reactions');
+            _reactToMessage(message, emoji);
           },
           onReply: () {
             Navigator.of(sheetContext).pop();
@@ -537,7 +539,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           },
           onForward: () {
             Navigator.of(sheetContext).pop();
-            _pendingBackend('Forwarding');
+            _forwardMessage(message);
           },
           onStar: () {
             Navigator.of(sheetContext).pop();
@@ -553,7 +555,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           onDelete: message.isMine
               ? () {
                   Navigator.of(sheetContext).pop();
-                  _pendingBackend('Deleting messages');
+                  _deleteMessage(message);
                 }
               : null,
           onReport: !message.isMine
@@ -569,6 +571,101 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   void _pendingBackend(String feature) {
     _toast('$feature needs the final backend contract.');
+  }
+
+  /// Toggle an emoji [reaction] on [message] via the server RPC. Only synced
+  /// messages (with a server id) can be reacted to; a still-queued local message
+  /// has no server row yet.
+  Future<void> _reactToMessage(ChatMessageView message, String emoji) async {
+    if (message.deliveryState == DeliveryState.pending ||
+        message.deliveryState == DeliveryState.failed) {
+      _toast('You can react once the message has sent.');
+      return;
+    }
+    final result = await _interactions.toggleReaction(message.id, emoji);
+    if (!mounted) return;
+    if (result == null) {
+      _toast('Could not add your reaction. Please try again.');
+      return;
+    }
+    // Pull the thread so the (realtime-materialised) reaction shows.
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    _toast(result ? 'Reacted $emoji' : 'Reaction removed');
+  }
+
+  /// Soft-delete an own [message] via the server RPC, then refresh the thread.
+  Future<void> _deleteMessage(ChatMessageView message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ChatColors.card,
+        title: const Text('Delete message?'),
+        content: const Text('This message will be removed for everyone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await _interactions.deleteMessage(message.id);
+    if (!mounted) return;
+    if (!ok) {
+      _toast('Could not delete the message.');
+      return;
+    }
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    _toast('Message deleted.');
+  }
+
+  /// Forward [message]'s text into another conversation the user picks. Purely
+  /// client-side: it queues the content into the target thread through the
+  /// existing outbound message pipeline.
+  Future<void> _forwardMessage(ChatMessageView message) async {
+    final text = message.hasText ? message.body : null;
+    if (text == null || text.trim().isEmpty) {
+      _toast('Only text messages can be forwarded for now.');
+      return;
+    }
+    final conversations = await widget.messagesRepository.loadConversations();
+    if (!mounted) return;
+    final targets = conversations
+        .where((c) => c.id != widget.conversationId)
+        .toList();
+    if (targets.isEmpty) {
+      _toast('No other conversations to forward to.');
+      return;
+    }
+    final target = await showModalBottomSheet<ConversationSummary>(
+      context: context,
+      backgroundColor: ChatColors.card,
+      barrierColor: ChatColors.barrier,
+      shape: const RoundedRectangleBorder(borderRadius: ChatRadii.sheetTop),
+      builder: (sheetContext) => _ForwardTargetSheet(conversations: targets),
+    );
+    if (target == null || !mounted) return;
+    await widget.messagesRepository.queueMessage(
+      conversationId: target.id,
+      senderName: widget.profile.displayName,
+      body: text,
+      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+    );
+    if (!mounted) return;
+    _toast('Forwarded to ${target.title}.');
   }
 
   /// Place a 1:1 [type] call to the other participant from the chat header.
@@ -1182,6 +1279,64 @@ class _EmptyChatsState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listing conversations to forward a message into.
+class _ForwardTargetSheet extends StatelessWidget {
+  const _ForwardTargetSheet({required this.conversations});
+
+  final List<ConversationSummary> conversations;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              'Forward to',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: conversations.length,
+              itemBuilder: (context, index) {
+                final c = conversations[index];
+                final title = c.title.trim().isEmpty ? 'Conversation' : c.title;
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ChatColors.primary,
+                    child: Text(
+                      title.characters.first.toUpperCase(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  title: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  onTap: () => Navigator.of(context).pop(c),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
