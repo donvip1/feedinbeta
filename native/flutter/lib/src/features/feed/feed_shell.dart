@@ -24,6 +24,7 @@ import '../calls/call_controller.dart';
 import '../calls/call_screen.dart';
 import '../calls/livekit_call_media_engine.dart';
 import '../channels/screens/channels_screen.dart';
+import '../contacts/contacts_screen.dart';
 import '../groups/screens/groups_screen.dart';
 import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
@@ -310,6 +311,22 @@ class _FeedShellState extends State<FeedShell> {
     );
   }
 
+  /// Find friends from contacts (hashed matching) — reachable from the Chats
+  /// tab app bar.
+  void _openContacts() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeCtx) => Scaffold(
+          backgroundColor: Colors.black,
+          body: ContactsScreen(
+            currentUserId: _profile.userId,
+            onBack: () => Navigator.of(routeCtx).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Channels (Telegram-style broadcast channels) — reachable from the Chats
   /// tab app bar, alongside Groups.
   void _openChannels() {
@@ -393,6 +410,11 @@ class _FeedShellState extends State<FeedShell> {
                   icon: const Icon(Icons.search),
                 ),
                 if (_index == 1) ...[
+                  IconButton(
+                    tooltip: 'Find contacts',
+                    onPressed: _openContacts,
+                    icon: const Icon(Icons.contacts_outlined),
+                  ),
                   IconButton(
                     tooltip: 'Channels',
                     onPressed: _openChannels,

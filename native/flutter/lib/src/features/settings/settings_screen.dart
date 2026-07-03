@@ -13,6 +13,7 @@ import 'screens/appearance_language_screen.dart';
 import 'screens/blocked_users_screen.dart';
 import 'screens/help_about_screen.dart';
 import 'screens/notification_preferences_screen.dart';
+import 'screens/contact_privacy_screen.dart';
 import 'screens/privacy_settings_screen.dart';
 import 'screens/security_settings_screen.dart';
 import 'settings_theme.dart';
@@ -228,6 +229,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           description: 'Who can message, follow & see you',
           accent: const Color(0xFFA855F7),
           onTap: () => unawaited(_openPrivacy()),
+        ),
+        const SettingsDivider(),
+        SettingsNavRow(
+          icon: Icons.remove_red_eye_outlined,
+          title: 'Last seen & contact privacy',
+          description: 'Who sees your last seen, photo, status & about',
+          accent: const Color(0xFF22C55E),
+          onTap: () => unawaited(_push(const ContactPrivacyScreen())),
         ),
         const SettingsDivider(),
         SettingsNavRow(

@@ -64,6 +64,8 @@ dependencies:
   device_info_plus: ^11.5.0
   # Lightweight first-run flag storage (permission onboarding seen).
   shared_preferences: ^2.3.0
+  # Read device contacts for hashed friend-matching (Module 6).
+  flutter_contacts: ^1.1.9+2
 
 dev_dependencies:
   flutter_test:
