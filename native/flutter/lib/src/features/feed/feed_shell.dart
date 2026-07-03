@@ -19,6 +19,7 @@ import '../../data/local/preferences_repository_contract.dart';
 import '../../data/local/post_draft_repository.dart';
 import '../../data/local/profile_repository_contract.dart';
 import '../../data/local/upload_queue_repository.dart';
+import '../../core/media/reel_preloader.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_screen.dart';
@@ -789,6 +790,11 @@ class _FeedScreenState extends State<FeedScreen> {
       onPageChanged: (index) {
         setState(() => _activePage = index);
         _maybeLoadMore(index, posts.length);
+        // Warm the next few reels so swiping to them starts playback instantly.
+        ReelPreloader.instance.preloadAround(
+          [for (final p in posts) p.mediaUrl ?? p.mediaUrls.firstOrNull],
+          index,
+        );
       },
       itemBuilder: (context, index) {
         final post = posts[index];

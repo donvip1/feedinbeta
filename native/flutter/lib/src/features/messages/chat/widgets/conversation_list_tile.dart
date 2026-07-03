@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/cached_image.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
@@ -407,20 +408,10 @@ class _Avatar extends StatelessWidget {
       ),
     );
 
-    Widget avatar = ClipOval(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: other.avatarUrl != null && other.avatarUrl!.isNotEmpty
-            ? Image.network(
-                other.avatarUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => fallback,
-              )
-            : fallback,
-      ),
+    final Widget avatar = CachedCircleAvatar(
+      url: other.avatarUrl,
+      radius: size / 2,
+      fallback: fallback,
     );
 
     return SizedBox(

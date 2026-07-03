@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/media/cached_image.dart';
 import '../contacts_theme.dart';
 
 /// A circular avatar for a contact row: shows the network image when available,
@@ -31,12 +32,12 @@ class ContactAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: url != null && url.isNotEmpty
-          ? Image.network(
-              url,
+          ? CachedImage(
+              url: url,
               width: size,
               height: size,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _Initial(initial),
+              errorWidget: _Initial(initial),
             )
           : _Initial(initial),
     );

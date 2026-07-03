@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/media/cached_image.dart';
 import '../groups_theme.dart';
 
 /// A circular avatar that renders a network image when available, otherwise a
@@ -41,20 +42,10 @@ class GroupAvatar extends StatelessWidget {
       ),
     );
 
-    final avatar = ClipOval(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: (avatarUrl != null && avatarUrl!.isNotEmpty)
-            ? Image.network(
-                avatarUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => fallback,
-              )
-            : fallback,
-      ),
+    final avatar = CachedCircleAvatar(
+      url: avatarUrl,
+      radius: size / 2,
+      fallback: fallback,
     );
 
     if (!showPresenceDot) return avatar;

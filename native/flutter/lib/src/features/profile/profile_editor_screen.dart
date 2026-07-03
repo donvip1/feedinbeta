@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/media/cached_image.dart';
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/local/profile_repository_contract.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
@@ -735,10 +736,10 @@ class _ProfileHero extends StatelessWidget {
                   height: ProfileSpacing.coverHeight,
                   width: double.infinity,
                   child: hasCover
-                      ? Image.network(
-                          coverUrl,
+                      ? CachedImage(
+                          url: coverUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const DecoratedBox(
+                          errorWidget: const DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: ProfileGradients.coverPlaceholder,
                             ),

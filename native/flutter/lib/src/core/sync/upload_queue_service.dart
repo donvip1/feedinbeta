@@ -5,19 +5,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/local/post_draft_repository.dart';
 import '../../data/local/upload_queue_repository.dart';
 import '../../features/create/post_draft.dart';
+import '../media/media_compressor.dart';
 
 class UploadQueueService {
   const UploadQueueService({
     required bool isConfigured,
     required PostDraftRepository draftRepository,
     required UploadQueueRepository uploadQueueRepository,
+    MediaCompressor compressor = const MediaCompressor(),
   }) : _isConfigured = isConfigured,
        _draftRepository = draftRepository,
-       _uploadQueueRepository = uploadQueueRepository;
+       _uploadQueueRepository = uploadQueueRepository,
+       _compressor = compressor;
 
   final bool _isConfigured;
   final PostDraftRepository _draftRepository;
   final UploadQueueRepository _uploadQueueRepository;
+  final MediaCompressor _compressor;
 
   Future<UploadQueueSummary> processQueue() async {
     if (!_isConfigured) {
@@ -194,13 +198,18 @@ class UploadQueueService {
     final total = mediaPaths.where((path) => path.isNotEmpty).length;
     for (final (index, mediaPath) in mediaPaths.indexed) {
       if (mediaPath.isEmpty) continue;
-      final file = File(mediaPath);
-      if (!file.existsSync()) continue;
+      if (!File(mediaPath).existsSync()) continue;
 
-      final extension = mediaPath.contains('.')
-          ? mediaPath.split('.').last
-          : 'bin';
       final mediaKind = index < rawTypes.length ? rawTypes[index] : 'image';
+      // Compress before upload (image -> WebP, video -> optimised MP4). Falls
+      // back to the original file on any failure.
+      final compressed = await _compressor.compressForUpload(
+        mediaPath,
+        mediaKind,
+      );
+      final file = File(compressed.path);
+      if (!file.existsSync()) continue;
+      final extension = compressed.extension;
       final storagePath =
           '$userId/${draft.id}/${DateTime.now().millisecondsSinceEpoch}_$index.$extension';
       // Set an explicit content-type so uploads pass the `post-media` bucket's
@@ -212,7 +221,8 @@ class UploadQueueService {
             storagePath,
             file,
             fileOptions: FileOptions(
-              contentType: _contentTypeFor(extension, mediaKind),
+              contentType:
+                  compressed.contentType ?? _contentTypeFor(extension, mediaKind),
               upsert: true,
             ),
           );

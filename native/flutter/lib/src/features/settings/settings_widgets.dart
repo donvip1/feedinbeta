@@ -15,6 +15,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../core/media/cached_image.dart';
 import 'settings_theme.dart';
 
 /// A titled settings card: rounded bordered surface with a header
@@ -682,12 +683,12 @@ class SettingsPersonRow extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: avatarUrl != null && avatarUrl!.isNotEmpty
-                ? Image.network(
-                    avatarUrl!,
+                ? CachedImage(
+                    url: avatarUrl!,
                     fit: BoxFit.cover,
                     width: 40,
                     height: 40,
-                    errorBuilder: (_, __, ___) => _AvatarInitial(initial),
+                    errorWidget: _AvatarInitial(initial),
                   )
                 : _AvatarInitial(initial),
           ),

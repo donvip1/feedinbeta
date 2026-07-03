@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/cached_image.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
@@ -308,14 +309,11 @@ class _ReplyThumbnail extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(ChatRadii.sm)),
         border: Border.all(color: ChatColors.primarySoft, width: 1.5),
       ),
-      child: Image.network(
-        url,
+      child: CachedImage(
+        url: url,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackIcon,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return _fallbackIcon;
-        },
+        placeholderColor: ChatColors.muted,
+        errorWidget: _fallbackIcon,
       ),
     );
   }

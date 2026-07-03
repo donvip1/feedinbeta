@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/cached_image.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
@@ -213,21 +214,12 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
       return const SizedBox(width: size);
     }
 
-    Widget avatar;
     final url = _message.senderAvatarUrl;
-    if (url != null && url.isNotEmpty) {
-      avatar = ClipOval(
-        child: Image.network(
-          url,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _initialAvatar(size),
-        ),
-      );
-    } else {
-      avatar = _initialAvatar(size);
-    }
+    final Widget avatar = CachedCircleAvatar(
+      url: url,
+      radius: size / 2,
+      fallback: _initialAvatar(size),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(right: ChatSpacing.sm),
@@ -473,24 +465,22 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
               if (reply.mediaThumbUrl != null &&
                   reply.mediaThumbUrl!.isNotEmpty) ...[
                 const SizedBox(width: ChatSpacing.sm),
-                ClipRRect(
+                CachedImage(
+                  url: reply.mediaThumbUrl!,
+                  width: ChatSpacing.avatarSm,
+                  height: ChatSpacing.avatarSm,
+                  fit: BoxFit.cover,
                   borderRadius: const BorderRadius.all(
                     Radius.circular(ChatRadii.grouped),
                   ),
-                  child: Image.network(
-                    reply.mediaThumbUrl!,
+                  errorWidget: Container(
                     width: ChatSpacing.avatarSm,
                     height: ChatSpacing.avatarSm,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: ChatSpacing.avatarSm,
-                      height: ChatSpacing.avatarSm,
-                      color: ChatColors.muted,
-                      child: const Icon(
-                        Icons.image,
-                        size: 14,
-                        color: ChatColors.mutedForeground,
-                      ),
+                    color: ChatColors.muted,
+                    child: const Icon(
+                      Icons.image,
+                      size: 14,
+                      color: ChatColors.mutedForeground,
                     ),
                   ),
                 ),

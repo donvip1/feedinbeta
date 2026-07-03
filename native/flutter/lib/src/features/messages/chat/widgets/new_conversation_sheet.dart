@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/cached_image.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
@@ -287,12 +288,13 @@ class _SharedImagePreview extends StatelessWidget {
               width: 56,
               height: 56,
               color: ChatColors.muted,
-              child: Image.network(
-                thumbUrl,
+              child: CachedImage(
+                url: thumbUrl,
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
+                placeholderColor: ChatColors.muted,
+                errorWidget: const Icon(
                   Icons.image_outlined,
                   color: ChatColors.mutedForeground,
                 ),
@@ -668,20 +670,10 @@ class _RecipientAvatar extends StatelessWidget {
       ),
     );
 
-    final avatar = ClipOval(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-            ? Image.network(
-                user.avatarUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => fallback,
-              )
-            : fallback,
-      ),
+    final avatar = CachedCircleAvatar(
+      url: user.avatarUrl,
+      radius: size / 2,
+      fallback: fallback,
     );
 
     if (onTap == null) return avatar;

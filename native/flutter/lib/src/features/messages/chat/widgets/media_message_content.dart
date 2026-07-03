@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/cached_image.dart';
 import '../audio_message_support.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
@@ -151,12 +152,11 @@ class _VideoThumbnail extends StatelessWidget {
     // Poster: prefer an explicit thumbnail; fall back to the (possibly local)
     // media frame so we still show *something*. No VideoPlayer is created here.
     final Widget poster = media.thumbnailUrl != null
-        ? Image.network(
-            media.thumbnailUrl!,
+        ? CachedImage(
+            url: media.thumbnailUrl!,
             fit: BoxFit.cover,
             width: double.infinity,
-            errorBuilder: (_, __, ___) =>
-                const _ThumbFallback(icon: Icons.movie_outlined),
+            errorWidget: const _ThumbFallback(icon: Icons.movie_outlined),
           )
         : _MediaImage(
             media: media,
@@ -315,31 +315,24 @@ class _MediaImage extends StatelessWidget {
 
   Widget _remoteOrFallback(String? remoteUrl) {
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
-      return Image.network(
-        remoteUrl,
+      return CachedImage(
+        url: remoteUrl,
         fit: BoxFit.cover,
         width: double.infinity,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const _ThumbFallback(loading: true);
-        },
-        errorBuilder: (_, __, ___) => _ThumbFallback(icon: fallbackIcon),
+        placeholderColor: ChatColors.muted,
+        errorWidget: _ThumbFallback(icon: fallbackIcon),
       );
     }
     return _ThumbFallback(icon: fallbackIcon);
   }
 }
 
-/// Neutral placeholder painted when an image fails / is mid-load. Sized to fill
-/// the framed thumbnail box.
+/// Neutral placeholder painted when an image fails. Sized to fill the framed
+/// thumbnail box. (The mid-load state is now owned by [CachedImage].)
 class _ThumbFallback extends StatelessWidget {
-  const _ThumbFallback({
-    this.icon = Icons.image_outlined,
-    this.loading = false,
-  });
+  const _ThumbFallback({this.icon = Icons.image_outlined});
 
   final IconData icon;
-  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -348,18 +341,7 @@ class _ThumbFallback extends StatelessWidget {
       height: 160,
       color: ChatColors.muted,
       alignment: Alignment.center,
-      child: loading
-          ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  ChatColors.mutedForeground,
-                ),
-              ),
-            )
-          : Icon(icon, color: ChatColors.mutedForeground, size: 28),
+      child: Icon(icon, color: ChatColors.mutedForeground, size: 28),
     );
   }
 }

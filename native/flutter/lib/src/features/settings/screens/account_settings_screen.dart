@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/media/cached_image.dart';
 import '../data/account_profile_data_source.dart';
 import '../settings_theme.dart';
 import '../settings_widgets.dart';
@@ -272,12 +273,12 @@ class _AccountAvatar extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: hasImage
-              ? Image.network(
-                  avatarUrl!,
+              ? CachedImage(
+                  url: avatarUrl!,
                   width: 64,
                   height: 64,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _Initial(initial),
+                  errorWidget: _Initial(initial),
                 )
               : _Initial(initial),
         ),

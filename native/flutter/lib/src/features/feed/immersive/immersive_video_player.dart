@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../core/media/reel_preloader.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_audio.dart';
 
@@ -103,9 +104,17 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     final localPath = widget.localPath;
     final url = widget.url;
 
-    final controller = localPath != null && File(localPath).existsSync()
+    // Prefer an explicit local file; otherwise use a preloaded cache file when
+    // one is ready so a swiped-to reel starts instantly instead of cold-
+    // streaming. Falls back to the network URL when nothing is cached yet.
+    String? filePath =
+        (localPath != null && File(localPath).existsSync()) ? localPath : null;
+    filePath ??= await ReelPreloader.instance.cachedFileFor(url);
+    if (!mounted) return; // widget disposed during the cache lookup
+
+    final controller = filePath != null
         ? VideoPlayerController.file(
-            File(localPath),
+            File(filePath),
             videoPlayerOptions: _audioPlaybackOptions(),
           )
         : url == null
