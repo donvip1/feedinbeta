@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/brand/brand_mark.dart';
 import 'auth_theme.dart';
 import 'widgets/auth_message.dart';
 import 'widgets/auth_mode_switch.dart';
@@ -85,6 +86,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: BrandMark(size: 56),
+        ),
+        const SizedBox(height: AuthSpacing.lg),
         const Text('Welcome back', style: AuthTextStyles.headlineOnBrand),
         const SizedBox(height: AuthSpacing.sm),
         const Text(

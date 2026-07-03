@@ -75,6 +75,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  # Branding generators (dev-only): app launcher icons + native splash screen.
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -87,10 +90,30 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - assets/brand/
+
+# App launcher icon generation (run: dart run flutter_launcher_icons).
+# Source is the 1280x1280 square brand icon; adaptive icon for Android 8+.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/brand/feedin-icon.png"
+  adaptive_icon_background: "#070A12"
+  adaptive_icon_foreground: "assets/brand/feedin-icon.png"
+  min_sdk_android: 23
+
+# Native splash screen (run: dart run flutter_native_splash:create).
+# Brand-dark background with the centered logo, matching the app theme.
+flutter_native_splash:
+  color: "#070A12"
+  image: "assets/brand/feedin-logo.png"
+  android_12:
+    color: "#070A12"
+    image: "assets/brand/feedin-logo.png"
+  android: true
+  ios: false
+  web: false
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
