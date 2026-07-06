@@ -6,7 +6,6 @@ import 'src/core/bootstrap/feedin_bootstrap.dart';
 import 'src/core/bootstrap/local_storage_bootstrap.dart';
 import 'src/core/config/feedin_config.dart';
 import 'src/core/notifications/push_notification_service.dart';
-import 'src/core/sync/background_sync_scheduler.dart';
 import 'src/features/messages/chat/audio_backends_impl.dart';
 import 'src/app/feedin_app.dart';
 
@@ -31,9 +30,10 @@ Future<void> main() async {
 
   await LocalStorageBootstrap().initialize();
   await FeedinBootstrap(config: config).initialize();
-  final backgroundSyncScheduler = BackgroundSyncScheduler(config: config);
-  await backgroundSyncScheduler.initialize();
-  await backgroundSyncScheduler.register();
+
+  // No background sync scheduler: online actions are performed immediately and
+  // offline actions are hard-blocked (never queued), so there is no offline
+  // backlog for a periodic Workmanager task to replay.
 
   runApp(const FeedinApp(config: config));
 }

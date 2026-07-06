@@ -9,6 +9,8 @@ import 'package:uuid/uuid.dart';
 
 import 'package:file_picker/file_picker.dart';
 
+import '../../core/connectivity/connectivity_service.dart';
+import '../../core/connectivity/offline_notice.dart';
 import '../../core/sync/conversation_starter.dart';
 import '../../core/sync/sync_service.dart';
 import '../../data/local/local_messages_repository_contract.dart';
@@ -42,6 +44,7 @@ class MessagesScreen extends StatefulWidget {
     required this.messagesRepository,
     required this.conversationStarter,
     required this.syncService,
+    required this.connectivityService,
     required this.profile,
     required this.realtimeVersion,
     this.initialConversationId,
@@ -51,6 +54,7 @@ class MessagesScreen extends StatefulWidget {
   final LocalMessagesRepositoryContract messagesRepository;
   final ConversationStarter conversationStarter;
   final SyncServiceContract syncService;
+  final ConnectivityService connectivityService;
   final UserProfile profile;
   final int realtimeVersion;
   final String? initialConversationId;
@@ -144,6 +148,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         initialTitle: _selectedConversationTitle,
         messagesRepository: widget.messagesRepository,
         syncService: widget.syncService,
+        connectivityService: widget.connectivityService,
         profile: widget.profile,
         realtimeVersion: widget.realtimeVersion,
         onBack: _closeConversation,
@@ -334,6 +339,7 @@ class ConversationScreen extends StatefulWidget {
     required this.conversationId,
     required this.messagesRepository,
     required this.syncService,
+    required this.connectivityService,
     required this.profile,
     required this.realtimeVersion,
     required this.onBack,
@@ -345,6 +351,7 @@ class ConversationScreen extends StatefulWidget {
   final String? initialTitle;
   final LocalMessagesRepositoryContract messagesRepository;
   final SyncServiceContract syncService;
+  final ConnectivityService connectivityService;
   final UserProfile profile;
   final int realtimeVersion;
   final VoidCallback onBack;
@@ -481,6 +488,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
+    // Hard-block when offline: leave the composed text in place so the user can
+    // resend once they reconnect. Nothing is queued for later delivery.
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
     await widget.messagesRepository.queueMessage(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
@@ -675,6 +688,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
   /// pushes the immersive call screen; a null return means the call could not
   /// be placed (unconfigured / signed out / already in a call).
   Future<void> _startCall(CallType type) async {
+    // A call is inherently an online action — block it outright when offline.
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
     final controller = widget.callController;
     final calleeId = _otherUserId;
     final kind = type.isVideo ? 'Video calling' : 'Voice calling';
@@ -743,6 +761,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
     required ImageSource source,
     required String mediaType,
   }) async {
+    // Uploading media is an online action; block before opening the picker.
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
     final XFile? picked = mediaType == 'video'
         ? await _picker.pickVideo(source: source)
         : await _picker.pickImage(source: source);
@@ -777,6 +800,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
   /// available runs through [_queueAudioAttachment] with a validated
   /// [StagedAudioMedia] of kind [StagedAudioKind.music].
   Future<void> _shareMusicFile() async {
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
     FilePickerResult? result;
     try {
       result = await FilePicker.platform.pickFiles(
@@ -833,6 +860,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
   /// wired the sheet itself explains why (see AudioRecorderFactory), so this
   /// simply no-ops when the sheet returns null.
   Future<void> _recordAudioNote() async {
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
     final staged = await showAudioNoteRecorderSheet(context);
     if (staged == null || !mounted) return;
     final validation = AudioMediaValidator.validateDuration(staged.durationMs);

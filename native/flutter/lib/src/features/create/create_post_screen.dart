@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/connectivity/connectivity_service.dart';
+import '../../core/connectivity/offline_notice.dart';
 import '../../core/sync/upload_queue_service.dart';
 import '../../data/local/post_draft_repository.dart';
 import '../../data/local/upload_queue_repository.dart';
@@ -35,12 +37,14 @@ class CreatePostScreen extends StatefulWidget {
     required this.draftRepository,
     required this.uploadQueueRepository,
     required this.uploadQueueService,
+    required this.connectivityService,
     required this.onPostUploaded,
   });
 
   final PostDraftRepository draftRepository;
   final UploadQueueRepository uploadQueueRepository;
   final UploadQueueService uploadQueueService;
+  final ConnectivityService connectivityService;
   final VoidCallback onPostUploaded;
 
   @override
@@ -328,7 +332,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ? _media.isNotEmpty
       : _caption.trim().isNotEmpty || _media.isNotEmpty;
 
-  Future<void> _submit() => _saveDraft(queueForUpload: true);
+  Future<void> _submit() {
+    // Publishing needs connectivity. Block offline (nothing is queued for a
+    // later background upload); the user can still "Save draft" to keep their
+    // work locally and publish once reconnected.
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(
+        context,
+        message: "You're offline. Save a draft and publish when reconnected.",
+      );
+      return Future<void>.value();
+    }
+    return _saveDraft(queueForUpload: true);
+  }
 
   Future<void> _saveDraft({required bool queueForUpload}) async {
     if (!_hasContent || _isSubmitting) return;

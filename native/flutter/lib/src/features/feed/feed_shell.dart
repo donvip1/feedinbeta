@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/connectivity/connectivity_service.dart';
+import '../../core/connectivity/offline_notice.dart';
 import '../../core/notifications/callkit_service.dart';
 import '../../core/notifications/local_notifications_service.dart';
 import '../../core/notifications/pending_reply_store.dart';
@@ -67,6 +69,7 @@ class FeedShell extends StatefulWidget {
     required this.pushNotificationService,
     required this.localNotificationsService,
     required this.callKitService,
+    required this.connectivityService,
     required this.onSignOut,
   });
 
@@ -89,6 +92,7 @@ class FeedShell extends StatefulWidget {
   final PushNotificationService pushNotificationService;
   final LocalNotificationsService localNotificationsService;
   final CallKitService callKitService;
+  final ConnectivityService connectivityService;
   final VoidCallback onSignOut;
 
   @override
@@ -125,7 +129,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
       _handleRealtimeEvent,
     );
     _connectRealtime();
-    widget.foregroundSyncCoordinator.start();
+    // No periodic auto-replay: online actions flush immediately and offline
+    // actions are hard-blocked (never queued), so there is no backlog to drain.
+    // Live message refresh still arrives via [realtimeService] below.
     unawaited(_initPush());
     _initLocalNotificationsAndCalls();
     // Real 1:1 call media over LiveKit (SFU + managed TURN), matching the web
@@ -146,7 +152,6 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     _localTapSub?.cancel();
     _replySub?.cancel();
     _callKitSub?.cancel();
-    widget.foregroundSyncCoordinator.stop();
     widget.realtimeService.disconnect();
     _callController.removeListener(_handleCallControllerChange);
     _callController.dispose();
@@ -364,6 +369,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
             draftRepository: widget.postDraftRepository,
             uploadQueueRepository: widget.uploadQueueRepository,
             uploadQueueService: widget.uploadQueueService,
+            connectivityService: widget.connectivityService,
             onPostUploaded: () => setState(() => _feedRealtimeVersion++),
           ),
         ),
@@ -447,6 +453,8 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     final pages = [
       FeedScreen(
         feedRepository: widget.feedRepository,
+        syncService: widget.syncService,
+        connectivityService: widget.connectivityService,
         realtimeVersion: _feedRealtimeVersion,
         onOpenNotifications: _showNotificationsScreen,
         notificationUnreadCountFuture: _notificationUnreadCountFuture,
@@ -455,6 +463,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         messagesRepository: widget.messagesRepository,
         conversationStarter: widget.conversationStarter,
         syncService: widget.syncService,
+        connectivityService: widget.connectivityService,
         profile: _profile,
         realtimeVersion: _messagesRealtimeVersion,
         initialConversationId: _initialConversationId,
@@ -618,12 +627,16 @@ class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
     required this.feedRepository,
+    required this.syncService,
+    required this.connectivityService,
     required this.realtimeVersion,
     required this.onOpenNotifications,
     required this.notificationUnreadCountFuture,
   });
 
   final LocalFeedRepositoryContract feedRepository;
+  final SyncServiceContract syncService;
+  final ConnectivityService connectivityService;
   final int realtimeVersion;
   final VoidCallback onOpenNotifications;
   final Future<int> notificationUnreadCountFuture;
@@ -637,7 +650,6 @@ class _FeedScreenState extends State<FeedScreen> {
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
-  int _pendingActionCount = 0;
   String? _message;
   int _tabIndex = 0;
   int _activePage = 0;
@@ -653,7 +665,6 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _postsFuture = _initialLoad();
-    _loadPendingActionCount();
   }
 
   @override
@@ -677,13 +688,6 @@ class _FeedScreenState extends State<FeedScreen> {
       _postsFuture = Future.value(result.posts);
       _message = 'New feed activity synced.';
     });
-    await _loadPendingActionCount();
-  }
-
-  Future<void> _loadPendingActionCount() async {
-    final count = await widget.feedRepository.pendingActionCount();
-    if (!mounted) return;
-    setState(() => _pendingActionCount = count);
   }
 
   Future<List<FeedPost>> _initialLoad() async {
@@ -707,7 +711,6 @@ class _FeedScreenState extends State<FeedScreen> {
       _message = result.message ?? 'Feed refreshed.';
       _hasMorePosts = result.usedRemote;
     });
-    await _loadPendingActionCount();
   }
 
   Future<void> _loadMore() async {
@@ -727,19 +730,34 @@ class _FeedScreenState extends State<FeedScreen> {
     });
   }
 
-  Future<void> _queueAction(Future<void> Function() action) async {
+  /// Whether the device currently has connectivity. Online actions are
+  /// hard-blocked when offline (modern-social behaviour — nothing is queued for
+  /// later); only cached reads work offline.
+  bool get _isOnline => widget.connectivityService.isOnline;
+
+  /// Show the standard "you're offline" affordance and return false when the
+  /// device is offline; return true when it's safe to proceed with a write.
+  bool _requireOnline() {
+    if (_isOnline) return true;
+    showOfflineSnackBar(context);
+    return false;
+  }
+
+  /// Run an online write, then flush immediately so it is sent now (not queued
+  /// for "later"). Blocks with the offline affordance when there's no network.
+  Future<void> _runOnlineAction(Future<void> Function() action) async {
+    if (!_requireOnline()) return;
     await action();
-    await _loadPendingActionCount();
-    if (!mounted) return;
-    setState(() => _message = 'Saved offline. It will sync later.');
+    await widget.syncService.syncNow();
   }
 
   Future<void> _likePost(FeedPost post) async {
+    if (!_requireOnline()) return;
     if (!_likedPostIds.contains(post.id)) {
       setState(() => _likedPostIds.add(post.id));
     }
     await widget.feedRepository.queueLike(post.id);
-    await _loadPendingActionCount();
+    await widget.syncService.syncNow();
   }
 
   /// Pull the next page in once the viewer nears the end of the loaded feed.
@@ -771,22 +789,30 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _savePost(FeedPost post) async {
+    if (!_requireOnline()) return;
     await widget.feedRepository.queueSave(post.id);
-    await _loadPendingActionCount();
+    await widget.syncService.syncNow();
     if (!mounted) return;
     setState(() {
       _savedPostIds.add(post.id);
-      _message = 'Post saved. It will sync when connected.';
+      _message = 'Post saved.';
     });
   }
 
   Future<void> _sharePost(FeedPost post) async {
+    // Copying the share text is a local action and stays available offline;
+    // recording the share event to the backend requires connectivity.
     final text = _shareTextForPost(post);
     await Clipboard.setData(ClipboardData(text: text));
+    if (!_requireOnline()) {
+      if (!mounted) return;
+      setState(() => _message = 'Share text copied.');
+      return;
+    }
     await widget.feedRepository.queueShare(post.id);
-    await _loadPendingActionCount();
+    await widget.syncService.syncNow();
     if (!mounted) return;
-    setState(() => _message = 'Share text copied. Share event queued.');
+    setState(() => _message = 'Share text copied.');
   }
 
   String _shareTextForPost(FeedPost post) {
@@ -806,7 +832,7 @@ class _FeedScreenState extends State<FeedScreen> {
       builder: (context) => _CommentSheet(post: post),
     );
     if (comment == null || comment.trim().isEmpty) return;
-    await _queueAction(
+    await _runOnlineAction(
       () => widget.feedRepository.queueComment(post.id, comment),
     );
   }
@@ -851,15 +877,12 @@ class _FeedScreenState extends State<FeedScreen> {
                 right: 0,
                 child: _buildTopOverlay(context),
               ),
-              if (_message != null || _pendingActionCount > 0)
+              if (_message != null)
                 Positioned(
                   left: 12,
                   right: 12,
                   bottom: 12,
-                  child: _FeedStatusBanner(
-                    message: _message,
-                    pendingActionCount: _pendingActionCount,
-                  ),
+                  child: _FeedStatusBanner(message: _message),
                 ),
             ],
           ),
@@ -904,7 +927,7 @@ class _FeedScreenState extends State<FeedScreen> {
           onLike: () => _likePost(post),
           onComment: () => _openComments(post),
           onRefeed: () =>
-              _queueAction(() => widget.feedRepository.queueRefeed(post.id)),
+              _runOnlineAction(() => widget.feedRepository.queueRefeed(post.id)),
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
           onOpenDetail: () => _openPostDetail(post),
@@ -979,11 +1002,11 @@ class _FeedScreenState extends State<FeedScreen> {
           post: post,
           isSaved: _savedPostIds.contains(post.id),
           onLike: () =>
-              _queueAction(() => widget.feedRepository.queueLike(post.id)),
+              _runOnlineAction(() => widget.feedRepository.queueLike(post.id)),
           onSave: () => _savePost(post),
           onComment: () => _openComments(post),
           onRefeed: () =>
-              _queueAction(() => widget.feedRepository.queueRefeed(post.id)),
+              _runOnlineAction(() => widget.feedRepository.queueRefeed(post.id)),
           onShare: () => _sharePost(post),
         ),
       ),
@@ -1261,21 +1284,13 @@ class _ImmersiveLoadingStateState extends State<_ImmersiveLoadingState>
 }
 
 class _FeedStatusBanner extends StatelessWidget {
-  const _FeedStatusBanner({
-    required this.message,
-    required this.pendingActionCount,
-  });
+  const _FeedStatusBanner({required this.message});
 
   final String? message;
-  final int pendingActionCount;
 
   @override
   Widget build(BuildContext context) {
-    final text = [
-      if (pendingActionCount > 0)
-        '$pendingActionCount offline action${pendingActionCount == 1 ? '' : 's'} queued',
-      if (message != null) message!,
-    ].join(' · ');
+    final text = message ?? '';
     if (text.isEmpty) return const SizedBox.shrink();
     return IgnorePointer(
       child: Align(
