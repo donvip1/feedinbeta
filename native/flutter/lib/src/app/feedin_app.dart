@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/config/feedin_config.dart';
 import '../features/auth/auth_gate.dart';
+import '../features/auth/data/google_auth_service.dart';
 import 'feedin_services.dart';
 
 class FeedinApp extends StatelessWidget {
@@ -14,6 +15,15 @@ class FeedinApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const primary = Color(0xFFFF3D9A);
     final services = servicesOverride ?? FeedinServices.create(config);
+
+    // Real Google sign-in handler (replaces the coming-soon default). Runs the
+    // native chooser, then establishes a Supabase session via the ID token;
+    // AuthGate's auth-state listener adopts the session and advances the UI.
+    final googleAuth = GoogleAuthService(
+      serverClientId: config.googleServerClientId.isEmpty
+          ? null
+          : config.googleServerClientId,
+    );
 
     return MaterialApp(
       title: 'feedIn',
@@ -74,7 +84,39 @@ class FeedinApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
-      home: AuthGate(services: services),
+      home: AuthGate(
+        services: services,
+        onGoogleSignIn: (context) =>
+            _signInWithGoogle(context, googleAuth, services),
+      ),
     );
+  }
+
+  /// Drive the native Google flow and hand the ID token to Supabase. A null
+  /// result means the user cancelled (silent). Any real failure surfaces a
+  /// snackbar; success is picked up by AuthGate's auth-state listener.
+  static Future<void> _signInWithGoogle(
+    BuildContext context,
+    GoogleAuthService googleAuth,
+    FeedinServices services,
+  ) async {
+    try {
+      final tokens = await googleAuth.signIn();
+      if (tokens == null) return; // cancelled
+      await services.authRepository.signInWithGoogle(
+        idToken: tokens.idToken,
+        accessToken: tokens.accessToken,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text("Couldn't sign in with Google. Please try again."),
+          ),
+        );
+    }
   }
 }

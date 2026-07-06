@@ -59,7 +59,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    _listenForPasswordRecovery();
+    _listenForAuthChanges();
     _restoreSession();
     _loadOnboardingFlag();
   }
@@ -80,20 +80,46 @@ class _AuthGateState extends State<AuthGate> {
     super.dispose();
   }
 
-  void _listenForPasswordRecovery() {
+  void _listenForAuthChanges() {
     if (!widget.services.authRepository.isConfigured) return;
 
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       data,
     ) {
-      if (data.event != AuthChangeEvent.passwordRecovery) return;
       if (!mounted) return;
 
-      setState(() {
-        _isRecoveringPassword = true;
-        _message = 'Enter a new password to finish account recovery.';
-        _errorMessage = null;
-      });
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        setState(() {
+          _isRecoveringPassword = true;
+          _message = 'Enter a new password to finish account recovery.';
+          _errorMessage = null;
+        });
+        return;
+      }
+
+      // OAuth sign-in (Google) completes outside [_submit], so adopt the fresh
+      // session here to advance past the auth screen. Password sign-in already
+      // sets [_user] in [_submit]; the guard avoids clobbering an active session
+      // on later token-refresh/signed-in events.
+      if (data.event == AuthChangeEvent.signedIn && _user == null) {
+        unawaited(_adoptSignedInSession());
+      }
+    });
+  }
+
+  /// Resolve the freshly signed-in Supabase session into our domain user +
+  /// profile so the gate renders the app shell.
+  Future<void> _adoptSignedInSession() async {
+    final user = await widget.services.authRepository.restoreSession();
+    if (user == null || !mounted) return;
+    final profile =
+        await widget.services.profileRepository.loadProfileForUser(user.id);
+    if (!mounted) return;
+    setState(() {
+      _user = user;
+      _profile = profile;
+      _isSubmitting = false;
+      _errorMessage = null;
     });
   }
 
