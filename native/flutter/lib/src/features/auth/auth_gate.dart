@@ -353,6 +353,8 @@ class _AuthGateState extends State<AuthGate> {
         realtimeService: widget.services.realtimeService,
         storageMaintenance: widget.services.storageMaintenance,
         pushNotificationService: widget.services.pushNotificationService,
+        localNotificationsService: widget.services.localNotificationsService,
+        callKitService: widget.services.callKitService,
         onSignOut: _signOut,
       );
     }

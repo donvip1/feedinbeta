@@ -51,6 +51,16 @@
                     android:host="auth-callback"/>
             </intent-filter>
         </activity>
+        <!-- Delivers flutter_local_notifications action buttons (the message
+             notification's inline Reply) to the Dart handler, including when the
+             app is backgrounded/killed. The plugin does NOT declare this itself.
+             flutter_callkit_incoming's own components + call permissions
+             (USE_FULL_SCREEN_INTENT, FOREGROUND_SERVICE_PHONE_CALL, …) are
+             merged in from its library manifest. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

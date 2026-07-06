@@ -1,17 +1,78 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/local/notification_repository_contract.dart';
+import 'callkit_service.dart';
+import 'local_notifications_service.dart';
 
-/// Top-level FCM background handler. Notification-type payloads are rendered by
-/// the OS automatically while the app is backgrounded or terminated, so this
-/// stays intentionally minimal — it exists so data-only messages have a handler
-/// and to leave a hook for future background processing.
+/// Top-level FCM background handler, invoked in a dedicated isolate while the app
+/// is backgrounded or terminated. It has no widget tree, no Hive, and no
+/// Supabase session — so it works purely from the message's `data` payload.
+///
+/// It handles the two Module 2 push types by their `type` field:
+///
+///   * `type: call`    → present the native full-screen incoming-call UI
+///                        (CallKit) so a call rings even from a killed app.
+///   * `type: message` → post a rich, grouped message notification with an
+///                        inline reply action.
+///
+/// ### Data-payload contract (backend must send data-only messages)
+///
+/// Incoming call (`type: call`):
+/// ```json
+/// { "type": "call", "call_id": "<uuid>", "caller_name": "Ada",
+///   "caller_avatar": "https://…", "call_type": "video" }
+/// ```
+/// (`call_type` is `voice` or `video`; `caller_avatar` optional.)
+///
+/// Message (`type: message`):
+/// ```json
+/// { "type": "message", "conversation_id": "<uuid>", "sender_name": "Ada",
+///   "body": "hey!", "message_id": "<uuid>" }
+/// ```
+/// (`message_id` optional but recommended so re-delivery replaces the entry.)
+///
+/// Notification-type payloads (with a `notification` block) are still rendered
+/// by the OS automatically, so they need nothing here.
 @pragma('vm:entry-point')
 Future<void> feedinFirebaseBackgroundHandler(RemoteMessage message) async {
-  // No-op: the system tray displays notification payloads without our help.
+  // The background isolate needs its plugin registrations bootstrapped before
+  // any platform channel (CallKit / local notifications) is usable.
+  DartPluginRegistrant.ensureInitialized();
+  final data = message.data;
+  switch (data['type']?.toString()) {
+    case 'call':
+      final callId = data['call_id']?.toString();
+      if (callId == null || callId.isEmpty) return;
+      await CallKitService.showIncomingCall(
+        callId: callId,
+        callerName: data['caller_name']?.toString() ?? 'feedIn user',
+        isVideo: data['call_type']?.toString() == 'video',
+        avatarUrl: data['caller_avatar']?.toString(),
+      );
+      break;
+    case 'message':
+      final conversationId = data['conversation_id']?.toString();
+      final body = data['body']?.toString();
+      if (conversationId == null || conversationId.isEmpty || body == null) {
+        return;
+      }
+      final local = LocalNotificationsService(isConfigured: true);
+      await local.initialize();
+      await local.showMessageNotification(
+        conversationId: conversationId,
+        senderName: data['sender_name']?.toString() ?? 'feedIn',
+        body: body,
+        messageId: data['message_id']?.toString(),
+      );
+      break;
+    default:
+      // Unknown / notification-only payload: the OS handles display.
+      break;
+  }
 }
 
 /// Wires Firebase Cloud Messaging into the app:

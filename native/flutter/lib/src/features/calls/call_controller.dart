@@ -233,6 +233,38 @@ class CallController extends ChangeNotifier {
     _startStatusPolling();
   }
 
+  /// Accept an incoming call known only by its [callId] — e.g. the user tapped
+  /// Accept on the native CallKit screen after a killed-app push, so we never
+  /// received the realtime `incoming` event that would have populated
+  /// [incomingCall]. Fetches the row (resolving the caller), then routes through
+  /// [acceptIncomingCall]. Returns the promoted session, or null if it could not
+  /// be resolved (already gone / not ours).
+  Future<CallSession?> acceptIncomingById(String callId) async {
+    if (_disposed) return null;
+    if (hasActiveCall && _session?.id == callId) return _session;
+    if (hasActiveCall) return null; // busy with a different call
+    final call = _incomingCall?.id == callId
+        ? _incomingCall
+        : await _data.fetchCall(callId);
+    if (call == null) return null;
+    await acceptIncomingCall(call);
+    return _session;
+  }
+
+  /// Decline an incoming call known only by its [callId] (native CallKit decline
+  /// / timeout). Uses the ringing path when it matches the surfaced banner,
+  /// otherwise rejects the row directly.
+  Future<void> declineIncomingById(String callId) async {
+    if (_disposed) return;
+    if (_incomingCall?.id == callId) {
+      await declineIncomingCall();
+      return;
+    }
+    try {
+      await _data.rejectCall(callId);
+    } catch (_) {}
+  }
+
   /// Decline the pending [incomingCall] (or an explicit [call]). Writes status
   /// 'rejected' and clears the incoming state.
   Future<void> declineIncomingCall([CallSession? call]) async {

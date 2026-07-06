@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/notifications/callkit_service.dart';
+import '../../core/notifications/local_notifications_service.dart';
+import '../../core/notifications/pending_reply_store.dart';
 import '../../core/notifications/push_notification_service.dart';
 import '../../core/realtime/feedin_realtime_service.dart';
 import '../../core/storage/local_storage_maintenance.dart';
@@ -62,6 +65,8 @@ class FeedShell extends StatefulWidget {
     required this.realtimeService,
     required this.storageMaintenance,
     required this.pushNotificationService,
+    required this.localNotificationsService,
+    required this.callKitService,
     required this.onSignOut,
   });
 
@@ -82,17 +87,22 @@ class FeedShell extends StatefulWidget {
   final FeedinRealtimeService realtimeService;
   final LocalStorageMaintenance storageMaintenance;
   final PushNotificationService pushNotificationService;
+  final LocalNotificationsService localNotificationsService;
+  final CallKitService callKitService;
   final VoidCallback onSignOut;
 
   @override
   State<FeedShell> createState() => _FeedShellState();
 }
 
-class _FeedShellState extends State<FeedShell> {
+class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   int _index = 0;
   bool _showNotifications = false;
   late final StreamSubscription<FeedinRealtimeEvent> _realtimeSubscription;
   StreamSubscription<String>? _pushTapSub;
+  StreamSubscription<String>? _localTapSub;
+  StreamSubscription<PendingReply>? _replySub;
+  StreamSubscription<CallKitAction>? _callKitSub;
   bool _realtimeConnected = false;
   int _feedRealtimeVersion = 0;
   int _messagesRealtimeVersion = 0;
@@ -103,12 +113,13 @@ class _FeedShellState extends State<FeedShell> {
   /// Shared, long-lived call controller: drives both outgoing calls placed from
   /// a chat header and the app-wide incoming-call presenter below.
   late final CallController _callController;
-  bool _incomingRouteOpen = false;
+  bool _callRouteOpen = false;
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
+    WidgetsBinding.instance.addObserver(this);
     _notificationUnreadCountFuture = widget.notificationRepository
         .unreadCount();
     _realtimeSubscription = widget.realtimeService.events.listen(
@@ -117,6 +128,7 @@ class _FeedShellState extends State<FeedShell> {
     _connectRealtime();
     widget.foregroundSyncCoordinator.start();
     unawaited(_initPush());
+    _initLocalNotificationsAndCalls();
     // Real 1:1 call media over LiveKit (SFU + managed TURN), matching the web
     // app. The engine fetches a short-lived token from the server-owned
     // `livekit-token` edge function (the app holds no LiveKit secret) and joins
@@ -129,13 +141,26 @@ class _FeedShellState extends State<FeedShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _realtimeSubscription.cancel();
     _pushTapSub?.cancel();
+    _localTapSub?.cancel();
+    _replySub?.cancel();
+    _callKitSub?.cancel();
     widget.foregroundSyncCoordinator.stop();
     widget.realtimeService.disconnect();
     _callController.removeListener(_handleCallControllerChange);
     _callController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Replies typed into a message notification while we were backgrounded /
+    // killed are parked in [PendingReplyStore]; flush them the moment we're back.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_drainPendingReplies());
+    }
   }
 
   /// App-wide incoming-call presenter: when the shared [CallController] surfaces
@@ -147,17 +172,93 @@ class _FeedShellState extends State<FeedShell> {
   /// double-present here.
   void _handleCallControllerChange() {
     if (!mounted) return;
-    if (_callController.incomingCall != null && !_incomingRouteOpen) {
-      _incomingRouteOpen = true;
-      Navigator.of(context, rootNavigator: true)
-          .push(
-            MaterialPageRoute<void>(
-              fullscreenDialog: true,
-              builder: (_) => CallScreen(controller: _callController),
-            ),
-          )
-          .whenComplete(() => _incomingRouteOpen = false);
+    // Auto-present only for a freshly *ringing incoming* call — outgoing calls
+    // push their own route via [CallScreen.start], so presenting on hasActiveCall
+    // here would double-present them. Calls accepted from the native CallKit
+    // screen are presented explicitly by [_handleCallKitAction].
+    if (_callController.incomingCall != null) {
+      _presentCallScreen();
     }
+  }
+
+  /// Push the shared full-screen [CallScreen]. Guarded so only one call route is
+  /// ever open; the flag resets when the route pops (the controller returns to
+  /// idle and auto-pops the screen).
+  void _presentCallScreen() {
+    if (!mounted || _callRouteOpen) return;
+    _callRouteOpen = true;
+    Navigator.of(context, rootNavigator: true)
+        .push(
+          MaterialPageRoute<void>(
+            fullscreenDialog: true,
+            builder: (_) => CallScreen(controller: _callController),
+          ),
+        )
+        .whenComplete(() => _callRouteOpen = false);
+  }
+
+  /// Set up the rich local-notification + native-call plumbing once the shell is
+  /// mounted: route notification taps into the existing deep-link handler, flush
+  /// any queued notification replies, and reconcile native CallKit accept/decline
+  /// actions with the shared [CallController].
+  void _initLocalNotificationsAndCalls() {
+    final local = widget.localNotificationsService;
+    final callKit = widget.callKitService;
+    unawaited(local.initialize());
+    callKit.initialize();
+    _localTapSub = local.notificationTaps.listen(_openNotificationRoute);
+    _replySub = local.replies.listen(_sendReply);
+    _callKitSub = callKit.actions.listen(_handleCallKitAction);
+    // A tap on a notification that cold-started the app, plus any replies parked
+    // while we were away.
+    unawaited(_consumeLocalInitialRoute());
+    unawaited(_drainPendingReplies());
+  }
+
+  Future<void> _consumeLocalInitialRoute() async {
+    final route = await widget.localNotificationsService.initialRoute();
+    if (route != null && mounted) _openNotificationRoute(route);
+  }
+
+  Future<void> _handleCallKitAction(CallKitAction action) async {
+    switch (action.kind) {
+      case CallKitActionKind.accept:
+        final session =
+            await _callController.acceptIncomingById(action.callId);
+        if (session != null && mounted) {
+          _presentCallScreen();
+        }
+        break;
+      case CallKitActionKind.decline:
+      case CallKitActionKind.timeout:
+        await _callController.declineIncomingById(action.callId);
+        break;
+      case CallKitActionKind.ended:
+        // Native UI reports the call finished; nothing to reconcile beyond what
+        // the controller's own teardown already handles.
+        break;
+    }
+  }
+
+  /// Flush queued notification replies through the normal local-first send path.
+  Future<void> _drainPendingReplies() async {
+    final replies = await const PendingReplyStore().drain();
+    for (final reply in replies) {
+      await _sendReply(reply);
+    }
+  }
+
+  Future<void> _sendReply(PendingReply reply) async {
+    await widget.messagesRepository.queueMessage(
+      conversationId: reply.conversationId,
+      senderName: _profile.displayName,
+      senderId: _profile.userId.isEmpty ? null : _profile.userId,
+      senderAvatarUrl: _profile.avatarUrl,
+      body: reply.body,
+    );
+    await widget.syncService.syncNow();
+    if (!mounted) return;
+    setState(() => _messagesRealtimeVersion++);
   }
 
   Future<void> _connectRealtime() async {
@@ -229,6 +330,10 @@ class _FeedShellState extends State<FeedShell> {
   void _openNotificationRoute(String route) {
     final conversationId = _conversationIdFromRoute(route);
     if (conversationId != null) {
+      // Opening the thread clears its collapsed notification group.
+      unawaited(
+        widget.localNotificationsService.clearConversation(conversationId),
+      );
       setState(() {
         _showNotifications = false;
         _index = 1;

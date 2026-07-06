@@ -2,6 +2,8 @@ import 'package:hive_ce/hive.dart';
 
 import '../core/bootstrap/local_storage_bootstrap.dart';
 import '../core/config/feedin_config.dart';
+import '../core/notifications/callkit_service.dart';
+import '../core/notifications/local_notifications_service.dart';
 import '../core/notifications/push_notification_service.dart';
 import '../core/security/secure_session_store.dart';
 import '../core/realtime/feedin_realtime_service.dart';
@@ -53,6 +55,8 @@ class FeedinServices {
     required this.realtimeService,
     required this.storageMaintenance,
     required this.pushNotificationService,
+    required this.localNotificationsService,
+    required this.callKitService,
   });
 
   final FeedinConfig config;
@@ -72,6 +76,8 @@ class FeedinServices {
   final FeedinRealtimeService realtimeService;
   final LocalStorageMaintenance storageMaintenance;
   final PushNotificationService pushNotificationService;
+  final LocalNotificationsService localNotificationsService;
+  final CallKitService callKitService;
 
   factory FeedinServices.create(FeedinConfig config) {
     final profileBox = Hive.box<Map>(LocalStorageBootstrap.profileBoxName);
@@ -188,6 +194,12 @@ class FeedinServices {
         messagesBox: messagesBox,
         notificationsBox: notificationsBox,
         mediaCacheService: mediaCacheService,
+      ),
+      localNotificationsService: LocalNotificationsService(
+        isConfigured: config.hasSupabaseConfig,
+      ),
+      callKitService: CallKitService(
+        isConfigured: config.hasSupabaseConfig,
       ),
       pushNotificationService: PushNotificationService(
         isConfigured: config.hasSupabaseConfig,
