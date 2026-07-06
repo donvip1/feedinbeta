@@ -77,6 +77,7 @@ dependencies:
   flutter_callkit_incoming: ^2.5.2
   flutter_local_notifications: ^18.0.1
   google_sign_in: ^7.2.0
+  connectivity_plus: ^6.1.5
 
 dev_dependencies:
   flutter_test:

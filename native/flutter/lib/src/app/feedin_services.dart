@@ -2,6 +2,7 @@ import 'package:hive_ce/hive.dart';
 
 import '../core/bootstrap/local_storage_bootstrap.dart';
 import '../core/config/feedin_config.dart';
+import '../core/connectivity/connectivity_service.dart';
 import '../core/notifications/callkit_service.dart';
 import '../core/notifications/local_notifications_service.dart';
 import '../core/notifications/push_notification_service.dart';
@@ -53,6 +54,7 @@ class FeedinServices {
     required this.foregroundSyncCoordinator,
     required this.storageDiagnosticsService,
     required this.realtimeService,
+    required this.connectivityService,
     required this.storageMaintenance,
     required this.pushNotificationService,
     required this.localNotificationsService,
@@ -74,6 +76,7 @@ class FeedinServices {
   final ForegroundSyncCoordinator foregroundSyncCoordinator;
   final StorageDiagnosticsService storageDiagnosticsService;
   final FeedinRealtimeService realtimeService;
+  final ConnectivityService connectivityService;
   final LocalStorageMaintenance storageMaintenance;
   final PushNotificationService pushNotificationService;
   final LocalNotificationsService localNotificationsService;
@@ -186,6 +189,7 @@ class FeedinServices {
       realtimeService: FeedinRealtimeService(
         isConfigured: config.hasSupabaseConfig,
       ),
+      connectivityService: ConnectivityService(),
       storageMaintenance: LocalStorageMaintenance(
         profileBox: profileBox,
         feedBox: feedBox,
