@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../call_models.dart';
@@ -93,6 +95,11 @@ class CallsRemoteDataSource {
     final callId = row['id'].toString();
     await _addSelfParticipant(callId);
 
+    // Ring the callee's native devices via the server-owned data-only push, so
+    // the call surfaces (CallKit) even when their app is killed. Best-effort:
+    // realtime still delivers the ring while their app is alive.
+    unawaited(_sendCallPush(client, callId));
+
     return _sessionFromRow(
       Map<String, Object?>.from(row),
       viewerId: callerId,
@@ -152,6 +159,21 @@ class CallsRemoteDataSource {
           if (durationSeconds > 0) 'duration_seconds': durationSeconds,
         })
         .eq('id', callId);
+  }
+
+  /// Ask the server to ring the callee's native devices (data-only FCM →
+  /// full-screen CallKit). Best-effort: swallow any error so a push hiccup never
+  /// fails placing the call — the callee's realtime listener is the primary path
+  /// while their app is alive.
+  Future<void> _sendCallPush(SupabaseClient client, String callId) async {
+    try {
+      await client.functions.invoke(
+        'send-call-push',
+        body: {'call_id': callId},
+      );
+    } catch (_) {
+      // ignore — non-critical
+    }
   }
 
   Future<void> _addSelfParticipant(String callId) async {

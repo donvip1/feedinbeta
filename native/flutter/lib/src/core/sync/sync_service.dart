@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -167,6 +168,22 @@ class SyncService implements SyncServiceContract {
         messageId: inserted['id'].toString(),
         message: message,
       );
+    }
+
+    // Notify the other participants' native devices via the server-owned
+    // data-only push (rich, grouped message notification with inline reply).
+    // Best-effort: a push hiccup must never fail or retry the message replay.
+    unawaited(_sendMessagePush(client, inserted['id'].toString()));
+  }
+
+  Future<void> _sendMessagePush(SupabaseClient client, String messageId) async {
+    try {
+      await client.functions.invoke(
+        'send-message-push',
+        body: {'message_id': messageId},
+      );
+    } catch (_) {
+      // ignore — non-critical
     }
   }
 

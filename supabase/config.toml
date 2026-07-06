@@ -68,3 +68,12 @@ verify_jwt = true
 
 [functions.extract-link-metadata]
 verify_jwt = true
+
+# Module 2 — native push + background calls. Data-only FCM senders invoked by
+# the sender/caller client right after the DB write. verify_jwt so the function
+# can confirm the caller owns the call/message before ringing/notifying.
+[functions.send-call-push]
+verify_jwt = true
+
+[functions.send-message-push]
+verify_jwt = true
