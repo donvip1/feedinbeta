@@ -103,7 +103,6 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   StreamSubscription<String>? _localTapSub;
   StreamSubscription<PendingReply>? _replySub;
   StreamSubscription<CallKitAction>? _callKitSub;
-  bool _realtimeConnected = false;
   int _feedRealtimeVersion = 0;
   int _messagesRealtimeVersion = 0;
   String? _initialConversationId;
@@ -263,8 +262,6 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
 
   Future<void> _connectRealtime() async {
     await widget.realtimeService.connect();
-    if (!mounted) return;
-    setState(() => _realtimeConnected = widget.realtimeService.isConnected);
   }
 
   /// Set up push notifications once the authenticated shell is mounted: request
@@ -381,11 +378,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Settings')),
           body: SettingsScreen(
-            syncService: widget.syncService,
-            uploadQueueService: widget.uploadQueueService,
-            storageDiagnosticsService: widget.storageDiagnosticsService,
             preferencesRepository: widget.preferencesRepository,
-            realtimeConnected: _realtimeConnected,
             storageMaintenance: widget.storageMaintenance,
             onSignOut: widget.onSignOut,
           ),

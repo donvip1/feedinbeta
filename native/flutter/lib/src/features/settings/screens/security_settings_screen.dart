@@ -8,14 +8,14 @@ import '../settings_theme.dart';
 import '../settings_widgets.dart';
 import 'settings_sub_scaffold.dart';
 
-/// Security overview: current session, two-factor, login activity.
+/// Security overview: the current session plus the account id.
 ///
-/// The native schema has no `user_sessions` / 2FA tables, and no password-reset
-/// or session-revocation RPC is wired natively yet. This screen therefore shows
-/// the real current session (from the Supabase auth user) and renders the
-/// remaining controls as UI with an explicit "not available yet" state so the
-/// parity surface is present and the gap is visible. Ports the Security /
-/// Sessions entries from src/pages/Settings.tsx.
+/// The native schema has no `user_sessions` / 2FA tables and no password-reset
+/// or session-revocation RPC is wired natively yet, so this screen intentionally
+/// only surfaces what genuinely works today: the real current session (from the
+/// Supabase auth user) and a tap-to-copy account id. Placeholder controls for
+/// password change, two-factor and session management are deliberately omitted
+/// rather than shown as non-functional rows.
 class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key, this.dataSource});
 
@@ -44,12 +44,6 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       _profile = profile;
       _loading = false;
     });
-  }
-
-  void _notAvailable(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature needs a backend endpoint (not wired).')),
-    );
   }
 
   @override
@@ -85,45 +79,8 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               ),
           ],
         ),
-        const SizedBox(height: SettingsSpacing.lg),
-        SettingsCard(
-          icon: Icons.lock_reset_outlined,
-          title: 'Sign-in & password',
-          children: [
-            const SettingsDivider(),
-            SettingsNavRow(
-              icon: Icons.password_outlined,
-              title: 'Change password',
-              description: 'Send a password reset email',
-              onTap: () => _notAvailable('Password change'),
-            ),
-            const SettingsDivider(),
-            SettingsNavRow(
-              icon: Icons.shield_moon_outlined,
-              title: 'Two-factor authentication',
-              description: 'Add an extra layer of security',
-              onTap: () => _notAvailable('Two-factor auth'),
-              trailing: const SettingsCountPill(label: 'Off'),
-            ),
-          ],
-        ),
-        const SizedBox(height: SettingsSpacing.lg),
-        SettingsCard(
-          icon: Icons.history,
-          title: 'Login activity',
-          description: 'Recent sign-ins to your account.',
-          children: [
-            const SettingsDivider(),
-            SettingsNavRow(
-              icon: Icons.devices_other_outlined,
-              title: 'Active sessions',
-              description: 'Review devices signed in to your account',
-              onTap: () => _notAvailable('Session management'),
-            ),
-          ],
-        ),
-        const SizedBox(height: SettingsSpacing.lg),
-        if (!_loading && _profile != null)
+        if (!_loading && _profile != null) ...[
+          const SizedBox(height: SettingsSpacing.lg),
           SettingsCard(
             icon: Icons.fingerprint,
             title: 'Account id',
@@ -151,15 +108,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               ),
             ],
           ),
-        const SizedBox(height: SettingsSpacing.lg),
-        const SettingsStatusBanner(
-          icon: Icons.info_outline,
-          message:
-              'Password reset, 2FA and session management need backend '
-              'endpoints (auth RPC + user_sessions table) that aren\'t wired '
-              'to the native app yet.',
-          tone: SettingsBannerTone.neutral,
-        ),
+        ],
       ],
     );
   }
