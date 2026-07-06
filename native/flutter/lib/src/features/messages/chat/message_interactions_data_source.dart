@@ -65,4 +65,40 @@ class MessageInteractionsDataSource {
       return false;
     }
   }
+
+  /// Marks a view-once [messageId] as seen (recipient only, enforced
+  /// server-side): stamps `view_once_seen_at` and blanks the payload so it can
+  /// never be re-fetched. Returns true on success.
+  Future<bool> markViewOnceSeen(String messageId) async {
+    final client = _client;
+    if (client == null) return false;
+    try {
+      await client.rpc<dynamic>(
+        'mark_view_once_seen',
+        params: {'p_message_id': messageId},
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Sets the per-conversation disappearing-message timer ([seconds]; 0 = off),
+  /// participant-only. Returns true on success.
+  Future<bool> setDisappearingTimer(String conversationId, int seconds) async {
+    final client = _client;
+    if (client == null) return false;
+    try {
+      await client.rpc<dynamic>(
+        'set_disappearing_timer',
+        params: {
+          'p_conversation_id': conversationId,
+          'p_seconds': seconds,
+        },
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

@@ -17,6 +17,7 @@ abstract interface class LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    int? expiresAtMillis,
   });
   Future<void> queueAttachment({
     required String conversationId,
@@ -26,6 +27,8 @@ abstract interface class LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    bool viewOnce = false,
+    int? expiresAtMillis,
   });
   Future<void> markMessageState({
     required String messageId,

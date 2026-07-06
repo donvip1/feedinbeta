@@ -40,6 +40,7 @@ class MediaMessageContent extends StatelessWidget {
     super.key,
     required this.message,
     this.onOpenViewer,
+    this.onOpenViewOnce,
     this.onDownload,
     this.onRetryDownload,
   });
@@ -49,6 +50,11 @@ class MediaMessageContent extends StatelessWidget {
 
   /// Open the full-screen viewer (image/video). The viewer owns playback.
   final VoidCallback? onOpenViewer;
+
+  /// Open a not-yet-seen incoming view-once photo. After it's viewed the sender
+  /// is told (via `mark_view_once_seen`) and the tile becomes an "Opened"
+  /// tombstone.
+  final VoidCallback? onOpenViewOnce;
 
   /// Begin (or, for files, open) a download. Used by file rows and by the
   /// `idle` placeholder tile.
@@ -75,6 +81,31 @@ class MediaMessageContent extends StatelessWidget {
     final media = _media;
     if (media == null || media.kind == ChatMediaKind.none) {
       return const SizedBox.shrink();
+    }
+
+    // View-once media renders as a self-destructing tile rather than a
+    // thumbnail: my own copy shows a "View once" sent state; an already-opened
+    // one (mine or theirs) becomes an "Opened" tombstone; an unopened incoming
+    // one is a tap-to-reveal tile that burns on view.
+    if (message.viewOnce) {
+      if (message.viewOnceSeen) {
+        return const _ViewOnceTile(
+          icon: Icons.visibility_off_rounded,
+          label: 'Opened',
+        );
+      }
+      if (message.isMine) {
+        return const _ViewOnceTile(
+          icon: Icons.hourglass_empty_rounded,
+          label: 'Photo · View once',
+        );
+      }
+      return _ViewOnceTile(
+        icon: Icons.hourglass_empty_rounded,
+        label: 'Tap to view once',
+        onTap: onOpenViewOnce,
+        emphasized: true,
+      );
     }
 
     // Files always render as a card row (they carry their own download/open
@@ -417,6 +448,80 @@ class _RoundIconButton extends StatelessWidget {
           width: 24,
           height: 24,
           child: Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// View-once tile (self-destructing photo)
+// ---------------------------------------------------------------------------
+
+class _ViewOnceTile extends StatelessWidget {
+  const _ViewOnceTile({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  /// An unopened incoming tile is emphasized (primary tint) to invite the tap.
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = emphasized ? ChatColors.primary : ChatColors.mutedForeground;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: emphasized ? ChatColors.primaryFaint : ChatColors.muted,
+        borderRadius: const BorderRadius.all(Radius.circular(ChatRadii.md)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: emphasized
+                          ? const Color(0x22000000)
+                          : ChatColors.primaryFaint,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(icon, size: 18, color: fg),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: emphasized
+                            ? ChatColors.primary
+                            : ChatColors.foreground,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

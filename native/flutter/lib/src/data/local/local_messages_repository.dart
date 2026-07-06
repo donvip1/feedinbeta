@@ -146,6 +146,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    int? expiresAtMillis,
   }) async {
     final trimmed = body.trim();
     if (trimmed.isEmpty) return;
@@ -160,6 +161,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       body: trimmed,
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.pending,
+      expiresAtMillis: expiresAtMillis,
     );
 
     await _messagesBox.put(message.id, message.toJson());
@@ -192,6 +194,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    bool viewOnce = false,
+    int? expiresAtMillis,
   }) async {
     if (localPath.trim().isEmpty) return;
 
@@ -201,7 +205,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       id: const Uuid().v4(),
       conversationId: conversationId,
       senderName: senderName,
-      body: _attachmentPreview(kind),
+      body: viewOnce ? 'Photo · View once' : _attachmentPreview(kind),
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.pending,
       messageType: kind,
@@ -209,6 +213,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       mimeType: mimeType,
       fileName: fileName,
       fileSizeBytes: fileSizeBytes,
+      viewOnce: viewOnce,
+      expiresAtMillis: expiresAtMillis,
     );
 
     await _messagesBox.put(message.id, message.toJson());

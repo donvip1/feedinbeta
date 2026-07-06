@@ -6,7 +6,7 @@ import '../chat_view_models.dart';
 /// The attachment kinds the composer's "+" entry point can offer. Mirrors the
 /// web composer's attach menu (photo / camera / video / file / voice). Kept
 /// local to the sheet so it does not widen the shared [ChatMediaKind] enum.
-enum AttachmentOption { photo, camera, video, file, music, voiceNote }
+enum AttachmentOption { photo, camera, video, file, music, voiceNote, viewOncePhoto }
 
 /// Grid bottom-sheet presented when the user taps the composer's "+" button.
 ///
@@ -53,6 +53,11 @@ class AttachmentOptionsSheet extends StatelessWidget {
       option: AttachmentOption.voiceNote,
       icon: Icons.mic_none,
       label: 'Audio note',
+    ),
+    _AttachmentSpec(
+      option: AttachmentOption.viewOncePhoto,
+      icon: Icons.hourglass_empty_rounded,
+      label: 'View once',
     ),
   ];
 

@@ -540,6 +540,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    int? expiresAtMillis,
   }) async {}
 
   @override
@@ -551,5 +552,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    bool viewOnce = false,
+    int? expiresAtMillis,
   }) async {}
 }

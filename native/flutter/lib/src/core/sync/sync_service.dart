@@ -156,6 +156,12 @@ class SyncService implements SyncServiceContract {
           'created_at': DateTime.fromMillisecondsSinceEpoch(
             message.createdAtMillis,
           ).toIso8601String(),
+          // Ephemeral message flags (view-once / disappearing timer).
+          if (message.viewOnce) 'view_once': true,
+          if (message.expiresAtMillis != null)
+            'expires_at': DateTime.fromMillisecondsSinceEpoch(
+              message.expiresAtMillis!,
+            ).toUtc().toIso8601String(),
         })
         .select('id')
         .single();

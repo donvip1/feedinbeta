@@ -375,6 +375,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
   static const ChatActivity _otherActivity = ChatActivity.none;
   int? _otherLastSeenMillis;
 
+  /// Per-conversation disappearing-message timer in seconds (0 = off). Set from
+  /// the chat header control and used to stamp outgoing messages' expiry.
+  // TODO: a full implementation reads conversations.disappearing_seconds from
+  // the server per conversation; this session-scoped value covers the sender.
+  int _disappearingSeconds = 0;
+
+  /// Absolute expiry (epoch millis) for a message sent now under the active
+  /// disappearing timer, or null when the timer is off.
+  int? _disappearingExpiryMillis() {
+    if (_disappearingSeconds <= 0) return null;
+    return DateTime.now().millisecondsSinceEpoch + _disappearingSeconds * 1000;
+  }
+
   /// The other participant's identity, resolved from the conversation record so
   /// the header can place a call to them. Null until resolved (or for group /
   /// self-only conversations without a distinct other user).
@@ -500,6 +513,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
       senderAvatarUrl: widget.profile.avatarUrl,
       body: _messageController.text,
+      expiresAtMillis: _disappearingExpiryMillis(),
     );
     _messageController.clear();
     if (!mounted) return;
@@ -750,6 +764,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 await _shareMusicFile();
               case AttachmentOption.voiceNote:
                 await _recordAudioNote();
+              case AttachmentOption.viewOncePhoto:
+                await _pickAttachment(
+                  source: ImageSource.gallery,
+                  mediaType: 'image',
+                  viewOnce: true,
+                );
             }
           },
         );
@@ -760,6 +780,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> _pickAttachment({
     required ImageSource source,
     required String mediaType,
+    bool viewOnce = false,
   }) async {
     // Uploading media is an online action; block before opening the picker.
     if (!widget.connectivityService.isOnline) {
@@ -780,6 +801,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
       mimeType: picked.mimeType,
       fileName: picked.name,
       fileSizeBytes: await File(localPath).length(),
+      viewOnce: viewOnce,
+      expiresAtMillis: _disappearingExpiryMillis(),
     );
     if (!mounted) return;
     setState(() {
@@ -986,7 +1009,174 @@ class _ConversationScreenState extends State<ConversationScreen> {
       case ChatMediaKind.video:
       case ChatMediaKind.file:
       case ChatMediaKind.callLog:
-        return MediaMessageContent(message: view);
+        return MediaMessageContent(
+          message: view,
+          onOpenViewOnce: view.viewOnce && !view.isMine && !view.viewOnceSeen
+              ? () => _openViewOnce(view)
+              : null,
+        );
+    }
+  }
+
+  /// Reveal an incoming view-once photo, then burn it: tell the server via
+  /// `mark_view_once_seen` (which blanks the payload) and refresh so the tile
+  /// becomes an "Opened" tombstone. Requires connectivity.
+  Future<void> _openViewOnce(ChatMessageView view) async {
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
+    // Reveal the image once in a full-screen viewer.
+    await _showViewOnceImage(view);
+    final ok = await _interactions.markViewOnceSeen(view.id);
+    if (!ok && mounted) {
+      _toast('Could not open this photo.');
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+  }
+
+  /// Full-screen one-shot reveal of a view-once image. Blocks until dismissed.
+  Future<void> _showViewOnceImage(ChatMessageView view) async {
+    final media = view.media;
+    final url = media?.remoteUrl;
+    final localPath = media?.localPath;
+    if ((url == null || url.isEmpty) && (localPath == null || localPath.isEmpty)) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialogContext) {
+        final image = localPath != null && localPath.isNotEmpty
+            ? Image.file(File(localPath), fit: BoxFit.contain)
+            : Image.network(url!, fit: BoxFit.contain);
+        return Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              Positioned.fill(child: Center(child: image)),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ),
+              ),
+              const Positioned(
+                left: 0,
+                right: 0,
+                bottom: 24,
+                child: SafeArea(
+                  child: Center(
+                    child: Text(
+                      'This photo can only be viewed once',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Present the disappearing-messages timer chooser (Off / 24h / 7d / 90d) and
+  /// apply the pick to the server + this session's outgoing-message stamping.
+  Future<void> _openDisappearingChooser() async {
+    const options = <(String, int)>[
+      ('Off', 0),
+      ('24 hours', 86400),
+      ('7 days', 604800),
+      ('90 days', 7776000),
+    ];
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: ChatColors.card,
+      barrierColor: ChatColors.barrier,
+      shape: const RoundedRectangleBorder(borderRadius: ChatRadii.sheetTop),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(
+                  ChatSpacing.lg,
+                  ChatSpacing.lg,
+                  ChatSpacing.lg,
+                  ChatSpacing.sm,
+                ),
+                child: Text(
+                  'Disappearing messages',
+                  style: ChatTextStyles.sectionLabel,
+                ),
+              ),
+              for (final (label, seconds) in options)
+                ListTile(
+                  leading: Icon(
+                    seconds == 0 ? Icons.timer_off_outlined : Icons.timer_outlined,
+                    color: ChatColors.primary,
+                  ),
+                  title: Text(
+                    label,
+                    style: const TextStyle(color: ChatColors.foreground),
+                  ),
+                  trailing: _disappearingSeconds == seconds
+                      ? const Icon(Icons.check_rounded, color: ChatColors.primary)
+                      : null,
+                  onTap: () => Navigator.of(sheetContext).pop(seconds),
+                ),
+              const SizedBox(height: ChatSpacing.sm),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
+    final ok = await _interactions.setDisappearingTimer(
+      widget.conversationId,
+      picked,
+    );
+    if (!mounted) return;
+    if (!ok) {
+      _toast('Could not update the timer.');
+      return;
+    }
+    setState(() => _disappearingSeconds = picked);
+    _toast(
+      picked == 0
+          ? 'Disappearing messages turned off'
+          : 'Messages now disappear after ${_timerLabel(picked)}',
+    );
+  }
+
+  static String _timerLabel(int seconds) {
+    switch (seconds) {
+      case 86400:
+        return '24 hours';
+      case 604800:
+        return '7 days';
+      case 7776000:
+        return '90 days';
+      default:
+        return '$seconds seconds';
     }
   }
 
@@ -1027,6 +1217,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
               onBack: widget.onBack,
               onVoiceCall: () => _startCall(CallType.voice),
               onVideoCall: () => _startCall(CallType.video),
+              onDisappearing: _openDisappearingChooser,
+              disappearingSeconds: _disappearingSeconds,
             ),
             Expanded(
               child: FutureBuilder<List<LocalMessage>>(
@@ -1044,8 +1236,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     return const _EmptyConversationState();
                   }
 
+                  // Disappearing messages vanish locally the moment they pass
+                  // their expiry, even before the server-side purge runs.
+                  final nowMillis = DateTime.now().millisecondsSinceEpoch;
+                  final live = messages
+                      .where(
+                        (m) =>
+                            m.expiresAtMillis == null ||
+                            m.expiresAtMillis! > nowMillis,
+                      )
+                      .toList(growable: false);
+                  if (live.isEmpty) {
+                    return const _EmptyConversationState();
+                  }
+
                   final views = localMessagesToViews(
-                    messages,
+                    live,
                     currentUserKey: _currentUserKey,
                   );
 
@@ -1103,6 +1309,8 @@ class _ConversationHeader extends StatelessWidget {
     required this.onBack,
     required this.onVoiceCall,
     required this.onVideoCall,
+    required this.onDisappearing,
+    required this.disappearingSeconds,
     this.header,
   });
 
@@ -1115,6 +1323,12 @@ class _ConversationHeader extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onVoiceCall;
   final VoidCallback onVideoCall;
+
+  /// Open the disappearing-messages timer chooser.
+  final VoidCallback onDisappearing;
+
+  /// Current timer (seconds; 0 = off) so the overflow item can show its state.
+  final int disappearingSeconds;
 
   @override
   Widget build(BuildContext context) {
@@ -1211,6 +1425,18 @@ class _ConversationHeader extends StatelessWidget {
             icon: const Icon(
               Icons.videocam_outlined,
               color: ChatColors.foreground,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Disappearing messages',
+            onPressed: onDisappearing,
+            icon: Icon(
+              disappearingSeconds > 0
+                  ? Icons.timer_rounded
+                  : Icons.timer_outlined,
+              color: disappearingSeconds > 0
+                  ? ChatColors.primary
+                  : ChatColors.foreground,
             ),
           ),
         ],
