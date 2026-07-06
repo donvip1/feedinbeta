@@ -72,6 +72,10 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   flutter_image_compress: ^2.3.0
   video_compress: ^3.1.4
+  # Push + background calls (Module 2): full-screen incoming-call UI when the
+  # app is killed + rich/grouped message notifications with a reply action.
+  flutter_callkit_incoming: ^2.5.2
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:
