@@ -38,11 +38,15 @@ class MessagesRemoteDataSource {
     // breaks the whole conversation load. Read state is therefore derived from
     // the recipient's conversation_participants.last_read_at instead of a
     // per-message flag.
+    //
+    // The ephemeral columns (view_once / expires_at / view_once_seen_at) are
+    // added by 20260706000000_message_ephemeral.sql, so they are safe to select
+    // here; RemoteMessage.fromJson tolerates their absence on older backends.
     final rows = await client
         .from('messages')
         .select(
           'id, conversation_id, sender_id, content, message_type, status, '
-          'created_at, '
+          'created_at, view_once, expires_at, view_once_seen_at, '
           'profiles!messages_sender_id_fkey(display_name, username, avatar_url)',
         )
         .eq('conversation_id', serverConversationId)
@@ -176,6 +180,9 @@ class RemoteMessage {
     this.mimeType,
     this.fileName,
     this.fileSizeBytes,
+    this.viewOnce = false,
+    this.expiresAtMillis,
+    this.viewOnceSeenAtMillis,
   });
 
   final String id;
@@ -197,6 +204,12 @@ class RemoteMessage {
   final String? mimeType;
   final String? fileName;
   final int? fileSizeBytes;
+
+  // Ephemeral (view-once / disappearing) fields from the ephemeral migration.
+  // Data is carried through to LocalMessage; no behaviour is wired off it yet.
+  final bool viewOnce;
+  final int? expiresAtMillis;
+  final int? viewOnceSeenAtMillis;
 
   factory RemoteMessage.fromJson(
     Map<String, Object?> json, {
@@ -241,8 +254,19 @@ class RemoteMessage {
       deliveryStateName: deliveryStateName,
       messageType: json['message_type']?.toString() ?? 'text',
       readAtMillis: readAtMillis,
+      viewOnce: _parseBool(json['view_once']),
+      expiresAtMillis: _parseNullableMillis(json['expires_at']),
+      viewOnceSeenAtMillis: _parseNullableMillis(json['view_once_seen_at']),
     );
   }
+}
+
+/// Parses a Postgres boolean that may arrive as a Dart [bool] or a string
+/// ('true'/'t'/'1'). Defaults to false when absent/unrecognised.
+bool _parseBool(Object? value) {
+  if (value is bool) return value;
+  final s = value?.toString().trim().toLowerCase();
+  return s == 'true' || s == 't' || s == '1';
 }
 
 /// Delivery state from the live `messages.status` column only. The live table

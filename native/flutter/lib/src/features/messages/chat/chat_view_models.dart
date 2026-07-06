@@ -251,6 +251,9 @@ class ChatMessageView {
     this.isPinned = false,
     this.isStarred = false,
     this.isDeletedForEveryone = false,
+    this.viewOnce = false,
+    this.expiresAtMillis,
+    this.viewOnceSeen = false,
     this.isFirstInGroup = true,
     this.isLastInGroup = true,
     this.isHighlighted = false,
@@ -280,6 +283,19 @@ class ChatMessageView {
 
   /// True after a "delete for everyone" — render the tombstone string.
   final bool isDeletedForEveryone;
+
+  /// True when this is a view-once message (self-destructs on first open).
+  /// Mirrors `LocalMessage.viewOnce` / backend `messages.view_once`.
+  final bool viewOnce;
+
+  /// Absolute expiry (epoch millis) for a disappearing message; null = never.
+  /// Mirrors `LocalMessage.expiresAtMillis` / backend `messages.expires_at`.
+  final int? expiresAtMillis;
+
+  /// True once a view-once message has been opened by the recipient (derived
+  /// from `LocalMessage.viewOnceSeenAtMillis != null`). No behaviour is wired
+  /// off this yet — it just carries the state.
+  final bool viewOnceSeen;
 
   // Render-time grouping/affordance flags (computed, not persisted).
   final bool isFirstInGroup;

@@ -42,6 +42,9 @@ class MessageMaterializer {
             mimeType: remoteMessage.mimeType,
             fileName: remoteMessage.fileName,
             fileSizeBytes: remoteMessage.fileSizeBytes,
+            viewOnce: remoteMessage.viewOnce,
+            expiresAtMillis: remoteMessage.expiresAtMillis,
+            viewOnceSeenAtMillis: remoteMessage.viewOnceSeenAtMillis,
           ),
         );
         messagesSaved++;

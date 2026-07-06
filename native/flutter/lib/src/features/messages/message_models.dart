@@ -102,6 +102,9 @@ class LocalMessage {
     this.fileSizeBytes,
     this.durationMs,
     this.musicTitle,
+    this.viewOnce = false,
+    this.expiresAtMillis,
+    this.viewOnceSeenAtMillis,
   });
 
   final String id;
@@ -129,11 +132,26 @@ class LocalMessage {
   /// bubble's track title). Null for recorded audio notes and non-audio types.
   final String? musicTitle;
 
+  /// True when this is a view-once message (self-destructs on first open by the
+  /// recipient). Mirrors the backend `messages.view_once` column.
+  final bool viewOnce;
+
+  /// Absolute expiry (epoch millis) for a disappearing message; null = never.
+  /// Mirrors the backend `messages.expires_at` column.
+  final int? expiresAtMillis;
+
+  /// When the recipient opened a view-once message (epoch millis); null until
+  /// then. Mirrors the backend `messages.view_once_seen_at` column.
+  final int? viewOnceSeenAtMillis;
+
   LocalMessage copyWith({
     MessageDeliveryState? deliveryState,
     int? durationMs,
     String? musicTitle,
     String? mediaUrl,
+    bool? viewOnce,
+    int? expiresAtMillis,
+    int? viewOnceSeenAtMillis,
   }) {
     return LocalMessage(
       id: id,
@@ -154,6 +172,9 @@ class LocalMessage {
       fileSizeBytes: fileSizeBytes,
       durationMs: durationMs ?? this.durationMs,
       musicTitle: musicTitle ?? this.musicTitle,
+      viewOnce: viewOnce ?? this.viewOnce,
+      expiresAtMillis: expiresAtMillis ?? this.expiresAtMillis,
+      viewOnceSeenAtMillis: viewOnceSeenAtMillis ?? this.viewOnceSeenAtMillis,
     );
   }
 
@@ -179,6 +200,9 @@ class LocalMessage {
       fileSizeBytes: json['fileSizeBytes'] as int?,
       durationMs: json['durationMs'] as int?,
       musicTitle: json['musicTitle'] as String?,
+      viewOnce: json['viewOnce'] as bool? ?? false,
+      expiresAtMillis: json['expiresAtMillis'] as int?,
+      viewOnceSeenAtMillis: json['viewOnceSeenAtMillis'] as int?,
     );
   }
 
@@ -202,6 +226,9 @@ class LocalMessage {
       'fileSizeBytes': fileSizeBytes,
       'durationMs': durationMs,
       'musicTitle': musicTitle,
+      'viewOnce': viewOnce,
+      'expiresAtMillis': expiresAtMillis,
+      'viewOnceSeenAtMillis': viewOnceSeenAtMillis,
     };
   }
 }

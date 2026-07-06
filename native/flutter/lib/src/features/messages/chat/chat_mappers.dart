@@ -100,6 +100,9 @@ List<ChatMessageView> localMessagesToViews(
           if (message.readAtMillis case final readAt?)
             ReadReceiptView(userId: senderId, readAtMillis: readAt),
         ],
+        viewOnce: message.viewOnce,
+        expiresAtMillis: message.expiresAtMillis,
+        viewOnceSeen: message.viewOnceSeenAtMillis != null,
         isFirstInGroup: isFirstInGroup,
         isLastInGroup: isLastInGroup,
       ),
