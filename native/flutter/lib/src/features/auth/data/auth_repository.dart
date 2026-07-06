@@ -106,6 +106,54 @@ class AuthRepository implements AuthRepositoryContract {
     );
   }
 
+  @override
+  Future<AuthUser> signInWithGoogle({
+    required String idToken,
+    String? accessToken,
+  }) async {
+    if (!isConfigured) {
+      return const AuthUser.demo();
+    }
+
+    final response = await Supabase.instance.client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+
+    final session = response.session;
+    final user = response.user;
+
+    if (session == null || user == null) {
+      throw const AuthException('Unable to sign in with Google.');
+    }
+
+    await _saveSession(session);
+
+    return AuthUser.fromSupabaseUser(user);
+  }
+
+  @override
+  Future<void> linkGoogleIdentity() async {
+    if (!isConfigured) return;
+
+    await Supabase.instance.client.auth.linkIdentity(OAuthProvider.google);
+  }
+
+  @override
+  Future<void> unlinkIdentity(UserIdentity identity) async {
+    if (!isConfigured) return;
+
+    await Supabase.instance.client.auth.unlinkIdentity(identity);
+  }
+
+  @override
+  Future<List<UserIdentity>> listIdentities() async {
+    if (!isConfigured) return const [];
+
+    return Supabase.instance.client.auth.getUserIdentities();
+  }
+
   Future<void> _saveSession(Session session) async {
     final refreshToken = session.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return;

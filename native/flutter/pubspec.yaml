@@ -76,6 +76,7 @@ dependencies:
   # app is killed + rich/grouped message notifications with a reply action.
   flutter_callkit_incoming: ^2.5.2
   flutter_local_notifications: ^18.0.1
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

@@ -28,6 +28,7 @@ import 'package:feedin/src/features/notifications/notification_item.dart';
 import 'package:feedin/src/features/profile/user_profile.dart';
 import 'package:feedin/src/features/settings/app_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show UserIdentity;
 
 void main() {
   testWidgets('feedIn offline preview opens from auth gate', (tester) async {
@@ -330,6 +331,21 @@ class _FakeAuthRepository implements AuthRepositoryContract {
 
   @override
   Future<void> signOut() async {}
+
+  @override
+  Future<AuthUser> signInWithGoogle({
+    required String idToken,
+    String? accessToken,
+  }) async => const AuthUser.demo();
+
+  @override
+  Future<void> linkGoogleIdentity() async {}
+
+  @override
+  Future<void> unlinkIdentity(UserIdentity identity) async {}
+
+  @override
+  Future<List<UserIdentity>> listIdentities() async => const [];
 }
 
 class _MemoryProfileRepository implements ProfileRepositoryContract {
