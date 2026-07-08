@@ -23,6 +23,9 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     // Firebase / Google Services (FCM). Applied in app/build.gradle.kts.
     id("com.google.gms.google-services") version "4.4.2" apply false
+    // Lets Gradle auto-provision a JDK toolchain (e.g. Java 17, which
+    // flutter_callkit_incoming requests) when none is installed locally.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
 include(":app")
