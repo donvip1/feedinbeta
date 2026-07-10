@@ -31,6 +31,8 @@ class ProfileHeader extends StatelessWidget {
     required this.onEditProfile,
     required this.onOpenSettings,
     required this.onOpenLink,
+    this.onChangeAvatar,
+    this.onChangeCover,
     this.isOnline = true,
   });
 
@@ -44,6 +46,10 @@ class ProfileHeader extends StatelessWidget {
 
   /// Opens (or copies) an external URL — used by the website meta pill.
   final ValueChanged<String> onOpenLink;
+
+  /// Upload/change actions for the viewer's own profile images.
+  final VoidCallback? onChangeAvatar;
+  final VoidCallback? onChangeCover;
 
   /// Drives the avatar online-status dot.
   final bool isOnline;
@@ -89,6 +95,15 @@ class ProfileHeader extends StatelessWidget {
                         )
                     : null,
               ),
+              Positioned(
+                right: ProfileSpacing.sm,
+                bottom: ProfileSpacing.avatarOverlap + ProfileSpacing.sm,
+                child: _CircleIconButton(
+                  icon: Icons.photo_camera_outlined,
+                  tooltip: 'Change cover photo',
+                  onTap: onChangeCover,
+                ),
+              ),
               // Settings gear floated top-right over the cover.
               Positioned(
                 top: ProfileSpacing.sm,
@@ -105,6 +120,7 @@ class ProfileHeader extends StatelessWidget {
                   imageUrl: profile.avatarUrl,
                   initial: _initial,
                   isOnline: isOnline,
+                  onChangeImage: onChangeAvatar,
                   onTap: () => ProfileImageViewer.show(
                     context,
                     imageUrl: profile.avatarUrl,
@@ -242,12 +258,14 @@ class _AvatarWithStatus extends StatelessWidget {
     required this.initial,
     required this.isOnline,
     required this.onTap,
+    required this.onChangeImage,
   });
 
   final String? imageUrl;
   final String initial;
   final bool isOnline;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final VoidCallback? onChangeImage;
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +291,47 @@ class _AvatarWithStatus extends StatelessWidget {
               bottom: 6,
               child: ProfileStatusDot(online: isOnline),
             ),
+            Positioned(
+              left: -2,
+              bottom: -2,
+              child: _MiniCameraButton(onTap: onChangeImage),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniCameraButton extends StatelessWidget {
+  const _MiniCameraButton({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Ink(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ProfileColors.card,
+            border: Border.all(color: ProfileColors.background, width: 2),
+            boxShadow: ProfileShadows.avatar,
+          ),
+          child: Icon(
+            Icons.photo_camera_outlined,
+            size: 17,
+            color: onTap == null
+                ? ProfileColors.mutedForeground
+                : ProfileColors.foreground,
+          ),
         ),
       ),
     );
@@ -425,7 +483,7 @@ class _CircleIconButton extends StatelessWidget {
 
   final IconData icon;
   final String tooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   /// When true the button uses the solid card surface (action row); otherwise a
   /// dark translucent scrim (floating over the cover).
@@ -448,7 +506,9 @@ class _CircleIconButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 22,
-              color: ProfileColors.foreground,
+              color: onTap == null
+                  ? ProfileColors.mutedForeground
+                  : ProfileColors.foreground,
             ),
           ),
         ),

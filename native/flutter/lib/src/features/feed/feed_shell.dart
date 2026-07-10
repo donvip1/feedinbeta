@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +42,6 @@ import '../profile/profile_screen.dart';
 import '../profile/user_profile.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
-import 'feed_video_player.dart';
 import 'immersive/feed_immersive_theme.dart';
 import 'immersive/immersive_post_card.dart';
 
@@ -474,6 +472,8 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         profile: _profile,
         profileRepository: widget.profileRepository,
         feedRepository: widget.feedRepository,
+        syncService: widget.syncService,
+        connectivityService: widget.connectivityService,
         onEditSaved: (profile) => setState(() => _profile = profile),
         onOpenSettings: _openSettings,
       ),
@@ -547,47 +547,167 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
               onChanged: _refreshNotificationBadge,
             )
           : pages[_index],
-      // Create is a floating "+" shown ONLY on Home (immersive feed), centered
-      // above the nav (TikTok-style) so it never overlaps the right action rail.
-      floatingActionButton: (immersiveFeed && !_showNotifications)
-          ? FloatingActionButton(
-              onPressed: _openCreate,
-              tooltip: 'Create',
-              backgroundColor: const Color(0xFFFF3D9A),
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      bottomNavigationBar: NavigationBar(
-        height: 72,
+      bottomNavigationBar: _FeedBottomNavigation(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() {
+        onSelected: (value) => setState(() {
           _showNotifications = false;
           _index = value;
         }),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Feeds',
+        onCreate: _openCreate,
+      ),
+    );
+  }
+}
+
+class _FeedBottomNavigation extends StatelessWidget {
+  const _FeedBottomNavigation({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.onCreate,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      top: false,
+      child: Material(
+        elevation: 8,
+        color: scheme.surface,
+        child: SizedBox(
+          height: 70,
+          child: Row(
+            children: [
+              _BottomNavItem(
+                label: 'Feed',
+                icon: Icons.home_outlined,
+                selectedIcon: Icons.home,
+                selected: selectedIndex == 0,
+                onTap: () => onSelected(0),
+              ),
+              _BottomNavItem(
+                label: 'Chats',
+                icon: Icons.mail_outline,
+                selectedIcon: Icons.mail,
+                selected: selectedIndex == 1,
+                onTap: () => onSelected(1),
+              ),
+              Expanded(
+                child: Center(
+                  child: _CreateNavButton(onTap: onCreate),
+                ),
+              ),
+              _BottomNavItem(
+                label: 'Wallet',
+                icon: Icons.account_balance_wallet_outlined,
+                selectedIcon: Icons.account_balance_wallet,
+                selected: selectedIndex == 2,
+                onTap: () => onSelected(2),
+              ),
+              _BottomNavItem(
+                label: 'Profile',
+                icon: Icons.person_outline,
+                selectedIcon: Icons.person,
+                selected: selectedIndex == 3,
+                onTap: () => onSelected(3),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.mail_outline),
-            selectedIcon: Icon(Icons.mail),
-            label: 'Chats',
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomNavItem extends StatelessWidget {
+  const _BottomNavItem({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(selected ? selectedIcon : icon, color: color, size: 24),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Wallet',
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateNavButton extends StatelessWidget {
+  const _CreateNavButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Create',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Ink(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: FeedImmersiveTheme.brandGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x59FF3D9A),
+                  blurRadius: 14,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.add, color: Colors.white, size: 28),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -930,7 +1050,6 @@ class _FeedScreenState extends State<FeedScreen> {
               _runOnlineAction(() => widget.feedRepository.queueRefeed(post.id)),
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
-          onOpenDetail: () => _openPostDetail(post),
         );
         return _PageTransition(
           controller: _pageController,
@@ -995,23 +1114,6 @@ class _FeedScreenState extends State<FeedScreen> {
     };
   }
 
-  Future<void> _openPostDetail(FeedPost post) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => PostDetailScreen(
-          post: post,
-          isSaved: _savedPostIds.contains(post.id),
-          onLike: () =>
-              _runOnlineAction(() => widget.feedRepository.queueLike(post.id)),
-          onSave: () => _savePost(post),
-          onComment: () => _openComments(post),
-          onRefeed: () =>
-              _runOnlineAction(() => widget.feedRepository.queueRefeed(post.id)),
-          onShare: () => _sharePost(post),
-        ),
-      ),
-    );
-  }
 }
 
 /// Applies a subtle depth transition to immersive feed pages as they scroll:
@@ -1378,233 +1480,6 @@ class _CommentSheetState extends State<_CommentSheet> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FeedActionButton extends StatelessWidget {
-  const _FeedActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 20),
-      label: Text(label),
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        minimumSize: const Size(0, 40),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    );
-  }
-}
-
-class PostDetailScreen extends StatelessWidget {
-  const PostDetailScreen({
-    super.key,
-    required this.post,
-    required this.isSaved,
-    required this.onLike,
-    required this.onSave,
-    required this.onComment,
-    required this.onRefeed,
-    required this.onShare,
-  });
-
-  final FeedPost post;
-  final bool isSaved;
-  final VoidCallback onLike;
-  final VoidCallback onSave;
-  final VoidCallback onComment;
-  final VoidCallback onRefeed;
-  final VoidCallback onShare;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Post')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                child: Text(post.authorName.characters.first.toUpperCase()),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.authorName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      [
-                        post.meta,
-                        if (post.location?.isNotEmpty ?? false) post.location!,
-                      ].join(' · '),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          if (post.body.trim().isNotEmpty)
-            Text(post.body, style: Theme.of(context).textTheme.titleMedium),
-          if ((post.mediaUrl ?? post.mediaUrls.firstOrNull) != null) ...[
-            const SizedBox(height: 16),
-            FeedMediaPreview(post: post),
-          ],
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _PostMetric(label: 'Likes', value: post.likesCount),
-              _PostMetric(label: 'Comments', value: post.commentsCount),
-              _PostMetric(label: 'Views', value: post.viewsCount),
-              _PostMetric(label: 'Refeeds', value: post.refeedsCount),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.spaceBetween,
-            children: [
-              _FeedActionButton(
-                icon: Icons.favorite_border,
-                label: 'Like',
-                onPressed: onLike,
-              ),
-              _FeedActionButton(
-                icon: Icons.mode_comment_outlined,
-                label: 'Comment',
-                onPressed: onComment,
-              ),
-              _FeedActionButton(
-                icon: Icons.repeat,
-                label: 'Refeed',
-                onPressed: onRefeed,
-              ),
-              _FeedActionButton(
-                icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
-                label: isSaved ? 'Saved' : 'Save',
-                onPressed: onSave,
-              ),
-              _FeedActionButton(
-                icon: Icons.ios_share,
-                label: 'Share',
-                onPressed: onShare,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PostMetric extends StatelessWidget {
-  const _PostMetric({required this.label, required this.value});
-
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text('$value $label'),
-      avatar: const Icon(Icons.trending_up, size: 16),
-    );
-  }
-}
-
-class FeedMediaPreview extends StatelessWidget {
-  const FeedMediaPreview({super.key, required this.post});
-
-  final FeedPost post;
-
-  @override
-  Widget build(BuildContext context) {
-    final mediaType =
-        post.mediaType ??
-        (post.mediaTypes.isNotEmpty ? post.mediaTypes.first : null);
-    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
-    if (mediaType == 'video') {
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
-            child: FeedVideoPlayer(
-              url: mediaUrl,
-              localPath: post.localMediaPath,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final localPath = post.localMediaPath;
-    final image = localPath != null && File(localPath).existsSync()
-        ? Image.file(
-            File(localPath),
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _RemoteImageFallback(url: mediaUrl),
-          )
-        : _RemoteImageFallback(url: mediaUrl);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: AspectRatio(aspectRatio: 4 / 3, child: image),
-    );
-  }
-}
-
-class _RemoteImageFallback extends StatelessWidget {
-  const _RemoteImageFallback({required this.url});
-
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final source = url;
-    if (source == null || source.isEmpty) {
-      return ColoredBox(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      );
-    }
-
-    return Image.network(
-      source,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => ColoredBox(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: const Center(child: Icon(Icons.broken_image_outlined)),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:hive_ce/hive.dart';
 
 import '../remote/profile_remote_data_source.dart';
@@ -44,6 +46,21 @@ class ProfileRepository implements ProfileRepositoryContract {
   Future<void> syncProfile(UserProfile profile) async {
     await saveCurrentProfile(profile);
     await _remoteDataSource.upsertProfile(profile);
+  }
+
+  @override
+  Future<UserProfile> uploadProfileImage({
+    required UserProfile profile,
+    required ProfileImageSlot slot,
+    required File file,
+  }) async {
+    final updated = await _remoteDataSource.uploadProfileImage(
+      profile: profile,
+      slot: slot,
+      file: file,
+    );
+    await saveCurrentProfile(updated);
+    return updated;
   }
 
   @override

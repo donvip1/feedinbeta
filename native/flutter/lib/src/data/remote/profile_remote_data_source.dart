@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../local/profile_repository_contract.dart';
 import '../../features/profile/user_profile.dart';
 
 class ProfileRemoteDataSource {
@@ -30,6 +33,9 @@ class ProfileRemoteDataSource {
       'display_name': profile.displayName,
       'username': profile.handle,
       'bio': profile.bio,
+      'avatar_url': profile.avatarUrl,
+      'cover_url': profile.coverUrl,
+      'banner_url': profile.coverUrl,
       'location': profile.location,
       'website_url': profile.websiteUrl,
       'instagram_url': profile.instagramUrl,
@@ -39,6 +45,53 @@ class ProfileRemoteDataSource {
       'tiktok_url': profile.tiktokUrl,
       'youtube_url': profile.youtubeUrl,
     });
+  }
+
+  Future<UserProfile> uploadProfileImage({
+    required UserProfile profile,
+    required ProfileImageSlot slot,
+    required File file,
+  }) async {
+    if (!isConfigured || profile.userId == 'local-demo') {
+      throw StateError('Live profile image uploads require Supabase.');
+    }
+    if (!file.existsSync()) {
+      throw StateError('Selected image file is no longer available.');
+    }
+
+    final client = Supabase.instance.client;
+    final currentUserId = client.auth.currentUser?.id;
+    final userId = currentUserId?.isNotEmpty == true
+        ? currentUserId!
+        : profile.userId;
+    if (userId.isEmpty) {
+      throw StateError('Sign in before uploading a profile image.');
+    }
+
+    final extension = _extensionFor(file.path);
+    final storagePath =
+        '$userId/profile/${slot.name}-${DateTime.now().millisecondsSinceEpoch}.$extension';
+    await client.storage
+        .from('post-media')
+        .upload(
+          storagePath,
+          file,
+          fileOptions: FileOptions(
+            contentType: _contentTypeFor(extension),
+            upsert: true,
+          ),
+        );
+    final publicUrl = client.storage.from('post-media').getPublicUrl(storagePath);
+
+    final updates = slot == ProfileImageSlot.avatar
+        ? <String, Object?>{'avatar_url': publicUrl}
+        : <String, Object?>{'cover_url': publicUrl, 'banner_url': publicUrl};
+
+    await client.from('profiles').update(updates).eq('id', profile.userId);
+
+    return slot == ProfileImageSlot.avatar
+        ? profile.copyWith(avatarUrl: publicUrl)
+        : profile.copyWith(coverUrl: publicUrl);
   }
 
   UserProfile _mapProfile(Map<String, dynamic> row) {
@@ -73,5 +126,23 @@ class ProfileRemoteDataSource {
           updatedAt?.millisecondsSinceEpoch ??
           DateTime.now().millisecondsSinceEpoch,
     );
+  }
+
+  String _extensionFor(String path) {
+    final raw = path.split('.').last.toLowerCase();
+    return switch (raw) {
+      'jpeg' => 'jpg',
+      'jpg' || 'png' || 'webp' || 'gif' => raw,
+      _ => 'jpg',
+    };
+  }
+
+  String _contentTypeFor(String extension) {
+    return switch (extension.toLowerCase()) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
   }
 }

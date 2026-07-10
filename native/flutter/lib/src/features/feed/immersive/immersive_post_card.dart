@@ -25,7 +25,6 @@ class ImmersivePostCard extends StatefulWidget {
     required this.onSave,
     required this.onShare,
     this.onAvatar,
-    this.onOpenDetail,
   });
 
   /// The post to render.
@@ -44,9 +43,6 @@ class ImmersivePostCard extends StatefulWidget {
 
   /// Tapping the avatar in the action rail.
   final VoidCallback? onAvatar;
-
-  /// Single-tap on a non-interactive area; opens the full post detail.
-  final VoidCallback? onOpenDetail;
 
   @override
   State<ImmersivePostCard> createState() => _ImmersivePostCardState();
@@ -173,70 +169,66 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
     final media = MediaQuery.of(context);
     final bottomInset = media.padding.bottom;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onOpenDetail,
-      child: ColoredBox(
-        color: Colors.black,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 1. Background media layer.
-            Positioned.fill(child: _buildMedia()),
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Background media layer.
+          Positioned.fill(child: _buildMedia()),
 
-            // 2. The shared top scrim is drawn once by FeedScreen's overlay
-            //    (above the pager), so the card omits its own to avoid the
-            //    over-darkened "double scrim" at the top of the media.
+          // 2. The shared top scrim is drawn once by FeedScreen's overlay
+          //    (above the pager), so the card omits its own to avoid the
+          //    over-darkened "double scrim" at the top of the media.
 
-            // 3. Bottom scrim for overlay legibility.
-            const Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 320,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: FeedImmersiveTheme.bottomScrim,
-                  ),
+          // 3. Bottom scrim for overlay legibility.
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 320,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: FeedImmersiveTheme.bottomScrim,
                 ),
               ),
             ),
+          ),
 
-            // 4. Bottom-left text overlay.
-            Positioned(
-              left: 16,
-              right: 78,
-              bottom: 28 + bottomInset,
-              child: _buildOverlay(context),
+          // 4. Bottom-left text overlay.
+          Positioned(
+            left: 16,
+            right: 78,
+            bottom: 28 + bottomInset,
+            child: _buildOverlay(context),
+          ),
+
+          // 5. Right action rail.
+          Positioned(
+            right: 8,
+            bottom: 28 + bottomInset,
+            child: FeedActionRail(
+              likesCount: widget.post.likesCount,
+              commentsCount: widget.post.commentsCount,
+              refeedsCount: widget.post.refeedsCount,
+              viewsCount: widget.post.viewsCount,
+              isLiked: widget.isLiked,
+              isSaved: widget.isSaved,
+              avatarText: widget.post.authorName,
+              avatarUrl: widget.post.avatarUrl,
+              onLike: widget.onLike,
+              onComment: widget.onComment,
+              onRefeed: widget.onRefeed,
+              onSave: widget.onSave,
+              onShare: widget.onShare,
+              onAvatar: widget.onAvatar,
             ),
+          ),
 
-            // 5. Right action rail.
-            Positioned(
-              right: 8,
-              bottom: 28 + bottomInset,
-              child: FeedActionRail(
-                likesCount: widget.post.likesCount,
-                commentsCount: widget.post.commentsCount,
-                refeedsCount: widget.post.refeedsCount,
-                viewsCount: widget.post.viewsCount,
-                isLiked: widget.isLiked,
-                isSaved: widget.isSaved,
-                avatarText: widget.post.authorName,
-                avatarUrl: widget.post.avatarUrl,
-                onLike: widget.onLike,
-                onComment: widget.onComment,
-                onRefeed: widget.onRefeed,
-                onSave: widget.onSave,
-                onShare: widget.onShare,
-                onAvatar: widget.onAvatar,
-              ),
-            ),
-
-            // 6. Double-tap heart burst.
-            Positioned.fill(child: _buildHeartBurst()),
-          ],
-        ),
+          // 6. Double-tap heart burst.
+          Positioned.fill(child: _buildHeartBurst()),
+        ],
       ),
     );
   }

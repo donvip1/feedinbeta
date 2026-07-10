@@ -25,14 +25,23 @@
 /// back to [SocialGraphRemoteDataSource.autoDetect] like the existing editor.
 library;
 
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/connectivity/connectivity_service.dart';
+import '../../core/connectivity/offline_notice.dart';
+import '../../core/sync/sync_service.dart';
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/local/profile_repository_contract.dart';
 import '../../data/remote/social_graph_remote_data_source.dart';
 import '../feed/feed_post.dart';
+import '../feed/immersive/feed_immersive_theme.dart';
+import '../feed/immersive/immersive_post_card.dart';
 import 'parity/profile_presenter.dart';
 import 'parity/profile_tokens.dart';
 import 'parity/profile_view_models.dart';
@@ -54,6 +63,8 @@ class ProfileScreen extends StatefulWidget {
     required this.profile,
     required this.profileRepository,
     required this.feedRepository,
+    required this.syncService,
+    required this.connectivityService,
     required this.onEditSaved,
     required this.onOpenSettings,
     this.socialGraphDataSource,
@@ -67,6 +78,12 @@ class ProfileScreen extends StatefulWidget {
 
   /// Source for the Posts/Reels grids and for the editor.
   final LocalFeedRepositoryContract feedRepository;
+
+  /// Flushes post engagement actions opened from the profile grid.
+  final SyncServiceContract syncService;
+
+  /// Blocks live post/profile writes while offline.
+  final ConnectivityService connectivityService;
 
   /// Fires with the updated profile whenever the pushed editor saves, so the
   /// host can update its own copy (mirrors the editor's `onSaved`).
@@ -87,11 +104,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final SocialGraphRemoteDataSource _socialGraph;
+  final ImagePicker _picker = ImagePicker();
   late UserProfile _profile;
 
   List<FeedPost> _posts = const [];
   bool _postsLoading = true;
   bool _postsError = false;
+  bool _uploadingProfileImage = false;
+  final Set<String> _likedPostIds = <String>{};
+  final Set<String> _savedPostIds = <String>{};
 
   @override
   void initState() {
@@ -215,6 +236,114 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  bool _requireOnline(BuildContext context) {
+    if (widget.connectivityService.isOnline) return true;
+    showOfflineSnackBar(context);
+    return false;
+  }
+
+  Future<void> _runOnlineAction(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    if (!_requireOnline(context)) return;
+    await action();
+    await widget.syncService.syncNow();
+  }
+
+  Future<void> _likePost(BuildContext context, FeedPost post) async {
+    if (!_requireOnline(context)) return;
+    setState(() => _likedPostIds.add(post.id));
+    await widget.feedRepository.queueLike(post.id);
+    await widget.syncService.syncNow();
+  }
+
+  Future<void> _savePost(BuildContext context, FeedPost post) async {
+    if (!_requireOnline(context)) return;
+    await widget.feedRepository.queueSave(post.id);
+    await widget.syncService.syncNow();
+    if (!mounted) return;
+    setState(() => _savedPostIds.add(post.id));
+  }
+
+  Future<void> _sharePost(BuildContext context, FeedPost post) async {
+    await Clipboard.setData(ClipboardData(text: _shareTextForPost(post)));
+    if (!context.mounted) return;
+    if (!_requireOnline(context)) return;
+    await widget.feedRepository.queueShare(post.id);
+    await widget.syncService.syncNow();
+  }
+
+  Future<void> _openComments(BuildContext context, FeedPost post) async {
+    final comment = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ProfileCommentSheet(post: post),
+    );
+    if (comment == null || comment.trim().isEmpty) return;
+    if (!context.mounted) return;
+    await _runOnlineAction(
+      context,
+      () => widget.feedRepository.queueComment(post.id, comment),
+    );
+  }
+
+  String _shareTextForPost(FeedPost post) {
+    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
+    return [
+      '${post.authorName} on feedIn',
+      if (post.body.trim().isNotEmpty) post.body.trim(),
+      if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
+    ].join('\n\n');
+  }
+
+  Future<void> _pickProfileImage(ProfileImageSlot slot) async {
+    if (_uploadingProfileImage) return;
+    if (!_requireOnline(context)) return;
+
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+      maxWidth: slot == ProfileImageSlot.cover ? 1800 : 900,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploadingProfileImage = true);
+    try {
+      final updated = await widget.profileRepository.uploadProfileImage(
+        profile: _profile,
+        slot: slot,
+        file: File(picked.path),
+      );
+      if (!mounted) return;
+      setState(() => _profile = updated);
+      widget.onEditSaved(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            slot == ProfileImageSlot.cover
+                ? 'Cover photo updated.'
+                : 'Profile photo updated.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: ${_formatUploadError(error)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingProfileImage = false);
+    }
+  }
+
+  static String _formatUploadError(Object error) {
+    final message = error.toString();
+    if (message.length <= 140) return message;
+    return '${message.substring(0, 140)}...';
+  }
+
   static Uri? _normaliseUrl(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
@@ -226,10 +355,25 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _onOpenTile(PostTileView tile) {
-    // Post-detail navigation is wired upstream once a post-detail route is
-    // exposed to the Profile tab (mirrors the parity grid's behavior).
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post detail opens once wired.')),
+    final index = _posts.indexWhere((post) => post.id == tile.id);
+    if (index < 0) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ProfilePostPager(
+          posts: _posts,
+          initialIndex: index,
+          likedPostIds: _likedPostIds,
+          savedPostIds: _savedPostIds,
+          onLike: _likePost,
+          onComment: _openComments,
+          onRefeed: (context, post) => _runOnlineAction(
+            context,
+            () => widget.feedRepository.queueRefeed(post.id),
+          ),
+          onSave: _savePost,
+          onShare: _sharePost,
+        ),
+      ),
     );
   }
 
@@ -264,6 +408,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               onEditProfile: _openEditor,
               onOpenSettings: widget.onOpenSettings,
               onOpenLink: _openLink,
+              onChangeAvatar: _uploadingProfileImage
+                  ? null
+                  : () => _pickProfileImage(ProfileImageSlot.avatar),
+              onChangeCover: _uploadingProfileImage
+                  ? null
+                  : () => _pickProfileImage(ProfileImageSlot.cover),
             ),
           ),
           SliverToBoxAdapter(
@@ -340,6 +490,214 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfilePostPager extends StatefulWidget {
+  const _ProfilePostPager({
+    required this.posts,
+    required this.initialIndex,
+    required this.likedPostIds,
+    required this.savedPostIds,
+    required this.onLike,
+    required this.onComment,
+    required this.onRefeed,
+    required this.onSave,
+    required this.onShare,
+  });
+
+  final List<FeedPost> posts;
+  final int initialIndex;
+  final Set<String> likedPostIds;
+  final Set<String> savedPostIds;
+  final Future<void> Function(BuildContext context, FeedPost post) onLike;
+  final Future<void> Function(BuildContext context, FeedPost post) onComment;
+  final Future<void> Function(BuildContext context, FeedPost post) onRefeed;
+  final Future<void> Function(BuildContext context, FeedPost post) onSave;
+  final Future<void> Function(BuildContext context, FeedPost post) onShare;
+
+  @override
+  State<_ProfilePostPager> createState() => _ProfilePostPagerState();
+}
+
+class _ProfilePostPagerState extends State<_ProfilePostPager> {
+  late final PageController _controller;
+  late int _activePage;
+  late final Set<String> _likedPostIds = Set<String>.of(widget.likedPostIds);
+  late final Set<String> _savedPostIds = Set<String>.of(widget.savedPostIds);
+
+  @override
+  void initState() {
+    super.initState();
+    _activePage = widget.initialIndex.clamp(0, widget.posts.length - 1);
+    _controller = PageController(initialPage: _activePage);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _like(FeedPost post) {
+    setState(() => _likedPostIds.add(post.id));
+    unawaited(widget.onLike(context, post));
+  }
+
+  void _save(FeedPost post) {
+    setState(() => _savedPostIds.add(post.id));
+    unawaited(widget.onSave(context, post));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _controller,
+            scrollDirection: Axis.vertical,
+            itemCount: widget.posts.length,
+            onPageChanged: (index) => setState(() => _activePage = index),
+            itemBuilder: (context, index) {
+              final post = widget.posts[index];
+              return ImmersivePostCard(
+                post: post,
+                isActive: index == _activePage,
+                isLiked: _likedPostIds.contains(post.id),
+                isSaved: _savedPostIds.contains(post.id),
+                onLike: () => _like(post),
+                onComment: () => unawaited(widget.onComment(context, post)),
+                onRefeed: () => unawaited(widget.onRefeed(context, post)),
+                onSave: () => _save(post),
+                onShare: () => unawaited(widget.onShare(context, post)),
+              );
+            },
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: FeedImmersiveTheme.topScrim,
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 6, 14, 14),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Posts',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          shadows: FeedImmersiveTheme.textShadow,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_activePage + 1}/${widget.posts.length}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          shadows: FeedImmersiveTheme.textShadow,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileCommentSheet extends StatefulWidget {
+  const _ProfileCommentSheet({required this.post});
+
+  final FeedPost post;
+
+  @override
+  State<_ProfileCommentSheet> createState() => _ProfileCommentSheetState();
+}
+
+class _ProfileCommentSheetState extends State<_ProfileCommentSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Comments',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.post.body,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            minLines: 2,
+            maxLines: 5,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Add a comment',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(_controller.text),
+              icon: const Icon(Icons.send),
+              label: const Text('Comment'),
+            ),
+          ),
+        ],
       ),
     );
   }

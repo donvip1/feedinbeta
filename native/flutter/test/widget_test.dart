@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:feedin/src/app/feedin_app.dart';
 import 'package:feedin/src/app/feedin_services.dart';
 import 'package:feedin/src/core/config/feedin_config.dart';
@@ -369,6 +371,19 @@ class _MemoryProfileRepository implements ProfileRepositoryContract {
   @override
   Future<void> syncProfile(UserProfile profile) async {
     _profile = profile;
+  }
+
+  @override
+  Future<UserProfile> uploadProfileImage({
+    required UserProfile profile,
+    required ProfileImageSlot slot,
+    required File file,
+  }) async {
+    final updated = slot == ProfileImageSlot.avatar
+        ? profile.copyWith(avatarUrl: file.path)
+        : profile.copyWith(coverUrl: file.path);
+    _profile = updated;
+    return updated;
   }
 
   @override
