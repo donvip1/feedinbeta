@@ -38,6 +38,24 @@ import 'chat/widgets/voice_note_bubble.dart';
 import 'message_models.dart';
 import 'message_recipient.dart';
 
+class MessagesScreenBackController {
+  VoidCallback? _activeBackHandler;
+
+  bool get canNavigateBack => _activeBackHandler != null;
+
+  bool navigateBack() {
+    final handler = _activeBackHandler;
+    if (handler == null) return false;
+    handler();
+    return true;
+  }
+
+  void _setActiveBackHandler(VoidCallback? handler) {
+    if (_activeBackHandler == handler) return;
+    _activeBackHandler = handler;
+  }
+}
+
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
     super.key,
@@ -48,7 +66,9 @@ class MessagesScreen extends StatefulWidget {
     required this.profile,
     required this.realtimeVersion,
     this.initialConversationId,
+    this.newConversationRequest = 0,
     this.callController,
+    this.backController,
   });
 
   final LocalMessagesRepositoryContract messagesRepository;
@@ -58,11 +78,16 @@ class MessagesScreen extends StatefulWidget {
   final UserProfile profile;
   final int realtimeVersion;
   final String? initialConversationId;
+  final int newConversationRequest;
 
   /// Shared, long-lived call controller from the app shell. When provided, a
   /// conversation's header voice/video buttons place a real 1:1 call. Optional
   /// so tests and standalone use still work (buttons show a "coming soon" note).
   final CallController? callController;
+
+  /// Allows the app shell's Android system-back policy to close an in-thread
+  /// conversation before it falls back to tab/home navigation.
+  final MessagesScreenBackController? backController;
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -78,11 +103,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.initState();
     _selectedConversationId = widget.initialConversationId;
     _conversationsFuture = widget.messagesRepository.loadConversations();
+    _syncBackController();
   }
 
   @override
   void didUpdateWidget(covariant MessagesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.backController != widget.backController) {
+      oldWidget.backController?._setActiveBackHandler(null);
+      _syncBackController();
+    }
     if (oldWidget.realtimeVersion != widget.realtimeVersion) {
       setState(() {
         _conversationsFuture = widget.messagesRepository.loadConversations();
@@ -95,7 +125,25 @@ class _MessagesScreenState extends State<MessagesScreen> {
         _selectedConversationTitle = null;
         _conversationsFuture = widget.messagesRepository.loadConversations();
       });
+      _syncBackController();
     }
+    if (oldWidget.newConversationRequest != widget.newConversationRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openNewConversation();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.backController?._setActiveBackHandler(null);
+    super.dispose();
+  }
+
+  void _syncBackController() {
+    widget.backController?._setActiveBackHandler(
+      _selectedConversationId == null ? null : _closeConversation,
+    );
   }
 
   void _openConversation(ConversationSummary summary) {
@@ -103,6 +151,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       _selectedConversationId = summary.id;
       _selectedConversationTitle = summary.title;
     });
+    _syncBackController();
   }
 
   void _closeConversation() {
@@ -111,6 +160,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       _selectedConversationTitle = null;
       _conversationsFuture = widget.messagesRepository.loadConversations();
     });
+    _syncBackController();
   }
 
   Future<void> _openNewConversation() async {
@@ -134,6 +184,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               _conversationsFuture = widget.messagesRepository
                   .loadConversations();
             });
+            _syncBackController();
           },
         );
       },
@@ -1046,7 +1097,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final media = view.media;
     final url = media?.remoteUrl;
     final localPath = media?.localPath;
-    if ((url == null || url.isEmpty) && (localPath == null || localPath.isEmpty)) {
+    if ((url == null || url.isEmpty) &&
+        (localPath == null || localPath.isEmpty)) {
       return;
     }
     await showDialog<void>(
@@ -1127,7 +1179,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
               for (final (label, seconds) in options)
                 ListTile(
                   leading: Icon(
-                    seconds == 0 ? Icons.timer_off_outlined : Icons.timer_outlined,
+                    seconds == 0
+                        ? Icons.timer_off_outlined
+                        : Icons.timer_outlined,
                     color: ChatColors.primary,
                   ),
                   title: Text(
@@ -1135,7 +1189,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     style: const TextStyle(color: ChatColors.foreground),
                   ),
                   trailing: _disappearingSeconds == seconds
-                      ? const Icon(Icons.check_rounded, color: ChatColors.primary)
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: ChatColors.primary,
+                        )
                       : null,
                   onTap: () => Navigator.of(sheetContext).pop(seconds),
                 ),

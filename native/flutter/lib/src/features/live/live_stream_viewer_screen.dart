@@ -193,6 +193,11 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
   }
 
   Future<void> _sendComment(String body) async {
+    final blocked = _interactionBlockedMessage('chat');
+    if (blocked != null) {
+      _showError(blocked);
+      return;
+    }
     // Optimistic append; the realtime echo upgrades/replaces this line by id.
     final selfId = _selfId;
     if (selfId != null) {
@@ -210,17 +215,28 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     }
     try {
       await _data.sendStreamComment(widget.stream.id, body);
-    } catch (_) {
-      if (mounted) _showError('Could not send your message');
+    } catch (error) {
+      if (mounted) {
+        _showError(
+          _liveActionErrorMessage(error, 'Could not send your message'),
+        );
+      }
     }
   }
 
   Future<void> _sendReaction(String type) async {
+    final blocked = _interactionBlockedMessage('react');
+    if (blocked != null) {
+      _showError(blocked);
+      return;
+    }
     _reactionsController.add(reactionEmojiFor(type));
     try {
       await _data.sendStreamReaction(widget.stream.id, type);
-    } catch (_) {
-      // Reaction is ephemeral; a failed insert is not worth interrupting for.
+    } catch (error) {
+      if (mounted) {
+        _showError(_liveActionErrorMessage(error, 'Could not send reaction'));
+      }
     }
   }
 
@@ -232,6 +248,11 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
       recipientName: widget.stream.host?.label ?? 'the host',
     );
     if (gift == null) return;
+    final blocked = _interactionBlockedMessage('send gifts');
+    if (blocked != null) {
+      _showError(blocked);
+      return;
+    }
     // Local burst + float so the sender sees instant feedback.
     _reactionsController.add(gift.emoji);
     _giftBurstController.add(gift.emoji, label: gift.label);
@@ -246,9 +267,22 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
       );
-    } catch (_) {
-      if (mounted) _showError('Could not send your gift');
+    } catch (error) {
+      if (mounted) {
+        _showError(_liveActionErrorMessage(error, 'Could not send your gift'));
+      }
     }
+  }
+
+  String? _interactionBlockedMessage(String action) {
+    if (!_data.isConfigured) return 'Live is unavailable right now.';
+    if (_selfId == null) return 'Sign in to $action.';
+    return null;
+  }
+
+  String _liveActionErrorMessage(Object error, String fallback) {
+    if (error is LiveDataException) return error.message;
+    return fallback;
   }
 
   void _showError(String message) {

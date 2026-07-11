@@ -48,6 +48,11 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
   List<SpaceSpeaker> _speakers = const [];
   int _listenerCount = 0;
   bool _loadingChat = true;
+  bool _presenceUnavailable = false;
+  bool _realtimeUnavailable = false;
+  bool _chatUnavailable = false;
+  bool _reactionsUnavailable = false;
+  bool _giftsUnavailable = false;
   Timer? _listenerPoll;
 
   StreamSubscription<SpaceMessage>? _messageSub;
@@ -66,9 +71,17 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
 
   Future<void> _bootstrap() async {
     final isHost = _selfId == widget.space.hostId;
-    await _data.joinSpace(widget.space.id, role: isHost ? 'host' : 'listener');
+    final joined = await _data.joinSpace(
+      widget.space.id,
+      role: isHost ? 'host' : 'listener',
+    );
+    if (!mounted) return;
+    setState(() => _presenceUnavailable = !joined);
 
-    _realtime.connect();
+    final realtimeConnected = _realtime.connect();
+    if (!realtimeConnected && mounted) {
+      setState(() => _realtimeUnavailable = true);
+    }
     _messageSub = _realtime.messages.listen((message) {
       if (!mounted) return;
       setState(() => _chat.addRealtime(LiveChatLine.fromSpaceMessage(message)));
@@ -162,32 +175,46 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
 
   Future<void> _sendMessage(String body) async {
     final selfId = _selfId;
-    if (selfId != null) {
-      setState(() {
-        _chat.addOptimistic(
-          LiveChatLine(
-            id: 'optimistic-${DateTime.now().microsecondsSinceEpoch}',
-            userId: selfId,
-            body: body,
-            pending: true,
-          ),
-        );
-      });
-      _hydrateAuthors();
+    if (selfId == null) {
+      _showUnavailable('Sign in to chat in this audio space.');
+      return;
     }
+    setState(() {
+      _chat.addOptimistic(
+        LiveChatLine(
+          id: 'optimistic-${DateTime.now().microsecondsSinceEpoch}',
+          userId: selfId,
+          body: body,
+          pending: true,
+        ),
+      );
+    });
+    _hydrateAuthors();
     try {
       await _data.sendSpaceMessage(widget.space.id, body);
+    } on LiveSpaceUnavailableException catch (error) {
+      if (!mounted) return;
+      setState(() => _chatUnavailable = true);
+      _showUnavailable(error.message);
     } catch (_) {
-      if (mounted) _showError('Could not send your message');
+      if (!mounted) return;
+      setState(() => _chatUnavailable = true);
+      _showUnavailable('Audio-space chat is unavailable right now.');
     }
   }
 
   Future<void> _sendReaction(String type) async {
-    _reactionsController.add(reactionEmojiFor(type));
     try {
       await _data.sendSpaceReaction(widget.space.id, type);
+      _reactionsController.add(reactionEmojiFor(type));
+    } on LiveSpaceUnavailableException catch (error) {
+      if (!mounted) return;
+      setState(() => _reactionsUnavailable = true);
+      _showUnavailable(error.message);
     } catch (_) {
-      // Ephemeral; ignore.
+      if (!mounted) return;
+      setState(() => _reactionsUnavailable = true);
+      _showUnavailable('Audio-space reactions are unavailable right now.');
     }
   }
 
@@ -197,8 +224,6 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
       recipientName: widget.space.host?.label ?? 'the host',
     );
     if (gift == null) return;
-    _reactionsController.add(gift.emoji);
-    _giftBurstController.add(gift.emoji, label: gift.label);
     try {
       await _data.sendSpaceGift(
         spaceId: widget.space.id,
@@ -207,18 +232,47 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
         receiverId: widget.space.hostId,
       );
       if (!mounted) return;
+      _reactionsController.add(gift.emoji);
+      _giftBurstController.add(gift.emoji, label: gift.label);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${gift.emoji} ${gift.label} sent!')),
       );
+    } on LiveSpaceUnavailableException catch (error) {
+      if (!mounted) return;
+      setState(() => _giftsUnavailable = true);
+      _showUnavailable(error.message);
     } catch (_) {
-      if (mounted) _showError('Could not send your gift');
+      if (!mounted) return;
+      setState(() => _giftsUnavailable = true);
+      _showUnavailable('Audio-space gifts are unavailable right now.');
     }
   }
 
-  void _showError(String message) {
+  void _showUnavailable(String message) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  List<String> get _roomNotices {
+    final notices = <String>[];
+    if (!_data.isConfigured) {
+      notices.add('Live backend is not configured on this device.');
+      return notices;
+    }
+    if (_selfId == null) {
+      notices.add('Sign in to join, chat, react, or send gifts.');
+    }
+    if (_presenceUnavailable) {
+      notices.add('Presence join/leave is unavailable; counts may be stale.');
+    }
+    if (_realtimeUnavailable) {
+      notices.add('Realtime updates are unavailable; reopen the room later.');
+    }
+    if (_chatUnavailable) notices.add('Chat posting is unavailable.');
+    if (_reactionsUnavailable) notices.add('Reactions are unavailable.');
+    if (_giftsUnavailable) notices.add('Gifts are unavailable.');
+    return notices;
   }
 
   @override
@@ -244,6 +298,10 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
               child: Column(
                 children: [
                   _header(),
+                  if (_roomNotices.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _AvailabilityBanner(messages: _roomNotices),
+                  ],
                   const SizedBox(height: 12),
                   _SpeakerGrid(speakers: _speakers, host: widget.space.host),
                   const SizedBox(height: 8),
@@ -340,26 +398,39 @@ class _SpeakerGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tiles = <Widget>[];
+    final stageTiles = <Widget>[];
+    final listenerTiles = <Widget>[];
     final seen = <String>{};
 
     for (final speaker in speakers) {
       if (speaker.userId.isEmpty || !seen.add(speaker.userId)) continue;
-      tiles.add(
-        _SpeakerTile(
-          profile: speaker.profile,
-          isHost: speaker.isHost,
-          muted: speaker.muted,
-        ),
+      final tile = _SpeakerTile(
+        profile: speaker.profile,
+        isHost: speaker.isHost,
+        muted: speaker.muted,
+        isListener: speaker.isListener,
       );
+      if (speaker.isListener) {
+        listenerTiles.add(tile);
+      } else {
+        stageTiles.add(tile);
+      }
     }
 
     // Host fallback: ensure the space owner always appears on stage.
     if (host != null && seen.add(host!.id)) {
-      tiles.insert(0, _SpeakerTile(profile: host, isHost: true, muted: false));
+      stageTiles.insert(
+        0,
+        _SpeakerTile(
+          profile: host,
+          isHost: true,
+          muted: false,
+          isListener: false,
+        ),
+      );
     }
 
-    if (tiles.isEmpty) {
+    if (stageTiles.isEmpty && listenerTiles.isEmpty) {
       return const SizedBox(
         height: 76,
         child: Center(
@@ -377,12 +448,49 @@ class _SpeakerGrid extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 12,
-        alignment: WrapAlignment.center,
-        children: tiles,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ParticipantSection(label: 'On stage', children: stageTiles),
+          if (listenerTiles.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _ParticipantSection(label: 'Listening', children: listenerTiles),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+class _ParticipantSection extends StatelessWidget {
+  const _ParticipantSection({required this.label, required this.children});
+
+  final String label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: LiveTheme.onSurfaceFaint,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 16,
+          runSpacing: 12,
+          alignment: WrapAlignment.center,
+          children: children,
+        ),
+      ],
     );
   }
 }
@@ -392,11 +500,13 @@ class _SpeakerTile extends StatelessWidget {
     required this.profile,
     required this.isHost,
     required this.muted,
+    required this.isListener,
   });
 
   final LiveProfile? profile;
   final bool isHost;
   final bool muted;
+  final bool isListener;
 
   @override
   Widget build(BuildContext context) {
@@ -431,9 +541,13 @@ class _SpeakerTile extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    isListener
+                        ? Icons.headphones_rounded
+                        : muted
+                        ? Icons.mic_off_rounded
+                        : Icons.mic_rounded,
                     size: 12,
-                    color: muted
+                    color: muted || isListener
                         ? LiveTheme.onSurfaceFaint
                         : LiveTheme.spacePurple,
                   ),
@@ -461,8 +575,62 @@ class _SpeakerTile extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
               ),
+            )
+          else if (isListener)
+            const Text(
+              'Listener',
+              style: TextStyle(
+                color: LiveTheme.onSurfaceFaint,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _AvailabilityBanner extends StatelessWidget {
+  const _AvailabilityBanner({required this.messages});
+
+  final List<String> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: LiveTheme.surface.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: LiveTheme.chipBorder),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: LiveTheme.spacePurple,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                messages.join(' '),
+                style: const TextStyle(
+                  color: LiveTheme.onSurfaceMuted,
+                  fontSize: 12,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

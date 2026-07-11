@@ -105,9 +105,15 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _refresh() async {
-    final data = await _load();
     if (!mounted) return;
-    setState(() => _future = Future.value(data));
+    final next = _load();
+    setState(() => _future = next);
+    try {
+      await next;
+    } catch (_) {
+      // The FutureBuilder renders the error state; keep pull-to-refresh from
+      // surfacing an unhandled exception.
+    }
   }
 
   void _openStream(LiveStreamSummary stream) {
@@ -151,6 +157,14 @@ class _LiveScreenState extends State<LiveScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return _LiveLoadingState(topPadding: widget.topPadding);
               }
+              if (snapshot.hasError) {
+                return _LiveErrorState(
+                  topPadding: widget.topPadding,
+                  onRetry: _refresh,
+                  onGoLive: _onGoLive,
+                  message: _liveBrowseErrorMessage(snapshot.error),
+                );
+              }
               final data = snapshot.data ?? const _LiveBrowseData();
               return _LiveBrowseGrid(
                 data: data,
@@ -165,6 +179,11 @@ class _LiveScreenState extends State<LiveScreen> {
       ),
     );
   }
+}
+
+String _liveBrowseErrorMessage(Object? error) {
+  if (error is LiveDataException) return error.message;
+  return 'Could not load Live. Pull to retry.';
 }
 
 class _LiveBrowseData {
@@ -431,6 +450,79 @@ class _LiveEmptyState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveErrorState extends StatelessWidget {
+  const _LiveErrorState({
+    required this.onRetry,
+    required this.onGoLive,
+    required this.message,
+    this.topPadding = 0,
+  });
+
+  final Future<void> Function() onRetry;
+  final VoidCallback onGoLive;
+  final String message;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        if (topPadding > 0)
+          SliverToBoxAdapter(child: SizedBox(height: topPadding)),
+        SliverToBoxAdapter(child: _Header(onGoLive: onGoLive)),
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: LiveTheme.brandOrange,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Live could not load',
+                    style: TextStyle(
+                      color: LiveTheme.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: LiveTheme.onSurfaceMuted,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: onRetry,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: LiveTheme.surfaceRaised,
+                      foregroundColor: LiveTheme.onSurface,
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

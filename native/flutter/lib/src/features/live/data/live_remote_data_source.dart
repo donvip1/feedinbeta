@@ -2,19 +2,47 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'live_models.dart';
 
+/// Honest failure reason for audio-space actions that cannot be completed.
+///
+/// The browse/read paths still degrade to empty data because they are passive
+/// surfaces, but room participation actions should not silently disappear: the
+/// room catches this and explains whether Supabase, auth, or backend RLS/schema
+/// support is missing.
+class LiveSpaceUnavailableException implements Exception {
+  const LiveSpaceUnavailableException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Honest failure reason for live-stream browse/watch actions.
+class LiveDataException implements Exception {
+  const LiveDataException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => message;
+}
+
 /// Live access to the video-stream + audio-space consumption surface.
 ///
 /// Modeled on [SocialGraphRemoteDataSource] / [ProfileSectionsRemoteDataSource]:
 /// auto-detects the Supabase singleton, exposes an `isConfigured` flag, and
-/// every method degrades gracefully when Supabase is unavailable or there is no
-/// authenticated user (reads return empty, writes become no-ops).
+/// read methods degrade gracefully where that makes sense; stream browse/watch
+/// actions throw [LiveDataException] when failure should be visible to the user
+/// instead of becoming a silent no-op.
 ///
 /// Talks directly to the native tables (there are no `join_live_stream` /
 /// `send_live_gift` RPCs in the applied migrations, unlike the web build which
 /// calls `send_live_gift` / `send_space_gift`). Every column referenced here is
 /// present on the live schema:
 ///   * `live_streams`  : id, user_id, title, description, status, viewer_count,
-///                       thumbnail_url, playback_url, started_at
+///                       thumbnail_url, playback_url, started_at,
+///                       stream_features
 ///   * `live_spaces`   : id, user_id, title, description, status, viewer_count,
 ///                       topic_category, started_at
 ///   * `live_stream_viewers`   : (stream_id, user_id) pk, joined_at, left_at
@@ -51,13 +79,30 @@ class LiveRemoteDataSource {
   static const _spaceReactionsTable = 'live_space_reactions';
   static const _spaceGiftsTable = 'live_space_gifts';
 
-  /// Embedded profile projection used across every read. `profiles!<fk>` picks
-  /// the FK-disambiguated relationship so the embed does not depend on the
-  /// auto-generated constraint name.
-  static const _hostEmbed =
-      'profiles!user_id(id, display_name, username, avatar_url)';
-  static const _commentAuthorEmbed =
-      'profiles!user_id(id, display_name, username, avatar_url)';
+  /// Embedded profile projections. Use concrete FK names from the native
+  /// migrations so PostgREST does not fail on ambiguous `profiles` relations.
+  static const _streamHostEmbed =
+      'host:profiles!live_streams_user_id_fkey('
+      'id, display_name, username, avatar_url)';
+  static const _spaceHostEmbed =
+      'host:profiles!live_spaces_user_id_fkey('
+      'id, display_name, username, avatar_url)';
+  static const _streamCommentAuthorEmbed =
+      'author:profiles!live_stream_comments_user_id_fkey('
+      'id, display_name, username, avatar_url)';
+  static const _spaceMessageAuthorEmbed =
+      'author:profiles!live_space_messages_user_id_fkey('
+      'id, display_name, username, avatar_url)';
+
+  Never _throwUnavailable() {
+    throw const LiveDataException(
+      'Live is unavailable because Supabase is not configured.',
+    );
+  }
+
+  Never _throwSignIn(String action) {
+    throw LiveDataException('Sign in to $action.');
+  }
 
   static bool _supabaseAvailable() {
     try {
@@ -113,17 +158,19 @@ class LiveRemoteDataSource {
 
   // --- Browse ----------------------------------------------------------------
 
-  /// Active (live) video streams, most-watched first. Falls back to an empty
-  /// list on any schema/RLS hiccup so the browse grid simply shows nothing.
+  /// Active (live) video streams, most-watched first. Throws a
+  /// [LiveDataException] on schema/RLS/network failures so browse can show a
+  /// real error instead of silently pretending no streams exist.
   Future<List<LiveStreamSummary>> fetchLiveStreams({int limit = 30}) async {
     final client = _client;
-    if (client == null) return const [];
+    if (client == null) _throwUnavailable();
     try {
       final rows = await client
           .from(_streamsTable)
           .select(
             'id, user_id, title, description, status, viewer_count, '
-            'thumbnail_url, playback_url, started_at, $_hostEmbed',
+            'thumbnail_url, playback_url, started_at, stream_features, '
+            '$_streamHostEmbed',
           )
           .eq('status', 'live')
           .order('viewer_count', ascending: false)
@@ -132,8 +179,11 @@ class LiveRemoteDataSource {
         for (final row in rows.whereType<Map>())
           LiveStreamSummary.fromJson(Map<String, Object?>.from(row)),
       ];
-    } catch (_) {
-      return const [];
+    } catch (error) {
+      throw LiveDataException(
+        'Could not load live streams. Check the live_streams schema/RLS and network.',
+        cause: error,
+      );
     }
   }
 
@@ -146,7 +196,7 @@ class LiveRemoteDataSource {
           .from(_spacesTable)
           .select(
             'id, user_id, title, description, status, viewer_count, '
-            'topic_category, started_at, $_hostEmbed',
+            'topic_category, started_at, $_spaceHostEmbed',
           )
           .eq('status', 'live')
           .order('viewer_count', ascending: false)
@@ -169,7 +219,8 @@ class LiveRemoteDataSource {
           .from(_streamsTable)
           .select(
             'id, user_id, title, description, status, viewer_count, '
-            'thumbnail_url, playback_url, started_at, $_hostEmbed',
+            'thumbnail_url, playback_url, started_at, stream_features, '
+            '$_streamHostEmbed',
           )
           .eq('id', streamId)
           .maybeSingle();
@@ -189,7 +240,7 @@ class LiveRemoteDataSource {
           .from(_spacesTable)
           .select(
             'id, user_id, title, description, status, viewer_count, '
-            'topic_category, started_at, $_hostEmbed',
+            'topic_category, started_at, $_spaceHostEmbed',
           )
           .eq('id', spaceId)
           .maybeSingle();
@@ -268,7 +319,9 @@ class LiveRemoteDataSource {
     try {
       final rows = await client
           .from(_streamCommentsTable)
-          .select('id, user_id, content, created_at, $_commentAuthorEmbed')
+          .select(
+            'id, user_id, content, created_at, $_streamCommentAuthorEmbed',
+          )
           .eq('stream_id', streamId)
           .order('created_at')
           .limit(limit);
@@ -287,8 +340,10 @@ class LiveRemoteDataSource {
     final client = _client;
     final userId = currentUserId;
     final body = content.trim();
-    if (client == null || userId == null || streamId.isEmpty || body.isEmpty) {
-      return;
+    if (client == null) _throwUnavailable();
+    if (userId == null) _throwSignIn('chat');
+    if (streamId.isEmpty || body.isEmpty) {
+      throw const LiveDataException('Cannot send an empty live chat message.');
     }
     await client.from(_streamCommentsTable).insert({
       'stream_id': streamId,
@@ -302,7 +357,13 @@ class LiveRemoteDataSource {
   Future<void> sendStreamReaction(String streamId, String reactionType) async {
     final client = _client;
     final userId = currentUserId;
-    if (client == null || userId == null || streamId.isEmpty) return;
+    if (client == null) _throwUnavailable();
+    if (userId == null) _throwSignIn('react');
+    if (streamId.isEmpty) {
+      throw const LiveDataException(
+        'Cannot react because the stream is missing.',
+      );
+    }
     await client.from(_streamReactionsTable).insert({
       'stream_id': streamId,
       'user_id': userId,
@@ -323,7 +384,13 @@ class LiveRemoteDataSource {
   }) async {
     final client = _client;
     final userId = currentUserId;
-    if (client == null || userId == null || streamId.isEmpty) return;
+    if (client == null) _throwUnavailable();
+    if (userId == null) _throwSignIn('send gifts');
+    if (streamId.isEmpty) {
+      throw const LiveDataException(
+        'Cannot send a gift because the stream is missing.',
+      );
+    }
     await client.from(_streamGiftsTable).insert({
       'stream_id': streamId,
       'sender_id': userId,
@@ -415,10 +482,10 @@ class LiveRemoteDataSource {
   /// The native `live_space_speakers` unique(space_id, user_id) makes this an
   /// upsert. Non-hosts join as `role: 'listener'` (a listener is still a row so
   /// the room can render presence); [role] lets a host self-register as 'host'.
-  Future<void> joinSpace(String spaceId, {String role = 'listener'}) async {
+  Future<bool> joinSpace(String spaceId, {String role = 'listener'}) async {
     final client = _client;
     final userId = currentUserId;
-    if (client == null || userId == null || spaceId.isEmpty) return;
+    if (client == null || userId == null || spaceId.isEmpty) return false;
     try {
       await client.from(_spaceSpeakersTable).upsert({
         'space_id': spaceId,
@@ -429,8 +496,12 @@ class LiveRemoteDataSource {
         'joined_at': DateTime.now().toUtc().toIso8601String(),
         'left_at': null,
       }, onConflict: 'space_id,user_id');
+      return true;
     } catch (_) {
-      // Best-effort presence.
+      // Best-effort presence. Current native RLS allows INSERT but may reject
+      // UPDATE, so a repeat join/upsert can fail until backend policies include
+      // self update for live_space_speakers.
+      return false;
     }
   }
 
@@ -506,7 +577,7 @@ class LiveRemoteDataSource {
     try {
       final rows = await client
           .from(_spaceMessagesTable)
-          .select('id, user_id, content, created_at, $_commentAuthorEmbed')
+          .select('id, user_id, content, created_at, $_spaceMessageAuthorEmbed')
           .eq('space_id', spaceId)
           .order('created_at')
           .limit(limit);
@@ -523,14 +594,33 @@ class LiveRemoteDataSource {
     final client = _client;
     final userId = currentUserId;
     final body = content.trim();
-    if (client == null || userId == null || spaceId.isEmpty || body.isEmpty) {
-      return;
+    if (body.isEmpty) return;
+    if (client == null) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space chat is unavailable because Supabase is not configured.',
+      );
     }
-    await client.from(_spaceMessagesTable).insert({
-      'space_id': spaceId,
-      'user_id': userId,
-      'content': body,
-    });
+    if (userId == null) {
+      throw const LiveSpaceUnavailableException(
+        'Sign in to chat in this audio space.',
+      );
+    }
+    if (spaceId.isEmpty) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space chat is unavailable for this room.',
+      );
+    }
+    try {
+      await client.from(_spaceMessagesTable).insert({
+        'space_id': spaceId,
+        'user_id': userId,
+        'content': body,
+      });
+    } catch (_) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space chat is unavailable. The backend may be missing message table access.',
+      );
+    }
   }
 
   // --- Space reactions -------------------------------------------------------
@@ -538,12 +628,32 @@ class LiveRemoteDataSource {
   Future<void> sendSpaceReaction(String spaceId, String reactionType) async {
     final client = _client;
     final userId = currentUserId;
-    if (client == null || userId == null || spaceId.isEmpty) return;
-    await client.from(_spaceReactionsTable).insert({
-      'space_id': spaceId,
-      'user_id': userId,
-      'reaction_type': reactionType,
-    });
+    if (client == null) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space reactions are unavailable because Supabase is not configured.',
+      );
+    }
+    if (userId == null) {
+      throw const LiveSpaceUnavailableException(
+        'Sign in to react in this audio space.',
+      );
+    }
+    if (spaceId.isEmpty) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space reactions are unavailable for this room.',
+      );
+    }
+    try {
+      await client.from(_spaceReactionsTable).insert({
+        'space_id': spaceId,
+        'user_id': userId,
+        'reaction_type': reactionType,
+      });
+    } catch (_) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space reactions are unavailable. The backend may be missing reaction table access.',
+      );
+    }
   }
 
   // --- Space gifts -----------------------------------------------------------
@@ -556,13 +666,33 @@ class LiveRemoteDataSource {
   }) async {
     final client = _client;
     final userId = currentUserId;
-    if (client == null || userId == null || spaceId.isEmpty) return;
-    await client.from(_spaceGiftsTable).insert({
-      'space_id': spaceId,
-      'sender_id': userId,
-      'receiver_id': receiverId.isEmpty ? null : receiverId,
-      'gift_type': giftType,
-      'credit_value': creditValue,
-    });
+    if (client == null) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space gifts are unavailable because Supabase is not configured.',
+      );
+    }
+    if (userId == null) {
+      throw const LiveSpaceUnavailableException(
+        'Sign in to send gifts in this audio space.',
+      );
+    }
+    if (spaceId.isEmpty) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space gifts are unavailable for this room.',
+      );
+    }
+    try {
+      await client.from(_spaceGiftsTable).insert({
+        'space_id': spaceId,
+        'sender_id': userId,
+        'receiver_id': receiverId.isEmpty ? null : receiverId,
+        'gift_type': giftType,
+        'credit_value': creditValue,
+      });
+    } catch (_) {
+      throw const LiveSpaceUnavailableException(
+        'Audio-space gifts are unavailable. The backend may be missing gift table access or credit handling.',
+      );
+    }
   }
 }

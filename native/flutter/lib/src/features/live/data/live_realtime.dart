@@ -141,13 +141,14 @@ class LiveSpaceRealtime {
   /// the presence list.
   Stream<void> get speakerChanges => _speakerChanges.stream;
 
-  void connect() {
-    if (_channel != null || spaceId.isEmpty) return;
+  bool connect() {
+    if (_channel != null) return true;
+    if (spaceId.isEmpty) return false;
     final SupabaseClient client;
     try {
       client = Supabase.instance.client;
     } catch (_) {
-      return;
+      return false;
     }
 
     final filter = PostgresChangeFilter(
@@ -206,6 +207,7 @@ class LiveSpaceRealtime {
               callback: (_) => _speakerChanges.add(null),
             )
           ..subscribe();
+    return true;
   }
 
   Future<void> dispose() async {

@@ -382,6 +382,7 @@ class SpaceSpeaker {
   final LiveProfile? profile;
 
   bool get isHost => role == 'host';
+  bool get isListener => role == 'listener';
 
   factory SpaceSpeaker.fromJson(Map<String, Object?> json) {
     return SpaceSpeaker(

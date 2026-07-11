@@ -107,7 +107,15 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   StreamSubscription<CallKitAction>? _callKitSub;
   int _feedRealtimeVersion = 0;
   int _messagesRealtimeVersion = 0;
+  int _newConversationRequests = 0;
   String? _initialConversationId;
+  final FeedScreenBackController _feedBackController =
+      FeedScreenBackController();
+  final MessagesScreenBackController _messagesBackController =
+      MessagesScreenBackController();
+  final List<int> _tabHistory = <int>[];
+  int _homeBackTapCount = 0;
+  DateTime? _lastHomeBackTapAt;
   late UserProfile _profile;
   late Future<int> _notificationUnreadCountFuture;
 
@@ -225,8 +233,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   Future<void> _handleCallKitAction(CallKitAction action) async {
     switch (action.kind) {
       case CallKitActionKind.accept:
-        final session =
-            await _callController.acceptIncomingById(action.callId);
+        final session = await _callController.acceptIncomingById(action.callId);
         if (session != null && mounted) {
           _presentCallScreen();
         }
@@ -335,8 +342,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         widget.localNotificationsService.clearConversation(conversationId),
       );
       setState(() {
-        _showNotifications = false;
-        _index = 1;
+        _selectTabState(1);
         _initialConversationId = conversationId;
         _messagesRealtimeVersion++;
       });
@@ -446,6 +452,105 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     );
   }
 
+  /// The shared search affordance should land on an actionable search surface.
+  /// Reuse the Messages tab's existing recipient search/new-chat sheet so the
+  /// feed/home search icon no longer appears inert.
+  void _openSearch() {
+    setState(() {
+      _selectTabState(1);
+      _initialConversationId = null;
+      _newConversationRequests++;
+    });
+  }
+
+  void _selectTabState(int value) {
+    if (value == _index) {
+      _showNotifications = false;
+      _resetHomeBackTaps();
+      return;
+    }
+    _tabHistory.remove(value);
+    _tabHistory.add(_index);
+    if (_tabHistory.length > 8) {
+      _tabHistory.removeAt(0);
+    }
+    _showNotifications = false;
+    _index = value;
+    _resetHomeBackTaps();
+  }
+
+  void _selectTab(int value) {
+    setState(() => _selectTabState(value));
+  }
+
+  void _resetHomeBackTaps() {
+    _homeBackTapCount = 0;
+    _lastHomeBackTapAt = null;
+  }
+
+  void _goToPreviousTabOrHome() {
+    final previousTab = _tabHistory.isEmpty ? 0 : _tabHistory.removeLast();
+    setState(() {
+      _showNotifications = false;
+      _index = previousTab;
+      _resetHomeBackTaps();
+    });
+  }
+
+  Future<void> _handleAndroidBack() async {
+    if (_showNotifications) {
+      setState(() {
+        _showNotifications = false;
+        _resetHomeBackTaps();
+      });
+      return;
+    }
+
+    if (_index == 1 && _messagesBackController.navigateBack()) {
+      _resetHomeBackTaps();
+      return;
+    }
+
+    if (_index == 0 && _feedBackController.navigateBack()) {
+      _resetHomeBackTaps();
+      return;
+    }
+
+    if (_index != 0) {
+      _goToPreviousTabOrHome();
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastHomeBackTapAt == null ||
+        now.difference(_lastHomeBackTapAt!) > const Duration(seconds: 2)) {
+      _homeBackTapCount = 0;
+    }
+    _lastHomeBackTapAt = now;
+    _homeBackTapCount++;
+
+    if (_homeBackTapCount >= 3) {
+      await SystemNavigator.pop();
+      return;
+    }
+
+    if (!mounted) return;
+    final remainingTaps = 3 - _homeBackTapCount;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+          content: Text(
+            remainingTaps == 1
+                ? 'Press back once more to exit.'
+                : 'Press back $remainingTaps more times to exit.',
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -455,6 +560,8 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         connectivityService: widget.connectivityService,
         realtimeVersion: _feedRealtimeVersion,
         onOpenNotifications: _showNotificationsScreen,
+        onOpenSearch: _openSearch,
+        backController: _feedBackController,
         notificationUnreadCountFuture: _notificationUnreadCountFuture,
       ),
       MessagesScreen(
@@ -465,7 +572,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         profile: _profile,
         realtimeVersion: _messagesRealtimeVersion,
         initialConversationId: _initialConversationId,
+        newConversationRequest: _newConversationRequests,
         callController: _callController,
+        backController: _messagesBackController,
       ),
       const WalletScreen(),
       ProfileScreen(
@@ -484,76 +593,80 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     final immersiveFeed = _index == 0 && !_showNotifications;
     // Feed (immersive), Wallet (index 2) and the redesigned Profile (index 3)
     // each draw their own chrome/header, so the shared AppBar is hidden there.
-    final hideAppBar = immersiveFeed ||
-        ((_index == 2 || _index == 3) && !_showNotifications);
+    final hideAppBar =
+        immersiveFeed || ((_index == 2 || _index == 3) && !_showNotifications);
 
-    return Scaffold(
-      backgroundColor: immersiveFeed ? Colors.black : null,
-      appBar: hideAppBar
-          ? null
-          : AppBar(
-              toolbarHeight: 64,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'feedIn',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_handleAndroidBack());
+      },
+      child: Scaffold(
+        backgroundColor: immersiveFeed ? Colors.black : null,
+        appBar: hideAppBar
+            ? null
+            : AppBar(
+                toolbarHeight: 64,
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'feedIn',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
                     ),
+                    Text(
+                      _profile.displayName,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Search',
+                    onPressed: _openSearch,
+                    icon: const Icon(Icons.search),
                   ),
-                  Text(
-                    _profile.displayName,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (_index == 1) ...[
+                    IconButton(
+                      tooltip: 'Find contacts',
+                      onPressed: _openContacts,
+                      icon: const Icon(Icons.contacts_outlined),
                     ),
+                    IconButton(
+                      tooltip: 'Channels',
+                      onPressed: _openChannels,
+                      icon: const Icon(Icons.campaign_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Groups',
+                      onPressed: _openGroups,
+                      icon: const Icon(Icons.groups_2_outlined),
+                    ),
+                  ],
+                  _NotificationBellAction(
+                    unreadCountFuture: _notificationUnreadCountFuture,
+                    onTap: _toggleNotifications,
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  tooltip: 'Search',
-                  onPressed: () {},
-                  icon: const Icon(Icons.search),
-                ),
-                if (_index == 1) ...[
-                  IconButton(
-                    tooltip: 'Find contacts',
-                    onPressed: _openContacts,
-                    icon: const Icon(Icons.contacts_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Channels',
-                    onPressed: _openChannels,
-                    icon: const Icon(Icons.campaign_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Groups',
-                    onPressed: _openGroups,
-                    icon: const Icon(Icons.groups_2_outlined),
-                  ),
-                ],
-                _NotificationBellAction(
-                  unreadCountFuture: _notificationUnreadCountFuture,
-                  onTap: _toggleNotifications,
-                ),
-              ],
-            ),
-      body: _showNotifications
-          ? NotificationsScreen(
-              notificationRepository: widget.notificationRepository,
-              onOpenRoute: _openNotificationRoute,
-              onChanged: _refreshNotificationBadge,
-            )
-          : pages[_index],
-      bottomNavigationBar: _FeedBottomNavigation(
-        selectedIndex: _index,
-        onSelected: (value) => setState(() {
-          _showNotifications = false;
-          _index = value;
-        }),
-        onCreate: _openCreate,
+        body: _showNotifications
+            ? NotificationsScreen(
+                notificationRepository: widget.notificationRepository,
+                onOpenRoute: _openNotificationRoute,
+                onChanged: _refreshNotificationBadge,
+              )
+            : pages[_index],
+        bottomNavigationBar: _FeedBottomNavigation(
+          selectedIndex: _index,
+          onSelected: _selectTab,
+          onCreate: _openCreate,
+        ),
       ),
     );
   }
@@ -597,9 +710,7 @@ class _FeedBottomNavigation extends StatelessWidget {
                 onTap: () => onSelected(1),
               ),
               Expanded(
-                child: Center(
-                  child: _CreateNavButton(onTap: onCreate),
-                ),
+                child: Center(child: _CreateNavButton(onTap: onCreate)),
               ),
               _BottomNavItem(
                 label: 'Wallet',
@@ -743,6 +854,21 @@ class _NotificationBellAction extends StatelessWidget {
   }
 }
 
+class FeedScreenBackController {
+  VoidCallback? _activeBackHandler;
+
+  bool navigateBack() {
+    final handler = _activeBackHandler;
+    if (handler == null) return false;
+    handler();
+    return true;
+  }
+
+  void setActiveBackHandler(VoidCallback? handler) {
+    _activeBackHandler = handler;
+  }
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
@@ -751,6 +877,8 @@ class FeedScreen extends StatefulWidget {
     required this.connectivityService,
     required this.realtimeVersion,
     required this.onOpenNotifications,
+    required this.onOpenSearch,
+    required this.backController,
     required this.notificationUnreadCountFuture,
   });
 
@@ -759,6 +887,8 @@ class FeedScreen extends StatefulWidget {
   final ConnectivityService connectivityService;
   final int realtimeVersion;
   final VoidCallback onOpenNotifications;
+  final VoidCallback onOpenSearch;
+  final FeedScreenBackController backController;
   final Future<int> notificationUnreadCountFuture;
 
   @override
@@ -785,10 +915,12 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _postsFuture = _initialLoad();
+    _syncBackController();
   }
 
   @override
   void dispose() {
+    widget.backController.setActiveBackHandler(null);
     _pageController.dispose();
     super.dispose();
   }
@@ -796,9 +928,32 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void didUpdateWidget(covariant FeedScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.backController != widget.backController) {
+      oldWidget.backController.setActiveBackHandler(null);
+      _syncBackController();
+    }
     if (oldWidget.realtimeVersion != widget.realtimeVersion) {
       _reloadAfterRealtimeEvent();
     }
+  }
+
+  void _syncBackController() {
+    widget.backController.setActiveBackHandler(
+      _tabIndex == 0 ? null : _returnToReelsTab,
+    );
+  }
+
+  void _returnToReelsTab() {
+    setState(() {
+      _tabIndex = 0;
+      _activePage = 0;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    });
+    _syncBackController();
   }
 
   Future<void> _reloadAfterRealtimeEvent() async {
@@ -906,6 +1061,7 @@ class _FeedScreenState extends State<FeedScreen> {
         _pageController.jumpToPage(0);
       }
     });
+    _syncBackController();
   }
 
   Future<void> _savePost(FeedPost post) async {
@@ -967,13 +1123,13 @@ class _FeedScreenState extends State<FeedScreen> {
         final overlayHeight = topInset + 104;
 
         Widget content;
-        if (posts == null) {
-          content = _ImmersiveLoadingState(topPadding: overlayHeight);
-        } else if (_tabIndex == 2) {
-          // The immersive "Live" tab now hosts the richer live browse surface
-          // (streams + audio spaces + Go live), padded to clear the feed's
-          // overlaid tab bar.
+        if (_tabIndex == 2) {
+          // Live loads from its own data source. Do not block this tab behind
+          // the feed post refresh; otherwise a slow/failed feed fetch makes the
+          // Live tab look non-functional.
           content = LiveScreen(topPadding: overlayHeight);
+        } else if (posts == null) {
+          content = _ImmersiveLoadingState(topPadding: overlayHeight);
         } else {
           final filteredPosts = _filterPosts(posts);
           content = filteredPosts.isEmpty
@@ -1032,10 +1188,9 @@ class _FeedScreenState extends State<FeedScreen> {
         setState(() => _activePage = index);
         _maybeLoadMore(index, posts.length);
         // Warm the next few reels so swiping to them starts playback instantly.
-        ReelPreloader.instance.preloadAround(
-          [for (final p in posts) p.mediaUrl ?? p.mediaUrls.firstOrNull],
-          index,
-        );
+        ReelPreloader.instance.preloadAround([
+          for (final p in posts) p.mediaUrl ?? p.mediaUrls.firstOrNull,
+        ], index);
       },
       itemBuilder: (context, index) {
         final post = posts[index];
@@ -1046,8 +1201,9 @@ class _FeedScreenState extends State<FeedScreen> {
           isSaved: _savedPostIds.contains(post.id),
           onLike: () => _likePost(post),
           onComment: () => _openComments(post),
-          onRefeed: () =>
-              _runOnlineAction(() => widget.feedRepository.queueRefeed(post.id)),
+          onRefeed: () => _runOnlineAction(
+            () => widget.feedRepository.queueRefeed(post.id),
+          ),
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
         );
@@ -1084,7 +1240,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   const Spacer(),
                   IconButton(
                     tooltip: 'Search',
-                    onPressed: () {},
+                    onPressed: widget.onOpenSearch,
                     icon: const Icon(Icons.search, color: Colors.white),
                   ),
                   _NotificationBellAction(
@@ -1113,7 +1269,6 @@ class _FeedScreenState extends State<FeedScreen> {
       _ => posts,
     };
   }
-
 }
 
 /// Applies a subtle depth transition to immersive feed pages as they scroll:
