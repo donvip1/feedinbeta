@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,10 +9,14 @@ import 'wallet_presenter.dart';
 import 'wallet_theme.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/package_card.dart';
+import 'widgets/payout_destination_sheet.dart';
+import 'widgets/payout_section.dart';
 import 'widgets/send_credits_sheet.dart';
 import 'widgets/subscription_card.dart';
 import 'widgets/transaction_list.dart';
 import 'widgets/wallet_common.dart';
+
+typedef WalletCheckoutLauncher = Future<bool> Function(Uri uri);
 
 /// Top-level Wallet screen: credit/token balance, buy credits, gift/transfer,
 /// subscriptions, transaction history, and (for monetized creators) payouts.
@@ -21,26 +27,33 @@ import 'widgets/wallet_common.dart';
 /// signed-out / unconfigured; money moves surface a soft failure via snackbar
 /// when the server-side contract isn't available.
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key, this.presenter});
+  const WalletScreen({super.key, this.presenter, this.checkoutLauncher});
 
   /// Optional injected presenter (e.g. for tests). When null the screen creates
   /// and owns one.
   final WalletPresenter? presenter;
 
+  /// Optional external-browser launcher used by focused widget tests.
+  final WalletCheckoutLauncher? checkoutLauncher;
+
   @override
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen>
+    with WidgetsBindingObserver {
   late final WalletPresenter _presenter;
   late final bool _ownsPresenter;
   final GlobalKey _packagesKey = GlobalKey();
   String? _busyPackageId;
   String? _busyTierId;
+  bool _checkoutWasBackgrounded = false;
+  bool _checkingCheckout = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ownsPresenter = widget.presenter == null;
     _presenter = widget.presenter ?? WalletPresenter();
     _load();
@@ -48,8 +61,28 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_ownsPresenter) _presenter.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (_checkoutWasBackgrounded && _presenter.hasPendingCheckout) {
+          _checkoutWasBackgrounded = false;
+          unawaited(_verifyPendingCheckout());
+        }
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        if (_presenter.hasPendingCheckout) {
+          _checkoutWasBackgrounded = true;
+        }
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   Future<void> _load() async {
@@ -66,7 +99,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String? _activeTierName() {
@@ -112,16 +147,42 @@ class _WalletScreenState extends State<WalletScreen> {
     if (mounted) await _presenter.refreshAfterMutation();
   }
 
-  Future<void> _openCheckout(String value) async {
-    final uri = Uri.tryParse(value);
-    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-      try {
-        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-      } catch (_) {
-        // fall through to the soft confirmation below
-      }
+  Future<void> _openCheckout(WalletCheckoutSession session) async {
+    try {
+      final launched =
+          await (widget.checkoutLauncher?.call(session.authorizationUri) ??
+              launchUrl(
+                session.authorizationUri,
+                mode: LaunchMode.externalApplication,
+              ));
+      if (launched) return;
+    } catch (_) {
+      // Convert launcher/plugin errors into the same actionable wallet state.
     }
-    _snack('Checkout ready — complete it to receive your credits.');
+    const message = 'Could not open the secure checkout link.';
+    _presenter.checkoutLaunchFailed(message);
+    throw const WalletBackendUnavailable(message);
+  }
+
+  Future<void> _verifyPendingCheckout() async {
+    if (_checkingCheckout || !_presenter.hasPendingCheckout) return;
+    _checkingCheckout = true;
+    try {
+      final outcome = await _presenter.refreshPendingCheckout();
+      switch (outcome) {
+        case WalletCheckoutRefreshOutcome.confirmed:
+          _snack('Payment confirmed.');
+        case WalletCheckoutRefreshOutcome.processing:
+          _snack('Payment is not confirmed yet. Check again shortly.');
+        case WalletCheckoutRefreshOutcome.failed:
+          _snack(
+            _presenter.checkoutMessage ??
+                'Could not verify the payment. Please try again.',
+          );
+      }
+    } finally {
+      _checkingCheckout = false;
+    }
   }
 
   Future<void> _buy(CreditPackage pkg) async {
@@ -129,7 +190,6 @@ class _WalletScreenState extends State<WalletScreen> {
     try {
       final checkout = await _presenter.startCreditCheckout(pkg.id);
       await _openCheckout(checkout);
-      await _presenter.refreshAfterMutation();
     } on WalletBackendUnavailable catch (e) {
       _snack(e.message);
     } catch (_) {
@@ -144,7 +204,6 @@ class _WalletScreenState extends State<WalletScreen> {
     try {
       final checkout = await _presenter.startSubscriptionCheckout(tier.id);
       await _openCheckout(checkout);
-      await _presenter.refreshAfterMutation();
     } on WalletBackendUnavailable catch (e) {
       _snack(e.message);
     } catch (_) {
@@ -155,50 +214,108 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _openPayout() async {
+    final blockedReason = _presenter.payoutBlockedReason;
+    if (blockedReason != null) {
+      _snack(blockedReason);
+      return;
+    }
+
     final controller = TextEditingController();
+    String? validationMessage;
     final amount = await showDialog<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WalletColors.card,
-        title: const Text(
-          'Request payout',
-          style: TextStyle(color: WalletColors.foreground),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: WalletColors.card,
+          title: const Text(
+            'Request payout',
+            style: TextStyle(color: WalletColors.foreground),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Available: ${formatMoney(_presenter.monetization.availableBalance, 'USD')}',
+                style: WalletTextStyles.rowMuted,
+              ),
+              const SizedBox(height: WalletSpacing.md),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                style: const TextStyle(color: WalletColors.foreground),
+                decoration: InputDecoration(
+                  labelText: 'Amount (USD)',
+                  labelStyle: const TextStyle(
+                    color: WalletColors.mutedForeground,
+                  ),
+                  errorText: validationMessage,
+                  suffixIcon: TextButton(
+                    onPressed: () {
+                      controller.text = _presenter.monetization.availableBalance
+                          .toStringAsFixed(2);
+                      setDialogState(() => validationMessage = null);
+                    },
+                    child: const Text('Max'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = double.tryParse(controller.text.trim());
+                if (parsed == null ||
+                    !parsed.isFinite ||
+                    parsed < kMinimumCreatorPayoutUsd) {
+                  setDialogState(
+                    () => validationMessage = 'The minimum payout is \$10.00.',
+                  );
+                  return;
+                }
+                if (parsed > _presenter.monetization.availableBalance) {
+                  setDialogState(
+                    () => validationMessage =
+                        'Amount exceeds your available balance.',
+                  );
+                  return;
+                }
+                Navigator.of(ctx).pop(parsed);
+              },
+              child: const Text('Request'),
+            ),
+          ],
         ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(color: WalletColors.foreground),
-          decoration: const InputDecoration(
-            labelText: 'Amount (USD)',
-            labelStyle: TextStyle(color: WalletColors.mutedForeground),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(
-              ctx,
-            ).pop(double.tryParse(controller.text.trim())),
-            child: const Text('Request'),
-          ),
-        ],
       ),
     );
     controller.dispose();
     if (amount == null || amount <= 0) return;
     try {
-      await _presenter.requestPayout(amount: amount, currency: 'USD');
+      await _presenter.requestPayout(amount: amount);
       _snack('Payout requested.');
-      await _presenter.loadPayouts();
     } on WalletBackendUnavailable catch (e) {
       _snack(e.message);
     } catch (_) {
       _snack('Could not request the payout.');
     }
+  }
+
+  Future<void> _openPayoutDestination() async {
+    final destination = await PayoutDestinationSheet.show(
+      context,
+      presenter: _presenter,
+    );
+    if (destination == null || !mounted) return;
+    _snack('Payout account saved.');
+    await _presenter.loadPayouts();
   }
 
   @override
@@ -246,12 +363,16 @@ class _WalletScreenState extends State<WalletScreen> {
                   onWithdraw: p.isMonetizedCreator ? () => _openPayout() : null,
                   tierName: _activeTierName(),
                 ),
+                if (p.checkoutState != WalletCheckoutState.idle) ...[
+                  const SizedBox(height: 12),
+                  _checkoutBanner(p),
+                ],
                 if (p.overviewState == WalletLoadState.error) ...[
                   const SizedBox(height: 12),
                   WalletInlineError(
                     message:
-                        'Could not refresh your balance. Pull to retry or tap '
-                        'below.',
+                        'Could not refresh your wallet or subscription status. '
+                        'Pull to retry or tap below.',
                     onRetry: _presenter.loadOverview,
                   ),
                 ],
@@ -332,6 +453,21 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(height: 20),
                 ],
 
+                if (p.isMonetizedCreator) ...[
+                  WalletPayoutSection(
+                    monetization: p.monetization,
+                    requests: p.payoutRequests,
+                    state: p.payoutState,
+                    requestState: p.payoutRequestState,
+                    blockedReason: p.payoutBlockedReason,
+                    destination: p.defaultPayoutDestination,
+                    onRequest: p.canRequestPayout ? _openPayout : null,
+                    onConfigureDestination: _openPayoutDestination,
+                    onRetry: p.loadPayouts,
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
                 // Transaction history
                 const WalletSectionHeader(title: 'Transactions'),
                 const SizedBox(height: 8),
@@ -371,4 +507,51 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     ),
   );
+
+  Widget _checkoutBanner(WalletPresenter presenter) {
+    final message =
+        presenter.checkoutMessage ?? 'Complete or verify the hosted checkout.';
+    return switch (presenter.checkoutState) {
+      WalletCheckoutState.idle => const SizedBox.shrink(),
+      WalletCheckoutState.awaitingReturn => WalletStatusBanner(
+        icon: Icons.open_in_browser_rounded,
+        title: 'Checkout opened',
+        message: message,
+        actionLabel: 'I completed payment',
+        onAction: _verifyPendingCheckout,
+        onDismiss: presenter.cancelPendingCheckout,
+      ),
+      WalletCheckoutState.verifying => WalletStatusBanner(
+        icon: Icons.verified_user_rounded,
+        title: 'Verifying payment',
+        message: message,
+        busy: true,
+      ),
+      WalletCheckoutState.confirmed => WalletStatusBanner(
+        icon: Icons.check_circle_rounded,
+        title: 'Payment confirmed',
+        message: message,
+        tone: WalletStatusTone.success,
+        onDismiss: presenter.clearCheckoutStatus,
+      ),
+      WalletCheckoutState.processing => WalletStatusBanner(
+        icon: Icons.schedule_rounded,
+        title: 'Confirmation pending',
+        message: message,
+        tone: WalletStatusTone.warning,
+        actionLabel: 'Check again',
+        onAction: _verifyPendingCheckout,
+        onDismiss: presenter.cancelPendingCheckout,
+      ),
+      WalletCheckoutState.error => WalletStatusBanner(
+        icon: Icons.error_outline_rounded,
+        title: 'Checkout needs attention',
+        message: message,
+        tone: WalletStatusTone.error,
+        actionLabel: presenter.hasPendingCheckout ? 'Try again' : null,
+        onAction: presenter.hasPendingCheckout ? _verifyPendingCheckout : null,
+        onDismiss: presenter.clearCheckoutStatus,
+      ),
+    };
+  }
 }

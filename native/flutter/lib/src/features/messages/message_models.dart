@@ -12,6 +12,7 @@ class ConversationSummary {
     this.otherUserAvatarUrl,
     this.otherUserPresence,
     this.otherUserLastSeenAtMillis,
+    this.disappearingSeconds = 0,
   });
 
   final String id;
@@ -24,6 +25,7 @@ class ConversationSummary {
   final String? otherUserAvatarUrl;
   final String? otherUserPresence;
   final int? otherUserLastSeenAtMillis;
+  final int disappearingSeconds;
 
   ConversationSummary copyWith({
     String? title,
@@ -35,6 +37,7 @@ class ConversationSummary {
     String? otherUserAvatarUrl,
     String? otherUserPresence,
     int? otherUserLastSeenAtMillis,
+    int? disappearingSeconds,
   }) {
     return ConversationSummary(
       id: id,
@@ -48,6 +51,7 @@ class ConversationSummary {
       otherUserPresence: otherUserPresence ?? this.otherUserPresence,
       otherUserLastSeenAtMillis:
           otherUserLastSeenAtMillis ?? this.otherUserLastSeenAtMillis,
+      disappearingSeconds: disappearingSeconds ?? this.disappearingSeconds,
     );
   }
 
@@ -63,6 +67,7 @@ class ConversationSummary {
       otherUserAvatarUrl: json['otherUserAvatarUrl'] as String?,
       otherUserPresence: json['otherUserPresence'] as String?,
       otherUserLastSeenAtMillis: json['otherUserLastSeenAtMillis'] as int?,
+      disappearingSeconds: json['disappearingSeconds'] as int? ?? 0,
     );
   }
 
@@ -78,6 +83,7 @@ class ConversationSummary {
       'otherUserAvatarUrl': otherUserAvatarUrl,
       'otherUserPresence': otherUserPresence,
       'otherUserLastSeenAtMillis': otherUserLastSeenAtMillis,
+      'disappearingSeconds': disappearingSeconds,
     };
   }
 }
@@ -94,6 +100,7 @@ class LocalMessage {
     this.senderAvatarUrl,
     this.messageType = 'text',
     this.readAtMillis,
+    this.readByUserId,
     this.mediaUrl,
     this.localMediaPath,
     this.thumbnailUrl,
@@ -117,6 +124,7 @@ class LocalMessage {
   final MessageDeliveryState deliveryState;
   final String messageType;
   final int? readAtMillis;
+  final String? readByUserId;
   final String? mediaUrl;
   final String? localMediaPath;
   final String? thumbnailUrl;
@@ -164,6 +172,7 @@ class LocalMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       messageType: messageType,
       readAtMillis: readAtMillis,
+      readByUserId: readByUserId,
       mediaUrl: mediaUrl ?? this.mediaUrl,
       localMediaPath: localMediaPath,
       thumbnailUrl: thumbnailUrl,
@@ -192,6 +201,7 @@ class LocalMessage {
       ),
       messageType: json['messageType'] as String? ?? 'text',
       readAtMillis: json['readAtMillis'] as int?,
+      readByUserId: json['readByUserId'] as String?,
       mediaUrl: json['mediaUrl'] as String?,
       localMediaPath: json['localMediaPath'] as String?,
       thumbnailUrl: json['thumbnailUrl'] as String?,
@@ -218,6 +228,7 @@ class LocalMessage {
       'deliveryState': deliveryState.name,
       'messageType': messageType,
       'readAtMillis': readAtMillis,
+      'readByUserId': readByUserId,
       'mediaUrl': mediaUrl,
       'localMediaPath': localMediaPath,
       'thumbnailUrl': thumbnailUrl,

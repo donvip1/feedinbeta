@@ -37,11 +37,13 @@ class MessageMaterializer {
             deliveryState: _deliveryState(remoteMessage.deliveryStateName),
             messageType: remoteMessage.messageType,
             readAtMillis: remoteMessage.readAtMillis,
+            readByUserId: remoteMessage.readByUserId,
             mediaUrl: remoteMessage.mediaUrl,
             thumbnailUrl: remoteMessage.thumbnailUrl,
             mimeType: remoteMessage.mimeType,
             fileName: remoteMessage.fileName,
             fileSizeBytes: remoteMessage.fileSizeBytes,
+            durationMs: remoteMessage.durationMs,
             viewOnce: remoteMessage.viewOnce,
             expiresAtMillis: remoteMessage.expiresAtMillis,
             viewOnceSeenAtMillis: remoteMessage.viewOnceSeenAtMillis,
@@ -75,6 +77,7 @@ class MessageMaterializer {
           otherUserPresence: remoteConversation.otherUserPresence,
           otherUserLastSeenAtMillis:
               remoteConversation.otherUserLastSeenAtMillis,
+          disappearingSeconds: remoteConversation.disappearingSeconds,
         ) ??
         ConversationSummary(
           id: remoteConversation.serverConversationId,
@@ -88,6 +91,7 @@ class MessageMaterializer {
           otherUserPresence: remoteConversation.otherUserPresence,
           otherUserLastSeenAtMillis:
               remoteConversation.otherUserLastSeenAtMillis,
+          disappearingSeconds: remoteConversation.disappearingSeconds,
         );
     await _messagesRepository.upsertConversation(conversation);
     return conversation;

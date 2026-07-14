@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const PAYSTACK_BASE = 'https://api.paystack.co';
@@ -10,6 +11,49 @@ const CREDITS_PER_USD = 100;
 const PLATFORM_FEE_PERCENT = 30;
 const MIN_WITHDRAWAL_CREDITS = 1000;
 const COOLDOWN_MINUTES = 5; // Rate limit: one withdrawal per 5 minutes
+
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord | null {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as JsonRecord;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function parsePositiveInteger(value: unknown, fieldName: string): number {
+  const parsed = typeof value === 'string' && /^\d+$/.test(value)
+    ? Number(value)
+    : value;
+  if (
+    typeof parsed !== 'number' ||
+    !Number.isSafeInteger(parsed) ||
+    parsed <= 0
+  ) {
+    throw new Error(`Invalid ${fieldName}`);
+  }
+  return parsed;
+}
+
+function requiredNgnRate(): number {
+  const rate = Number(Deno.env.get('PAYSTACK_NGN_PER_USD'));
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error('PAYSTACK_NGN_PER_USD not configured');
+  }
+  return rate;
+}
+
+async function readProviderResponse(response: Response): Promise<JsonRecord> {
+  const data = asRecord(await response.json());
+  if (!data) throw new Error('Payment provider returned an invalid response');
+  return data;
+}
 
 function getFriendlyErrorMessage(technicalError: string): string {
   const lower = technicalError.toLowerCase();
@@ -30,7 +74,13 @@ function getFriendlyErrorMessage(technicalError: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -39,6 +89,9 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase service credentials not configured');
+    }
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization') ?? '';
@@ -55,6 +108,243 @@ Deno.serve(async (req) => {
 
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
     const { action, ...params } = await req.json();
+
+    // Creator payouts use verified Paystack transfer recipients. Only the
+    // masked destination is client-readable; the recipient code stays in the
+    // service-role-only destination secrets table.
+    if (action === 'save-creator-payout-destination') {
+      const bankCode = optionalString(params.bank_code);
+      const bankName = optionalString(params.bank_name);
+      const accountNumber = optionalString(params.account_number);
+      if (
+        !bankCode ||
+        !bankName ||
+        !accountNumber ||
+        !/^\d{10}$/.test(accountNumber)
+      ) {
+        return new Response(JSON.stringify({
+          error: 'Select a bank and enter a valid 10-digit account number',
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const resolveResponse = await fetch(
+        `${PAYSTACK_BASE}/bank/resolve?account_number=${
+          encodeURIComponent(accountNumber)
+        }&bank_code=${encodeURIComponent(bankCode)}`,
+        { headers: { Authorization: `Bearer ${paystackSecretKey}` } },
+      );
+      const resolved = await readProviderResponse(resolveResponse);
+      const resolvedData = asRecord(resolved.data);
+      const accountName = optionalString(resolvedData?.account_name);
+      if (!resolveResponse.ok || resolved.status !== true || !accountName) {
+        return new Response(JSON.stringify({
+          error: optionalString(resolved.message) ??
+            'Could not verify this bank account',
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const recipientResponse = await fetch(
+        `${PAYSTACK_BASE}/transferrecipient`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'nuban',
+            name: accountName,
+            account_number: accountNumber,
+            bank_code: bankCode,
+            currency: 'NGN',
+          }),
+        },
+      );
+      const recipient = await readProviderResponse(recipientResponse);
+      const recipientData = asRecord(recipient.data);
+      const recipientCode = optionalString(recipientData?.recipient_code);
+      if (
+        !recipientResponse.ok ||
+        recipient.status !== true ||
+        !recipientCode
+      ) {
+        return new Response(JSON.stringify({
+          error: optionalString(recipient.message) ??
+            'Could not create the payout destination',
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const accountLast4 = accountNumber.slice(-4);
+      const { data: destination, error: destinationError } =
+        await serviceClient.rpc('wallet_save_creator_payout_destination', {
+          p_user_id: user.id,
+          p_display_label: `${bankName} - ****${accountLast4}`,
+          p_account_last4: accountLast4,
+          p_currency: 'NGN',
+          p_country_code: 'NG',
+          p_provider_reference: recipientCode,
+          p_metadata: {
+            bank_code: bankCode,
+            bank_name: bankName,
+            account_name: accountName,
+          },
+        });
+      if (destinationError || !destination) {
+        throw destinationError ??
+          new Error('Could not save the payout destination');
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        destination,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'process-creator-payout') {
+      const requestId = optionalString(params.request_id);
+      if (
+        !requestId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+          .test(requestId)
+      ) {
+        return new Response(JSON.stringify({ error: 'Invalid payout request' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: payout, error: payoutError } = await serviceClient
+        .from('creator_payout_requests')
+        .select(
+          'id,user_id,amount_minor,currency,status,provider,' +
+            'payout_destination_id,provider_reference',
+        )
+        .eq('id', requestId)
+        .eq('user_id', user.id)
+        .single();
+      if (payoutError || !payout) {
+        return new Response(JSON.stringify({
+          error: 'Payout request not found',
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (payout.status === 'paid' || payout.status === 'processing') {
+        return new Response(JSON.stringify({ success: true, payout }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (
+        payout.status !== 'pending' ||
+        payout.provider !== 'paystack' ||
+        payout.currency !== 'USD'
+      ) {
+        return new Response(JSON.stringify({
+          error: `Payout cannot be processed from status ${payout.status}`,
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const amountMinor = parsePositiveInteger(
+        payout.amount_minor,
+        'payout amount',
+      );
+      const amountKobo = Math.round(amountMinor * requiredNgnRate());
+      if (!Number.isSafeInteger(amountKobo) || amountKobo <= 0) {
+        throw new Error('Converted payout amount is invalid');
+      }
+
+      const reference = `cp_${requestId.replaceAll('-', '')}`;
+      const { data: claimed, error: claimError } = await serviceClient.rpc(
+        'wallet_claim_creator_payout',
+        {
+          p_request_id: requestId,
+          p_user_id: user.id,
+          p_provider_reference: reference,
+        },
+      );
+      if (claimError || !claimed) {
+        throw claimError ?? new Error('Could not claim payout request');
+      }
+
+      const { data: destinationSecret, error: secretError } =
+        await serviceClient
+          .from('creator_payout_destination_secrets')
+          .select('provider_reference')
+          .eq('destination_id', payout.payout_destination_id)
+          .single();
+      const recipientCode = optionalString(
+        destinationSecret?.provider_reference,
+      );
+      if (secretError || !recipientCode) {
+        await serviceClient.rpc('wallet_update_creator_payout_status', {
+          p_request_id: requestId,
+          p_status: 'failed',
+          p_provider_reference: reference,
+          p_failure_reason: 'Payout destination is unavailable',
+        });
+        throw new Error('Payout destination is unavailable');
+      }
+
+      const transferResponse = await fetch(`${PAYSTACK_BASE}/transfer`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${paystackSecretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source: 'balance',
+          amount: amountKobo,
+          recipient: recipientCode,
+          reason: `Feedin creator payout ${requestId}`,
+          reference,
+          metadata: {
+            creator_payout_request_id: requestId,
+            user_id: user.id,
+            amount_minor: String(amountMinor),
+            source_currency: 'USD',
+          },
+        }),
+      });
+      const transfer = await readProviderResponse(transferResponse);
+      if (!transferResponse.ok || transfer.status !== true) {
+        const failureReason = optionalString(transfer.message) ??
+          'Paystack transfer initiation failed';
+        await serviceClient.rpc('wallet_update_creator_payout_status', {
+          p_request_id: requestId,
+          p_status: 'failed',
+          p_provider_reference: reference,
+          p_failure_reason: failureReason,
+        });
+        return new Response(JSON.stringify({ error: failureReason }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        payout: claimed,
+        transfer_status: optionalString(asRecord(transfer.data)?.status) ??
+          'processing',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // ─── LIST BANKS ───
     if (action === 'list-banks') {

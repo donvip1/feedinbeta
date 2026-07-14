@@ -166,7 +166,9 @@ class _TransactionRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: WalletTextStyles.rowMuted.copyWith(
                       fontSize: 10,
-                      color: WalletColors.mutedForeground.withValues(alpha: 0.7),
+                      color: WalletColors.mutedForeground.withValues(
+                        alpha: 0.7,
+                      ),
                     ),
                   ),
               ],

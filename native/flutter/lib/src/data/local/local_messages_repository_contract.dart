@@ -38,5 +38,9 @@ abstract interface class LocalMessagesRepositoryContract {
     required String conversationId,
     required String serverConversationId,
   });
+  Future<void> setConversationDisappearingSeconds({
+    required String conversationId,
+    required int seconds,
+  });
   Future<void> markConversationRead(String conversationId);
 }

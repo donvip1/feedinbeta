@@ -6,6 +6,19 @@ import 'data/wallet_remote_data_source.dart';
 /// Loading phase for a section of the wallet.
 enum WalletLoadState { idle, loading, ready, error }
 
+const double kMinimumCreatorPayoutUsd = 10;
+
+/// Lifecycle of a hosted checkout while the user moves between the app and the
+/// provider browser.
+enum WalletCheckoutState {
+  idle,
+  awaitingReturn,
+  verifying,
+  confirmed,
+  processing,
+  error,
+}
+
 /// A [ChangeNotifier] that owns all wallet state and orchestrates loads through
 /// [WalletRemoteDataSource]. Widgets subscribe via `ListenableBuilder` and stay
 /// dumb — they never touch Supabase directly (mirrors the profile parity split
@@ -15,10 +28,22 @@ enum WalletLoadState { idle, loading, ready, error }
 /// returns empty/neutral values, so the screen renders an honest empty state
 /// rather than throwing.
 class WalletPresenter extends ChangeNotifier {
-  WalletPresenter({WalletRemoteDataSource? dataSource})
-    : _data = dataSource ?? WalletRemoteDataSource.autoDetect();
+  WalletPresenter({
+    WalletDataSource? dataSource,
+    List<Duration> checkoutRefreshDelays = const [
+      Duration.zero,
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 3),
+    ],
+    DateTime Function()? now,
+  }) : _data = dataSource ?? WalletRemoteDataSource.autoDetect(),
+       _checkoutRefreshDelays = List.unmodifiable(checkoutRefreshDelays),
+       _now = now ?? DateTime.now;
 
-  final WalletRemoteDataSource _data;
+  final WalletDataSource _data;
+  final List<Duration> _checkoutRefreshDelays;
+  final DateTime Function() _now;
 
   // --- Overview / balance ---
   WalletLoadState _overviewState = WalletLoadState.idle;
@@ -62,9 +87,67 @@ class WalletPresenter extends ChangeNotifier {
   CreatorMonetization get monetization => _monetization;
   List<PayoutRequest> _payoutRequests = const [];
   List<PayoutRequest> get payoutRequests => _payoutRequests;
+  List<PayoutDestination> _payoutDestinations = const [];
+  List<PayoutDestination> get payoutDestinations => _payoutDestinations;
+  PayoutDestination? get defaultPayoutDestination {
+    for (final destination in _payoutDestinations) {
+      if (destination.isActive && destination.isDefault) return destination;
+    }
+    for (final destination in _payoutDestinations) {
+      if (destination.isActive) return destination;
+    }
+    return null;
+  }
+
+  WalletLoadState _payoutRequestState = WalletLoadState.idle;
+  WalletLoadState get payoutRequestState => _payoutRequestState;
 
   /// Whether the payout tab should be shown at all (creator is monetized).
   bool get isMonetizedCreator => _monetization.isMonetized;
+  bool get hasOpenPayoutRequest =>
+      _payoutRequests.any((request) => request.isOpen);
+
+  bool get canRequestPayout => payoutBlockedReason == null;
+
+  String? get payoutBlockedReason {
+    if (!_monetization.isMonetized) {
+      return 'Creator payouts are not enabled for this account.';
+    }
+    if (_payoutState == WalletLoadState.idle ||
+        _payoutState == WalletLoadState.loading) {
+      return 'Payout eligibility is still loading.';
+    }
+    if (_payoutState == WalletLoadState.error) {
+      return 'Refresh payout history before requesting another payout.';
+    }
+    if (_payoutRequestState == WalletLoadState.loading) {
+      return 'A payout request is being submitted.';
+    }
+    if (hasOpenPayoutRequest) {
+      return 'A payout request is already being processed.';
+    }
+    if (defaultPayoutDestination == null) {
+      return 'Add a bank account before requesting a payout.';
+    }
+    if (_monetization.availableBalance < kMinimumCreatorPayoutUsd) {
+      return 'The minimum creator payout is \$10.00.';
+    }
+    final nextEligible = _monetization.nextEligiblePayoutMillis;
+    if (nextEligible != null &&
+        DateTime.fromMillisecondsSinceEpoch(nextEligible).isAfter(_now())) {
+      return 'The next payout date has not been reached yet.';
+    }
+    return null;
+  }
+
+  _PendingCheckout? _pendingCheckout;
+  WalletCheckoutSession? get pendingCheckout => _pendingCheckout?.session;
+  bool get hasPendingCheckout => _pendingCheckout != null;
+  WalletCheckoutState _checkoutState = WalletCheckoutState.idle;
+  WalletCheckoutState get checkoutState => _checkoutState;
+  String? _checkoutMessage;
+  String? get checkoutMessage => _checkoutMessage;
+  Future<WalletCheckoutRefreshOutcome>? _checkoutRefreshFuture;
 
   bool _disposed = false;
 
@@ -148,9 +231,11 @@ class WalletPresenter extends ChangeNotifier {
       final results = await Future.wait([
         _data.fetchMonetization(),
         _data.fetchMyPayoutRequests(),
+        _data.fetchPayoutDestinations(),
       ]);
       _monetization = results[0] as CreatorMonetization;
       _payoutRequests = results[1] as List<PayoutRequest>;
+      _payoutDestinations = results[2] as List<PayoutDestination>;
       _payoutState = WalletLoadState.ready;
     } catch (_) {
       _payoutState = WalletLoadState.error;
@@ -171,11 +256,181 @@ class WalletPresenter extends ChangeNotifier {
 
   // --- Money moves (delegate to the data source; caller handles UX) -------
 
-  Future<String> startCreditCheckout(String packageId) =>
-      _data.startCreditCheckout(packageId);
+  Future<WalletCheckoutSession> startCreditCheckout(String packageId) async {
+    final session = await _data.startCreditCheckout(packageId);
+    _rememberCheckout(session);
+    return session;
+  }
 
-  Future<String> startSubscriptionCheckout(String tierId) =>
-      _data.startSubscriptionCheckout(tierId);
+  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) async {
+    final session = await _data.startSubscriptionCheckout(tierId);
+    _rememberCheckout(session);
+    return session;
+  }
+
+  void _rememberCheckout(WalletCheckoutSession session) {
+    _pendingCheckout = _PendingCheckout(
+      session: session,
+      balanceBefore: _balance.balance,
+      activeTierBefore: activeTierId,
+      transactionIdsBefore: _transactions.map((tx) => tx.id).toSet(),
+    );
+    _checkoutState = WalletCheckoutState.awaitingReturn;
+    _checkoutMessage = switch (session.kind) {
+      WalletCheckoutKind.credits =>
+        'Complete the payment in your browser, then return here.',
+      WalletCheckoutKind.subscription =>
+        'Complete the subscription payment in your browser, then return here.',
+    };
+    _safeNotify();
+  }
+
+  void cancelPendingCheckout() {
+    if (_pendingCheckout == null &&
+        _checkoutState == WalletCheckoutState.idle) {
+      return;
+    }
+    _pendingCheckout = null;
+    _checkoutState = WalletCheckoutState.idle;
+    _checkoutMessage = null;
+    _safeNotify();
+  }
+
+  void checkoutLaunchFailed(String message) {
+    _pendingCheckout = null;
+    _checkoutState = WalletCheckoutState.error;
+    _checkoutMessage = message;
+    _safeNotify();
+  }
+
+  void clearCheckoutStatus() {
+    if (_pendingCheckout != null) {
+      cancelPendingCheckout();
+      return;
+    }
+    if (_checkoutState == WalletCheckoutState.idle) return;
+    _checkoutState = WalletCheckoutState.idle;
+    _checkoutMessage = null;
+    _safeNotify();
+  }
+
+  /// Reloads balance, subscription, monetization and ledger after the app
+  /// returns from hosted checkout. A few bounded retries cover webhook /
+  /// callback processing delay without reporting payment success prematurely.
+  Future<WalletCheckoutRefreshOutcome> refreshPendingCheckout() async {
+    final running = _checkoutRefreshFuture;
+    if (running != null) return running;
+
+    late final Future<WalletCheckoutRefreshOutcome> refresh;
+    refresh = _performCheckoutRefresh().whenComplete(() {
+      if (identical(_checkoutRefreshFuture, refresh)) {
+        _checkoutRefreshFuture = null;
+      }
+    });
+    _checkoutRefreshFuture = refresh;
+    return refresh;
+  }
+
+  Future<WalletCheckoutRefreshOutcome> _performCheckoutRefresh() async {
+    final pending = _pendingCheckout;
+    if (pending == null) return WalletCheckoutRefreshOutcome.failed;
+
+    _checkoutState = WalletCheckoutState.verifying;
+    _checkoutMessage = 'Verifying your payment...';
+    _safeNotify();
+
+    var hadSuccessfulRead = false;
+    var paymentVerified = false;
+    WalletCheckoutVerificationException? lastVerificationError;
+
+    for (final delay in _checkoutRefreshDelays) {
+      if (delay > Duration.zero) await Future<void>.delayed(delay);
+
+      try {
+        final verification = await _data.verifyCheckout(
+          pending.session.reference,
+        );
+        paymentVerified =
+            verification.isCompleted &&
+            verification.paymentIntentId == pending.session.paymentIntentId;
+        if (!paymentVerified) {
+          lastVerificationError = const WalletCheckoutVerificationException(
+            'The payment details did not match this checkout.',
+            code: 'PAYMENT_INTENT_MISMATCH',
+          );
+        }
+      } on WalletCheckoutVerificationException catch (error) {
+        lastVerificationError = error;
+        if (!error.isPaymentIncomplete) {
+          _checkoutState = WalletCheckoutState.error;
+          _checkoutMessage = error.message;
+          _safeNotify();
+          return WalletCheckoutRefreshOutcome.failed;
+        }
+      } catch (_) {
+        lastVerificationError = const WalletCheckoutVerificationException(
+          'Could not verify this payment. Check your connection and try again.',
+        );
+      }
+
+      await Future.wait([loadOverview(), loadTransactions()]);
+
+      final readSucceeded =
+          _overviewState == WalletLoadState.ready ||
+          _transactionsState == WalletLoadState.ready;
+      hadSuccessfulRead = hadSuccessfulRead || readSucceeded;
+      if (paymentVerified || _checkoutIsConfirmed(pending)) {
+        _pendingCheckout = null;
+        _checkoutState = WalletCheckoutState.confirmed;
+        _checkoutMessage = switch (pending.session.kind) {
+          WalletCheckoutKind.credits =>
+            'Payment confirmed. Your wallet balance has been refreshed.',
+          WalletCheckoutKind.subscription =>
+            'Subscription confirmed. Your current plan has been refreshed.',
+        };
+        _safeNotify();
+        return WalletCheckoutRefreshOutcome.confirmed;
+      }
+    }
+
+    if (hadSuccessfulRead &&
+        (lastVerificationError == null ||
+            lastVerificationError.isPaymentIncomplete)) {
+      _checkoutState = WalletCheckoutState.processing;
+      _checkoutMessage =
+          'Payment has not been confirmed yet. You can check again shortly.';
+      _safeNotify();
+      return WalletCheckoutRefreshOutcome.processing;
+    }
+
+    _checkoutState = WalletCheckoutState.error;
+    _checkoutMessage =
+        lastVerificationError?.message ??
+        'Could not refresh your wallet after checkout.';
+    _safeNotify();
+    return WalletCheckoutRefreshOutcome.failed;
+  }
+
+  bool _checkoutIsConfirmed(_PendingCheckout pending) {
+    final session = pending.session;
+    final matchingReference = _transactions.any(
+      (tx) => tx.paymentReference == session.reference,
+    );
+    if (matchingReference) return true;
+
+    return switch (session.kind) {
+      WalletCheckoutKind.credits =>
+        _balance.balance > pending.balanceBefore ||
+            _transactions.any(
+              (tx) =>
+                  tx.isPurchase &&
+                  !pending.transactionIdsBefore.contains(tx.id),
+            ),
+      WalletCheckoutKind.subscription =>
+        activeTierId == session.itemId &&
+            pending.activeTierBefore != session.itemId,
+    };
+  }
 
   Future<void> transferCredits({
     required String recipientUsername,
@@ -195,13 +450,88 @@ class WalletPresenter extends ChangeNotifier {
     creditValue: creditValue,
   );
 
-  Future<PayoutRequest?> requestPayout({
-    required double amount,
-    required String currency,
-    String? payoutMethod,
-  }) => _data.requestPayout(
-    amount: amount,
-    currency: currency,
-    payoutMethod: payoutMethod,
-  );
+  Future<PayoutRequest> requestPayout({required double amount}) async {
+    final blockedReason = payoutBlockedReason;
+    if (blockedReason != null) {
+      throw WalletBackendUnavailable(blockedReason);
+    }
+    if (!amount.isFinite || amount < kMinimumCreatorPayoutUsd) {
+      throw const WalletBackendUnavailable(
+        'The minimum creator payout is \$10.00.',
+      );
+    }
+    if (amount > _monetization.availableBalance) {
+      throw const WalletBackendUnavailable(
+        'The requested amount is higher than your available creator balance.',
+      );
+    }
+    if (_payoutRequestState == WalletLoadState.loading) {
+      throw const WalletBackendUnavailable(
+        'A payout request is already being submitted.',
+      );
+    }
+
+    _payoutRequestState = WalletLoadState.loading;
+    _safeNotify();
+    try {
+      final request = await _data.requestPayout(amount: amount);
+      _payoutRequests = [
+        request,
+        ..._payoutRequests.where((item) => item.id != request.id),
+      ];
+      _payoutRequestState = WalletLoadState.ready;
+      _safeNotify();
+
+      await loadPayouts();
+      return request;
+    } catch (_) {
+      _payoutRequestState = WalletLoadState.error;
+      _safeNotify();
+      rethrow;
+    }
+  }
+
+  Future<List<PaystackBank>> fetchPayoutBanks() {
+    return _data.fetchPaystackBanks();
+  }
+
+  Future<VerifiedPayoutAccount> verifyPayoutAccount({
+    required String bankCode,
+    required String accountNumber,
+  }) {
+    return _data.verifyPayoutAccount(
+      bankCode: bankCode,
+      accountNumber: accountNumber,
+    );
+  }
+
+  Future<PayoutDestination> savePayoutDestination({
+    required PaystackBank bank,
+    required String accountNumber,
+  }) async {
+    final destination = await _data.savePayoutDestination(
+      bank: bank,
+      accountNumber: accountNumber,
+    );
+    _payoutDestinations = [
+      destination,
+      ..._payoutDestinations.where((item) => item.id != destination.id),
+    ];
+    _safeNotify();
+    return destination;
+  }
+}
+
+class _PendingCheckout {
+  const _PendingCheckout({
+    required this.session,
+    required this.balanceBefore,
+    required this.activeTierBefore,
+    required this.transactionIdsBefore,
+  });
+
+  final WalletCheckoutSession session;
+  final int balanceBefore;
+  final String? activeTierBefore;
+  final Set<String> transactionIdsBefore;
 }

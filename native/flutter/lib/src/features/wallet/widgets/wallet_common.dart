@@ -39,8 +39,18 @@ String currencySymbol(String currency) => switch (currency.toUpperCase()) {
 String formatTimestamp(int millis) {
   final dt = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final month = months[dt.month - 1];
   final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
@@ -346,11 +356,7 @@ class WalletNavTile extends StatelessWidget {
 /// A compact inline error strip with an optional retry action, used where a
 /// full empty state would be too heavy (e.g. a failed balance refresh).
 class WalletInlineError extends StatelessWidget {
-  const WalletInlineError({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
+  const WalletInlineError({super.key, required this.message, this.onRetry});
 
   final String message;
   final VoidCallback? onRetry;
@@ -399,6 +405,106 @@ class WalletInlineError extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+enum WalletStatusTone { neutral, success, warning, error }
+
+/// Compact persistent status surface used for hosted checkout progress.
+class WalletStatusBanner extends StatelessWidget {
+  const WalletStatusBanner({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.tone = WalletStatusTone.neutral,
+    this.busy = false,
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final WalletStatusTone tone;
+  final bool busy;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final VoidCallback? onDismiss;
+
+  Color get _accent => switch (tone) {
+    WalletStatusTone.neutral => WalletColors.primary,
+    WalletStatusTone.success => WalletColors.success,
+    WalletStatusTone.warning => WalletColors.warning,
+    WalletStatusTone.error => WalletColors.destructive,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _accent;
+    return Container(
+      padding: const EdgeInsets.all(WalletSpacing.md),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: WalletRadii.inner,
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: busy
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(accent),
+                    ),
+                  )
+                : Icon(icon, size: 19, color: accent),
+          ),
+          const SizedBox(width: WalletSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: WalletTextStyles.rowTitle),
+                const SizedBox(height: 2),
+                Text(message, style: WalletTextStyles.rowMuted),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: WalletSpacing.sm),
+                  GestureDetector(
+                    onTap: onAction,
+                    child: Text(
+                      actionLabel!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (onDismiss != null)
+            IconButton(
+              tooltip: 'Dismiss',
+              visualDensity: VisualDensity.compact,
+              onPressed: onDismiss,
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: WalletColors.mutedForeground,
+              ),
+            ),
         ],
       ),
     );

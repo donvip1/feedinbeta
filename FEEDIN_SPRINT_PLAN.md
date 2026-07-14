@@ -4,6 +4,12 @@
 
 **Reality check:** this is a multi-week program, not a single pass. Several items are large sub-projects with hard external dependencies (Google OAuth credentials, Apple PushKit/CallKit certs, a video transcoding CDN). This plan splits every module into: packages to install · backend work · client files · **blockers only you can clear** · what can start immediately with no new packages.
 
+## Completed on July 14, 2026
+
+- **Disappearing messages:** conversation timer details are live and client materialization respects the server contract.
+- **Private-chat polish/actions:** typing, presence/last-seen, double-blue receipts, starring, reporting, generic file attachments, and realtime receipt refresh are wired and tested.
+- **Wallet:** hosted credit/subscription checkout, return verification, seeded catalog, subscription lifecycle webhooks, bank destination setup, payout reservation/transfer/history, and idempotent provider ledgers are live. Runtime Paystack transactions still require the project owner to configure `PAYSTACK_SECRET_KEY` and an approved `PAYSTACK_NGN_PER_USD` Edge Function secret.
+
 ---
 
 ## Consolidated package install list (exact names — nothing hallucinated)
@@ -61,7 +67,7 @@ Full-bleed brand gradient, borderless underline inputs, one big rounded primary 
 - Files: migration + `change_username` RPC; `features/profile/profile_screen.dart`, `.../widgets/*`, `features/settings/username_section.dart`.
 
 ## MODULE 5 — Chat Rebrand & Groups
-- **Private chat:** bubbles, swipe-to-reply, reactions, read receipts, **voice notes with waveform**, forwarding — *most already built this session*. Remaining: reaction polish, double-blue-check receipts, typing/online/last-seen surfacing, optional disappearing messages. *Startable now.*
+- **Private chat:** bubbles, swipe-to-reply, reactions, read receipts, **voice notes with waveform**, forwarding, view-once media, disappearing-message timers, double-blue receipts, typing/presence/last-seen, message stars, reports, and generic file attachments are complete for the current scope.
 - **Groups (Telegram-grade):** admin controls (pin, restrict, slow mode, anon admin), granular permissions, invite links. Backend: extend group tables + RLS + RPCs. Large but mostly server + UI.
 - **Group calls:** LiveKit room per group (engine exists); **shareable invite links** `feedin://join-call/<uuid>` with expiry/revoke (new `call_invites` table + `create-call-invite` edge fn — already in web repo); **PiP** via `floating`. *Blocked on decision 4 for scale.*
 

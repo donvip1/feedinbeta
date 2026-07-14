@@ -2,6 +2,261 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'wallet_models.dart';
 
+/// Testable wallet boundary. Server contract details remain in the remote
+/// implementation while presenters can use deterministic fakes.
+abstract interface class WalletDataSource {
+  Future<CreditBalance> fetchBalance();
+
+  Future<List<CreditPackage>> fetchPackages();
+
+  Future<List<CreditTransaction>> fetchTransactions({int limit = 100});
+
+  Future<List<SubscriptionTier>> fetchTiers();
+
+  Future<UserSubscription?> fetchActiveSubscription();
+
+  Future<CreatorMonetization> fetchMonetization();
+
+  Future<List<PayoutRequest>> fetchMyPayoutRequests({int limit = 20});
+
+  Future<List<PayoutDestination>> fetchPayoutDestinations();
+
+  Future<List<PaystackBank>> fetchPaystackBanks();
+
+  Future<VerifiedPayoutAccount> verifyPayoutAccount({
+    required String bankCode,
+    required String accountNumber,
+  });
+
+  Future<PayoutDestination> savePayoutDestination({
+    required PaystackBank bank,
+    required String accountNumber,
+  });
+
+  Future<WalletCheckoutSession> startCreditCheckout(String packageId);
+
+  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId);
+
+  Future<WalletCheckoutVerification> verifyCheckout(String reference);
+
+  Future<void> transferCredits({
+    required String recipientUsername,
+    required int amount,
+  });
+
+  Future<void> sendDirectGift({
+    required String recipientIdentifier,
+    required String giftType,
+    required int creditValue,
+  });
+
+  Future<PayoutRequest> requestPayout({required double amount});
+}
+
+/// Central definition of the native wallet's server-owned contracts.
+abstract final class WalletServerContract {
+  static const checkoutFunction = 'paystack-checkout';
+  static const creatorPayoutRequestRpc = 'request_creator_payout';
+  static const creatorPayoutRequestsTable = 'creator_payout_requests';
+  static const creatorPayoutDestinationsTable = 'creator_payout_destinations';
+  static const payoutFunction = 'paystack-withdrawal';
+
+  static const checkoutTypeKey = 'type';
+  static const checkoutItemIdKey = 'itemId';
+  static const checkoutUrlKey = 'authorization_url';
+  static const checkoutReferenceKey = 'reference';
+  static const checkoutPaymentIntentIdKey = 'payment_intent_id';
+  static const checkoutIdempotencyKey = 'idempotency_key';
+  static const checkoutReusedKey = 'reused';
+  static const checkoutActionKey = 'action';
+  static const checkoutVerifyAction = 'verify';
+
+  static const payoutAmountParam = 'p_amount';
+  static const payoutIdempotencyParam = 'p_idempotency_key';
+  static const payoutActionKey = 'action';
+  static const payoutListBanksAction = 'list-banks';
+  static const payoutVerifyAccountAction = 'verify-account';
+  static const payoutSaveDestinationAction = 'save-creator-payout-destination';
+  static const payoutProcessAction = 'process-creator-payout';
+  static const payoutRequestIdKey = 'request_id';
+
+  static WalletCheckoutSession parseCheckoutSession(
+    Object? raw, {
+    required WalletCheckoutKind kind,
+    required String itemId,
+  }) {
+    final data = _objectMap(raw);
+    final serverError = _string(data?['error']);
+    if (serverError != null) {
+      throw WalletBackendUnavailable(serverError);
+    }
+
+    final rawUrl = _string(data?[checkoutUrlKey]);
+    final uri = rawUrl == null ? null : Uri.tryParse(rawUrl);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      throw const WalletBackendUnavailable(
+        'Checkout did not return a secure payment link. Please try again.',
+      );
+    }
+
+    final reference = _string(data?[checkoutReferenceKey]);
+    final paymentIntentId = _string(data?[checkoutPaymentIntentIdKey]);
+    final idempotencyKey = _string(data?[checkoutIdempotencyKey]);
+    if (reference == null ||
+        paymentIntentId == null ||
+        idempotencyKey == null) {
+      throw const WalletBackendUnavailable(
+        'Checkout did not return the details needed for verification. '
+        'Please try again.',
+      );
+    }
+
+    return WalletCheckoutSession(
+      kind: kind,
+      itemId: itemId,
+      authorizationUri: uri,
+      reference: reference,
+      paymentIntentId: paymentIntentId,
+      idempotencyKey: idempotencyKey,
+      reused: data?[checkoutReusedKey] == true,
+    );
+  }
+
+  static WalletCheckoutVerification parseCheckoutVerification(Object? raw) {
+    final data = _objectMap(raw);
+    final serverError = _string(data?['error']);
+    if (serverError != null) {
+      throw WalletCheckoutVerificationException(
+        serverError,
+        code: _string(data?['code']),
+      );
+    }
+    if (data?['success'] != true) {
+      throw const WalletCheckoutVerificationException(
+        'Payment verification returned an invalid response.',
+      );
+    }
+
+    final payment = _objectMap(data?['payment']);
+    final paymentIntentId = _string(payment?['payment_intent_id']);
+    final status = _string(payment?['status'])?.toLowerCase();
+    if (paymentIntentId == null || status == null) {
+      throw const WalletCheckoutVerificationException(
+        'Payment verification returned incomplete details.',
+      );
+    }
+
+    return WalletCheckoutVerification(
+      paymentIntentId: paymentIntentId,
+      status: status,
+      alreadyProcessed: payment?['already_processed'] == true,
+      purchaseKind: switch (_string(payment?['purchase_type'])) {
+        'credits' => WalletCheckoutKind.credits,
+        'subscription' => WalletCheckoutKind.subscription,
+        _ => null,
+      },
+      balanceAfter: _nullableInt(payment?['balance_after']),
+      subscriptionId: _string(payment?['subscription_id']),
+    );
+  }
+
+  static PayoutRequest? parsePayoutRequest(Object? raw) {
+    final data = _objectMap(raw);
+    if (data == null) return null;
+    final serverError = _string(data['error']);
+    if (serverError != null) {
+      throw WalletBackendUnavailable(serverError);
+    }
+
+    final nested =
+        _objectMap(data['request']) ??
+        _objectMap(data['payout']) ??
+        _objectMap(data['data']);
+    final row = nested ?? data;
+    if (row['id'] == null || row['amount'] == null) return null;
+    return PayoutRequest.fromJson(row);
+  }
+
+  static List<PaystackBank> parsePaystackBanks(Object? raw) {
+    final data = _objectMap(raw);
+    final serverError = _string(data?['error']);
+    if (serverError != null) throw WalletBackendUnavailable(serverError);
+    final rows = data?['data'];
+    if (rows is! List) {
+      throw const WalletBackendUnavailable(
+        'The bank directory returned an invalid response.',
+      );
+    }
+    return rows
+        .whereType<Map>()
+        .map((row) => PaystackBank.fromJson(Map<String, Object?>.from(row)))
+        .where((bank) => bank.code.isNotEmpty)
+        .toList()
+      ..sort((left, right) => left.name.compareTo(right.name));
+  }
+
+  static VerifiedPayoutAccount parseVerifiedPayoutAccount(Object? raw) {
+    final data = _objectMap(raw);
+    final serverError = _string(data?['error']);
+    if (serverError != null) throw WalletBackendUnavailable(serverError);
+    if (data?['status'] != true) {
+      throw WalletBackendUnavailable(
+        _string(data?['message']) ?? 'Could not verify this bank account.',
+      );
+    }
+    final account = _objectMap(data?['data']);
+    final parsed = account == null
+        ? null
+        : VerifiedPayoutAccount.fromJson(account);
+    if (parsed == null ||
+        parsed.accountName.isEmpty ||
+        parsed.accountNumber.isEmpty) {
+      throw const WalletBackendUnavailable(
+        'The bank account verification response was incomplete.',
+      );
+    }
+    return parsed;
+  }
+
+  static PayoutDestination parsePayoutDestination(Object? raw) {
+    final data = _objectMap(raw);
+    final serverError = _string(data?['error']);
+    if (serverError != null) throw WalletBackendUnavailable(serverError);
+    final destination = _objectMap(data?['destination']) ?? data;
+    if (destination == null || destination['id'] == null) {
+      throw const WalletBackendUnavailable(
+        'The payout destination was not returned by the server.',
+      );
+    }
+    return PayoutDestination.fromJson(destination);
+  }
+
+  static String? functionErrorMessage(Object? details) {
+    final data = _objectMap(details);
+    return _string(data?['error']) ?? _string(data?['message']);
+  }
+
+  static String? functionErrorCode(Object? details) {
+    return _string(_objectMap(details)?['code']);
+  }
+
+  static Map<String, Object?>? _objectMap(Object? value) {
+    if (value is! Map) return null;
+    return Map<String, Object?>.from(value);
+  }
+
+  static String? _string(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  static int? _nullableInt(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+}
+
 /// Live data access for the Wallet / credit-token feature.
 ///
 /// Talks to the credits/monetization schema created in
@@ -31,7 +286,7 @@ import 'wallet_models.dart';
 /// is wrapped so a missing contract surfaces as [WalletBackendUnavailable] and
 /// the UI shows an honest "coming soon / server not ready" state instead of
 /// silently succeeding.
-class WalletRemoteDataSource {
+class WalletRemoteDataSource implements WalletDataSource {
   const WalletRemoteDataSource({required this.isConfigured});
 
   /// Detects configuration from whether the Supabase singleton is initialised,
@@ -48,10 +303,10 @@ class WalletRemoteDataSource {
   static const _tiersTable = 'subscription_tiers';
   static const _subscriptionsTable = 'user_subscriptions';
   static const _monetizationTable = 'creator_monetization';
-  static const _payoutRequestsTable = 'creator_payout_requests';
-
-  /// Server-owned checkout Edge Function (hosted payment; no client keys).
-  static const _checkoutFunction = 'paystack-checkout';
+  static const _payoutRequestsTable =
+      WalletServerContract.creatorPayoutRequestsTable;
+  static const _payoutDestinationsTable =
+      WalletServerContract.creatorPayoutDestinationsTable;
 
   static bool _supabaseAvailable() {
     try {
@@ -77,6 +332,7 @@ class WalletRemoteDataSource {
 
   /// The current user's credit balance + lifetime stats, or [CreditBalance.empty]
   /// when signed-out / unconfigured / no row yet.
+  @override
   Future<CreditBalance> fetchBalance() async {
     final client = _client;
     final userId = currentUserId;
@@ -94,6 +350,7 @@ class WalletRemoteDataSource {
   // --- Packages -----------------------------------------------------------
 
   /// Active credit packages, cheapest first (so "Starter" leads).
+  @override
   Future<List<CreditPackage>> fetchPackages() async {
     final client = _client;
     if (client == null) return const [];
@@ -113,6 +370,7 @@ class WalletRemoteDataSource {
   // --- Transactions -------------------------------------------------------
 
   /// The current user's credit ledger, newest first.
+  @override
   Future<List<CreditTransaction>> fetchTransactions({int limit = 100}) async {
     final client = _client;
     final userId = currentUserId;
@@ -139,6 +397,7 @@ class WalletRemoteDataSource {
   // --- Subscriptions ------------------------------------------------------
 
   /// Active subscription tiers, cheapest first.
+  @override
   Future<List<SubscriptionTier>> fetchTiers() async {
     final client = _client;
     if (client == null) return const [];
@@ -156,6 +415,7 @@ class WalletRemoteDataSource {
   }
 
   /// The current user's active subscription, or null.
+  @override
   Future<UserSubscription?> fetchActiveSubscription() async {
     final client = _client;
     final userId = currentUserId;
@@ -176,6 +436,7 @@ class WalletRemoteDataSource {
   // --- Creator monetization / payouts ------------------------------------
 
   /// The current user's monetization state, or [CreatorMonetization.empty].
+  @override
   Future<CreatorMonetization> fetchMonetization() async {
     final client = _client;
     final userId = currentUserId;
@@ -194,6 +455,7 @@ class WalletRemoteDataSource {
   }
 
   /// The current user's own payout requests, newest first.
+  @override
   Future<List<PayoutRequest>> fetchMyPayoutRequests({int limit = 20}) async {
     final client = _client;
     final userId = currentUserId;
@@ -201,8 +463,10 @@ class WalletRemoteDataSource {
 
     final rows = await client
         .from(_payoutRequestsTable)
-        .select('id, amount, currency, payout_method, status, requested_at, '
-            'processed_at')
+        .select(
+          'id, amount, currency, payout_method, status, requested_at, '
+          'processed_at, provider_reference, failure_reason',
+        )
         .eq('user_id', userId)
         .order('requested_at', ascending: false)
         .limit(limit);
@@ -211,6 +475,121 @@ class WalletRemoteDataSource {
         .whereType<Map>()
         .map((row) => PayoutRequest.fromJson(Map<String, Object?>.from(row)))
         .toList();
+  }
+
+  @override
+  Future<List<PayoutDestination>> fetchPayoutDestinations() async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) return const [];
+
+    final rows = await client
+        .from(_payoutDestinationsTable)
+        .select(
+          'id, provider, display_label, account_last4, currency, '
+          'country_code, status, is_default',
+        )
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('is_default', ascending: false)
+        .order('created_at', ascending: false);
+
+    return rows
+        .whereType<Map>()
+        .map(
+          (row) => PayoutDestination.fromJson(Map<String, Object?>.from(row)),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<PaystackBank>> fetchPaystackBanks() async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletBackendUnavailable(
+        'Sign in to configure a payout account.',
+      );
+    }
+    try {
+      final response = await client.functions.invoke(
+        WalletServerContract.payoutFunction,
+        body: {
+          WalletServerContract.payoutActionKey:
+              WalletServerContract.payoutListBanksAction,
+        },
+      );
+      return WalletServerContract.parsePaystackBanks(response.data);
+    } on FunctionException catch (error) {
+      throw WalletBackendUnavailable(
+        WalletServerContract.functionErrorMessage(error.details) ??
+            'Could not load the bank directory.',
+        cause: error,
+      );
+    }
+  }
+
+  @override
+  Future<VerifiedPayoutAccount> verifyPayoutAccount({
+    required String bankCode,
+    required String accountNumber,
+  }) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletBackendUnavailable(
+        'Sign in to verify a payout account.',
+      );
+    }
+    try {
+      final response = await client.functions.invoke(
+        WalletServerContract.payoutFunction,
+        body: {
+          WalletServerContract.payoutActionKey:
+              WalletServerContract.payoutVerifyAccountAction,
+          'bank_code': bankCode,
+          'account_number': accountNumber,
+        },
+      );
+      return WalletServerContract.parseVerifiedPayoutAccount(response.data);
+    } on FunctionException catch (error) {
+      throw WalletBackendUnavailable(
+        WalletServerContract.functionErrorMessage(error.details) ??
+            'Could not verify this bank account.',
+        cause: error,
+      );
+    }
+  }
+
+  @override
+  Future<PayoutDestination> savePayoutDestination({
+    required PaystackBank bank,
+    required String accountNumber,
+  }) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletBackendUnavailable('Sign in to save a payout account.');
+    }
+    try {
+      final response = await client.functions.invoke(
+        WalletServerContract.payoutFunction,
+        body: {
+          WalletServerContract.payoutActionKey:
+              WalletServerContract.payoutSaveDestinationAction,
+          'bank_code': bank.code,
+          'bank_name': bank.name,
+          'account_number': accountNumber,
+        },
+      );
+      return WalletServerContract.parsePayoutDestination(response.data);
+    } on FunctionException catch (error) {
+      throw WalletBackendUnavailable(
+        WalletServerContract.functionErrorMessage(error.details) ??
+            'Could not save this payout account.',
+        cause: error,
+      );
+    }
   }
 
   // --- Money moves (server-owned) ----------------------------------------
@@ -223,45 +602,89 @@ class WalletRemoteDataSource {
   ///
   /// SECURITY: no payment keys are used here — the Edge Function owns the
   /// provider secret and returns only a redirect URL.
-  Future<String> startCreditCheckout(String packageId) {
-    return _startCheckout(type: 'credits', itemId: packageId);
+  @override
+  Future<WalletCheckoutSession> startCreditCheckout(String packageId) {
+    return _startCheckout(kind: WalletCheckoutKind.credits, itemId: packageId);
   }
 
   /// Start a hosted checkout to subscribe to [tierId]. Same server-owned
   /// contract as [startCreditCheckout].
-  Future<String> startSubscriptionCheckout(String tierId) {
-    return _startCheckout(type: 'subscription', itemId: tierId);
+  @override
+  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) {
+    return _startCheckout(
+      kind: WalletCheckoutKind.subscription,
+      itemId: tierId,
+    );
   }
 
-  Future<String> _startCheckout({
-    required String type,
+  Future<WalletCheckoutSession> _startCheckout({
+    required WalletCheckoutKind kind,
     required String itemId,
   }) async {
     final client = _client;
     final userId = currentUserId;
     if (client == null || userId == null) {
-      throw const WalletBackendUnavailable(
-        'Sign in to complete a purchase.',
+      throw const WalletBackendUnavailable('Sign in to complete a purchase.');
+    }
+
+    try {
+      final response = await client.functions.invoke(
+        WalletServerContract.checkoutFunction,
+        body: {
+          WalletServerContract.checkoutTypeKey: switch (kind) {
+            WalletCheckoutKind.credits => 'credits',
+            WalletCheckoutKind.subscription => 'subscription',
+          },
+          WalletServerContract.checkoutItemIdKey: itemId,
+        },
+      );
+      return WalletServerContract.parseCheckoutSession(
+        response.data,
+        kind: kind,
+        itemId: itemId,
+      );
+    } on FunctionException catch (error) {
+      final serverMessage = WalletServerContract.functionErrorMessage(
+        error.details,
+      );
+      throw WalletBackendUnavailable(
+        serverMessage ??
+            'Payments are temporarily unavailable. Please try again shortly.',
+        cause: error,
+      );
+    }
+  }
+
+  /// Verify the provider reference after the app returns from hosted checkout.
+  ///
+  /// The same server-owned function completes the payment intent and performs
+  /// the balance or subscription mutation atomically.
+  @override
+  Future<WalletCheckoutVerification> verifyCheckout(String reference) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletCheckoutVerificationException(
+        'Sign in to verify this payment.',
+        code: 'UNAUTHORIZED',
       );
     }
 
     try {
       final response = await client.functions.invoke(
-        _checkoutFunction,
-        body: {'type': type, 'itemId': itemId},
+        WalletServerContract.checkoutFunction,
+        body: {
+          WalletServerContract.checkoutActionKey:
+              WalletServerContract.checkoutVerifyAction,
+          WalletServerContract.checkoutReferenceKey: reference,
+        },
       );
-      final data = response.data;
-      final url = data is Map ? data['authorization_url']?.toString() : null;
-      if (url == null || url.isEmpty) {
-        throw const WalletBackendUnavailable(
-          'Checkout did not return a payment link. Please try again shortly.',
-        );
-      }
-      return url;
+      return WalletServerContract.parseCheckoutVerification(response.data);
     } on FunctionException catch (error) {
-      throw WalletBackendUnavailable(
-        'Payments are not available yet. The checkout service is not '
-        'reachable for this build.',
+      throw WalletCheckoutVerificationException(
+        WalletServerContract.functionErrorMessage(error.details) ??
+            'Could not verify this payment. Please try again.',
+        code: WalletServerContract.functionErrorCode(error.details),
         cause: error,
       );
     }
@@ -272,6 +695,7 @@ class WalletRemoteDataSource {
   /// action). The RPC enforces balance, self-transfer and existence checks
   /// server-side. Throws a typed [WalletTransferException] on a known business
   /// error, or [WalletBackendUnavailable] if the RPC is missing.
+  @override
   Future<void> transferCredits({
     required String recipientUsername,
     required int amount,
@@ -299,6 +723,7 @@ class WalletRemoteDataSource {
   /// identified by [recipientIdentifier] (username or email) via the server RPC
   /// `send_direct_gift` (mirrors the web `SendDirectGiftModal`). Server applies
   /// the platform fee and moves credits.
+  @override
   Future<void> sendDirectGift({
     required String recipientIdentifier,
     required String giftType,
@@ -314,8 +739,9 @@ class WalletRemoteDataSource {
       await client.rpc<dynamic>(
         'send_direct_gift',
         params: {
-          'p_recipient_identifier':
-              recipientIdentifier.replaceAll('@', '').trim(),
+          'p_recipient_identifier': recipientIdentifier
+              .replaceAll('@', '')
+              .trim(),
           'p_gift_type': giftType,
           'p_credit_value': creditValue,
         },
@@ -325,46 +751,139 @@ class WalletRemoteDataSource {
     }
   }
 
-  /// Create a creator payout request for [amount] (in the creator's earnings
-  /// currency). Inserts into `creator_payout_requests` — the row the creator is
-  /// permitted to create; admin approval + the actual money move happen
-  /// server-side. Returns the created request, or throws
-  /// [WalletBackendUnavailable] when the insert is refused.
-  Future<PayoutRequest?> requestPayout({
-    required double amount,
-    required String currency,
-    String? payoutMethod,
-  }) async {
+  /// Create a creator payout request through the server-owned validation RPC.
+  /// Admin approval and the actual money move remain server-side.
+  @override
+  Future<PayoutRequest> requestPayout({required double amount}) async {
     final client = _client;
     final userId = currentUserId;
     if (client == null || userId == null) {
       throw const WalletBackendUnavailable('Sign in to request a payout.');
     }
 
+    if (!amount.isFinite || amount <= 0) {
+      throw const WalletBackendUnavailable('Enter a valid payout amount.');
+    }
+
     try {
-      final inserted = await client
-          .from(_payoutRequestsTable)
-          .insert({
-            'user_id': userId,
-            'amount': amount,
-            'currency': currency,
-            if (payoutMethod != null) 'payout_method': payoutMethod,
-            'status': 'pending',
-          })
-          .select(
-            'id, amount, currency, payout_method, status, requested_at, '
-            'processed_at',
-          )
-          .maybeSingle();
-      if (inserted == null) return null;
-      return PayoutRequest.fromJson(Map<String, Object?>.from(inserted));
+      final amountMinor = (amount * 100).round();
+      final idempotencyKey =
+          'native-${userId.substring(0, 8)}-$amountMinor-'
+          '${DateTime.now().microsecondsSinceEpoch}';
+      final response = await client.rpc<dynamic>(
+        WalletServerContract.creatorPayoutRequestRpc,
+        params: {
+          WalletServerContract.payoutAmountParam: amount,
+          WalletServerContract.payoutIdempotencyParam: idempotencyKey,
+        },
+      );
+      final reserved = WalletServerContract.parsePayoutRequest(response);
+      if (reserved == null) {
+        throw const WalletBackendUnavailable(
+          'The payout request was accepted but no request record was returned.',
+        );
+      }
+
+      try {
+        final processResponse = await client.functions.invoke(
+          WalletServerContract.payoutFunction,
+          body: {
+            WalletServerContract.payoutActionKey:
+                WalletServerContract.payoutProcessAction,
+            WalletServerContract.payoutRequestIdKey: reserved.id,
+          },
+        );
+        return WalletServerContract.parsePayoutRequest(processResponse.data) ??
+            reserved;
+      } on FunctionException catch (error) {
+        final current = await _fetchPayoutRequest(reserved.id);
+        if (current != null && (current.isOpen || current.isSuccessful)) {
+          return current;
+        }
+        throw WalletBackendUnavailable(
+          WalletServerContract.functionErrorMessage(error.details) ??
+              'Could not start the payout transfer.',
+          cause: error,
+        );
+      }
+    } on WalletBackendUnavailable {
+      rethrow;
     } on PostgrestException catch (error) {
-      throw WalletBackendUnavailable(
-        'Could not submit your payout request. Payouts may not be enabled for '
-        'your account yet.',
+      throw _mapPayoutError(error);
+    }
+  }
+
+  Future<PayoutRequest?> _fetchPayoutRequest(String requestId) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) return null;
+    final row = await client
+        .from(_payoutRequestsTable)
+        .select(
+          'id, amount, currency, payout_method, status, requested_at, '
+          'processed_at, provider_reference, failure_reason',
+        )
+        .eq('id', requestId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    return row == null
+        ? null
+        : PayoutRequest.fromJson(Map<String, Object?>.from(row));
+  }
+
+  WalletBackendUnavailable _mapPayoutError(PostgrestException error) {
+    final message = error.message.toLowerCase();
+    if (_isMissingContract(error)) {
+      return WalletBackendUnavailable(
+        'Creator payouts are not available in this build yet.',
         cause: error,
       );
     }
+    if (message.contains('available') ||
+        message.contains('insufficient') ||
+        message.contains('balance')) {
+      return WalletBackendUnavailable(
+        'The requested amount is higher than your available creator balance.',
+        cause: error,
+      );
+    }
+    if (message.contains('eligible') || message.contains('cooldown')) {
+      return WalletBackendUnavailable(
+        'This creator account is not eligible for another payout yet.',
+        cause: error,
+      );
+    }
+    if (message.contains('pending') || message.contains('already')) {
+      return WalletBackendUnavailable(
+        'You already have a payout request being processed.',
+        cause: error,
+      );
+    }
+    if (message.contains('destination') || message.contains('bank account')) {
+      return WalletBackendUnavailable(
+        'Add and verify a bank account before requesting a payout.',
+        cause: error,
+      );
+    }
+    if (message.contains('minimum')) {
+      return WalletBackendUnavailable(
+        'The minimum creator payout is \$10.00.',
+        cause: error,
+      );
+    }
+    return WalletBackendUnavailable(
+      'Could not submit your payout request. Please try again shortly.',
+      cause: error,
+    );
+  }
+
+  bool _isMissingContract(PostgrestException error) {
+    final message = error.message.toLowerCase();
+    final code = error.code ?? '';
+    return code == 'PGRST202' ||
+        code == '42883' ||
+        message.contains('could not find the function') ||
+        message.contains('does not exist');
   }
 
   /// Maps a Postgrest error from a credit-moving RPC into a typed, user-facing
@@ -372,13 +891,9 @@ class WalletRemoteDataSource {
   /// the RPC itself is missing (e.g. function does not exist -> 404 / PGRST202).
   Exception _mapTransferError(PostgrestException error) {
     final message = error.message.toLowerCase();
-    final code = error.code ?? '';
 
     // Function/relation not found -> the contract is not deployed.
-    if (code == 'PGRST202' ||
-        code == '42883' ||
-        message.contains('could not find the function') ||
-        message.contains('does not exist')) {
+    if (_isMissingContract(error)) {
       return const WalletBackendUnavailable(
         'This action needs a server contract that is not available in this '
         'build yet.',
@@ -391,7 +906,9 @@ class WalletRemoteDataSource {
       );
     }
     if (message.contains('user not found') || message.contains('not found')) {
-      return const WalletTransferException(WalletTransferError.recipientNotFound);
+      return const WalletTransferException(
+        WalletTransferError.recipientNotFound,
+      );
     }
     if (message.contains('yourself')) {
       return const WalletTransferException(WalletTransferError.selfTransfer);

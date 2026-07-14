@@ -33,8 +33,7 @@ class SendCreditsSheet extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: WalletColors.barrier,
-      builder: (_) =>
-          SendCreditsSheet(presenter: presenter, balance: balance),
+      builder: (_) => SendCreditsSheet(presenter: presenter, balance: balance),
     );
   }
 
@@ -89,7 +88,9 @@ class _SendCreditsSheetState extends State<SendCreditsSheet> {
     messenger?.showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error ? WalletColors.destructive : WalletColors.success,
+        backgroundColor: error
+            ? WalletColors.destructive
+            : WalletColors.success,
       ),
     );
   }
@@ -203,11 +204,17 @@ class _Field extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: WalletTextStyles.rowMuted,
-            prefixIcon: Icon(icon, size: 18, color: WalletColors.mutedForeground),
+            prefixIcon: Icon(
+              icon,
+              size: 18,
+              color: WalletColors.mutedForeground,
+            ),
             filled: true,
             fillColor: WalletColors.background,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: WalletRadii.inner,
               borderSide: const BorderSide(color: WalletColors.border),

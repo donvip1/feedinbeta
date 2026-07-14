@@ -104,9 +104,15 @@ class WalletBalanceCard extends StatelessWidget {
           const SizedBox(height: WalletSpacing.lg),
           Row(
             children: [
-              _Stat(label: 'In', value: '+${formatCredits(balance.lifetimeEarned)}'),
+              _Stat(
+                label: 'In',
+                value: '+${formatCredits(balance.lifetimeEarned)}',
+              ),
               const SizedBox(width: WalletSpacing.xl),
-              _Stat(label: 'Out', value: '−${formatCredits(balance.lifetimeSpent)}'),
+              _Stat(
+                label: 'Out',
+                value: '−${formatCredits(balance.lifetimeSpent)}',
+              ),
             ],
           ),
           const SizedBox(height: WalletSpacing.lg),
@@ -195,7 +201,9 @@ class _GhostAction extends StatelessWidget {
         child: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: filled ? WalletColors.primaryForeground : const Color(0x1FFFFFFF),
+            color: filled
+                ? WalletColors.primaryForeground
+                : const Color(0x1FFFFFFF),
             borderRadius: WalletRadii.inner,
             border: filled ? null : Border.all(color: const Color(0x33FFFFFF)),
           ),
@@ -205,7 +213,9 @@ class _GhostAction extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: filled ? WalletColors.primary : WalletColors.primaryForeground,
+                color: filled
+                    ? WalletColors.primary
+                    : WalletColors.primaryForeground,
               ),
               const SizedBox(width: 5),
               Flexible(

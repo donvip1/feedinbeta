@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,8 +23,10 @@ import 'chat/audio_backends_impl.dart';
 import 'chat/message_interactions_data_source.dart';
 import 'chat/audio_message_support.dart';
 import 'chat/chat_mappers.dart';
+import 'chat/chat_realtime_data_source.dart';
 import 'chat/chat_theme.dart';
 import 'chat/chat_view_models.dart';
+import 'chat/generic_file_attachment.dart';
 import 'chat/widgets/attachment_options_sheet.dart';
 import 'chat/widgets/audio_note_recorder_sheet.dart';
 import 'chat/widgets/chat_composer.dart';
@@ -33,6 +36,7 @@ import 'chat/widgets/media_message_content.dart';
 import 'chat/widgets/message_action_sheet.dart';
 import 'chat/widgets/music_message_bubble.dart';
 import 'chat/widgets/new_conversation_sheet.dart';
+import 'chat/widgets/report_message_sheet.dart';
 import 'chat/widgets/typing_indicator_bubble.dart';
 import 'chat/widgets/voice_note_bubble.dart';
 import 'message_models.dart';
@@ -93,17 +97,23 @@ class MessagesScreen extends StatefulWidget {
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> {
+class _MessagesScreenState extends State<MessagesScreen>
+    with WidgetsBindingObserver {
   String? _selectedConversationId;
   String? _selectedConversationTitle;
   late Future<List<ConversationSummary>> _conversationsFuture;
+  late final ChatRealtimeDataSource _presenceDataSource;
+  Timer? _presenceHeartbeat;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _presenceDataSource = ChatRealtimeDataSource.autoDetect();
     _selectedConversationId = widget.initialConversationId;
     _conversationsFuture = widget.messagesRepository.loadConversations();
     _syncBackController();
+    _startPresenceHeartbeat();
   }
 
   @override
@@ -136,8 +146,40 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceHeartbeat?.cancel();
+    unawaited(_stopPresence());
     widget.backController?._setActiveBackHandler(null);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _startPresenceHeartbeat();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        _presenceHeartbeat?.cancel();
+        unawaited(_presenceDataSource.updatePresence('away'));
+      case AppLifecycleState.detached:
+        _presenceHeartbeat?.cancel();
+        unawaited(_presenceDataSource.updatePresence('offline'));
+    }
+  }
+
+  void _startPresenceHeartbeat() {
+    _presenceHeartbeat?.cancel();
+    unawaited(_presenceDataSource.updatePresence('online'));
+    _presenceHeartbeat = Timer.periodic(const Duration(seconds: 45), (_) {
+      unawaited(_presenceDataSource.updatePresence('online'));
+    });
+  }
+
+  Future<void> _stopPresence() async {
+    await _presenceDataSource.updatePresence('offline');
+    await _presenceDataSource.dispose();
   }
 
   void _syncBackController() {
@@ -419,17 +461,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final _messageController = TextEditingController();
   final _picker = ImagePicker();
   final _interactions = MessageInteractionsDataSource.autoDetect();
+  final _genericFilePicker = GenericFileAttachmentPicker();
+  late final ChatRealtimeDataSource _chatRealtime;
+  late final StreamSubscription<ChatRealtimeEvent> _chatRealtimeSubscription;
   late Future<List<LocalMessage>> _messagesFuture;
   String? _title;
   ReplyPreview? _replyTarget;
   PresenceState _otherPresence = PresenceState.offline;
-  static const ChatActivity _otherActivity = ChatActivity.none;
+  String? _otherPresenceWire;
+  ChatActivity _otherActivity = ChatActivity.none;
   int? _otherLastSeenMillis;
+  Timer? _otherActivityTimer;
+  Timer? _receiptRefreshTimer;
+  Timer? _presenceAgeTimer;
+  Set<String> _starredMessageIds = <String>{};
 
-  /// Per-conversation disappearing-message timer in seconds (0 = off). Set from
-  /// the chat header control and used to stamp outgoing messages' expiry.
-  // TODO: a full implementation reads conversations.disappearing_seconds from
-  // the server per conversation; this session-scoped value covers the sender.
+  /// Per-conversation disappearing-message timer in seconds (0 = off). Loaded
+  /// from the conversation summary and used to stamp outgoing messages' expiry.
   int _disappearingSeconds = 0;
 
   /// Absolute expiry (epoch millis) for a message sent now under the active
@@ -477,44 +525,156 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _chatRealtime = ChatRealtimeDataSource.autoDetect();
+    _chatRealtimeSubscription = _chatRealtime.events.listen(
+      _handleChatRealtimeEvent,
+    );
     _title = widget.initialTitle;
     _messagesFuture = widget.messagesRepository.loadMessages(
       widget.conversationId,
     );
     _resolveTitle();
     _markReadLocally();
+    _presenceAgeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _refreshPresenceAge();
+    });
   }
 
   Future<void> _resolveTitle() async {
+    final conversationId = widget.conversationId;
     final conversation = await widget.messagesRepository.loadConversation(
-      widget.conversationId,
+      conversationId,
     );
-    if (!mounted || conversation == null) return;
+    if (!mounted ||
+        widget.conversationId != conversationId ||
+        conversation == null) {
+      return;
+    }
+    final serverConversationId = conversation.serverConversationId;
     setState(() {
       _title = (_title != null && _title!.isNotEmpty)
           ? _title
           : conversation.title;
+      _otherPresenceWire = conversation.otherUserPresence;
       _otherPresence = conversationPresence(conversation);
       _otherLastSeenMillis = conversationLastSeenMillis(conversation);
       _otherUserId = conversation.otherUserId;
       _otherUserAvatarUrl = conversation.otherUserAvatarUrl;
+      _disappearingSeconds = conversation.disappearingSeconds;
     });
+    if (serverConversationId != null && serverConversationId.isNotEmpty) {
+      await _chatRealtime.connect(
+        conversationId: serverConversationId,
+        currentUserId: widget.profile.userId,
+        otherUserId: conversation.otherUserId,
+      );
+      await _loadStarredMessageIds(
+        serverConversationId: serverConversationId,
+        localConversationId: conversationId,
+      );
+    } else {
+      await _chatRealtime.disconnect();
+      if (mounted && widget.conversationId == conversationId) {
+        setState(() => _starredMessageIds = <String>{});
+      }
+    }
+  }
+
+  Future<void> _loadStarredMessageIds({
+    required String serverConversationId,
+    required String localConversationId,
+  }) async {
+    final ids = await _interactions.fetchStarredMessageIds(
+      serverConversationId,
+    );
+    if (!mounted ||
+        widget.conversationId != localConversationId ||
+        ids == null) {
+      return;
+    }
+    setState(() => _starredMessageIds = ids);
+  }
+
+  void _handleChatRealtimeEvent(ChatRealtimeEvent event) {
+    if (!mounted) return;
+    switch (event.type) {
+      case ChatRealtimeEventType.typing:
+        if (_otherUserId != null && event.userId != _otherUserId) return;
+        final activity = chatActivityFromWire(
+          event.activity,
+          updatedAtMillis: event.occurredAtMillis,
+        );
+        _setOtherActivity(activity, updatedAtMillis: event.occurredAtMillis);
+      case ChatRealtimeEventType.presence:
+        if (_otherUserId != null && event.userId != _otherUserId) return;
+        setState(() {
+          _otherPresenceWire = event.presence;
+          _otherLastSeenMillis = event.occurredAtMillis ?? _otherLastSeenMillis;
+          _otherPresence = presenceStateFromWire(
+            event.presence,
+            lastSeenMillis: _otherLastSeenMillis,
+          );
+        });
+      case ChatRealtimeEventType.readReceipt:
+        if (_otherUserId != null && event.userId != _otherUserId) return;
+        _receiptRefreshTimer?.cancel();
+        _receiptRefreshTimer = Timer(
+          const Duration(milliseconds: 250),
+          _refreshReadReceipts,
+        );
+    }
+  }
+
+  void _setOtherActivity(ChatActivity activity, {int? updatedAtMillis}) {
+    _otherActivityTimer?.cancel();
+    setState(() => _otherActivity = activity);
+    if (activity == ChatActivity.none) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = updatedAtMillis == null ? 0 : now - updatedAtMillis;
+    final remainingMillis = (6000 - elapsed).clamp(1, 6000);
+    _otherActivityTimer = Timer(Duration(milliseconds: remainingMillis), () {
+      if (mounted) setState(() => _otherActivity = ChatActivity.none);
+    });
+  }
+
+  void _refreshPresenceAge() {
+    if (!mounted) return;
+    final next = presenceStateFromWire(
+      _otherPresenceWire,
+      lastSeenMillis: _otherLastSeenMillis,
+    );
+    if (next != _otherPresence) {
+      setState(() => _otherPresence = next);
+    }
+  }
+
+  Future<void> _refreshReadReceipts() async {
+    final conversationId = widget.conversationId;
+    await widget.syncService.syncNow();
+    if (!mounted || widget.conversationId != conversationId) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
+    });
+  }
+
+  void _onTypingChanged(bool active) {
+    unawaited(_chatRealtime.setTyping(active));
   }
 
   Future<void> _markReadLocally() async {
-    await widget.messagesRepository.markConversationRead(widget.conversationId);
-    await _markReadRemotely();
-    if (!mounted) return;
+    final conversationId = widget.conversationId;
+    await widget.messagesRepository.markConversationRead(conversationId);
+    await _markReadRemotely(conversationId);
+    if (!mounted || widget.conversationId != conversationId) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
     });
   }
 
-  Future<void> _markReadRemotely() async {
+  Future<void> _markReadRemotely(String conversationId) async {
     final conversation = await widget.messagesRepository.loadConversation(
-      widget.conversationId,
+      conversationId,
     );
     final serverConversationId = conversation?.serverConversationId;
     if (serverConversationId == null || serverConversationId.isEmpty) return;
@@ -534,6 +694,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.realtimeVersion != widget.realtimeVersion ||
         oldWidget.conversationId != widget.conversationId) {
+      if (oldWidget.conversationId != widget.conversationId) {
+        unawaited(_chatRealtime.setTyping(false));
+        unawaited(_chatRealtime.disconnect());
+        _otherActivityTimer?.cancel();
+        _otherActivity = ChatActivity.none;
+        _otherPresence = PresenceState.offline;
+        _otherPresenceWire = null;
+        _otherLastSeenMillis = null;
+        _otherUserId = null;
+        _otherUserAvatarUrl = null;
+        _disappearingSeconds = 0;
+        _starredMessageIds = <String>{};
+        _title = widget.initialTitle;
+        _replyTarget = null;
+        _messageController.clear();
+      }
       setState(() {
         _messagesFuture = widget.messagesRepository.loadMessages(
           widget.conversationId,
@@ -546,8 +722,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   void dispose() {
+    _otherActivityTimer?.cancel();
+    _receiptRefreshTimer?.cancel();
+    _presenceAgeTimer?.cancel();
+    unawaited(_disposeRealtime());
     _messageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _disposeRealtime() async {
+    await _chatRealtime.setTyping(false);
+    await _chatRealtimeSubscription.cancel();
+    await _chatRealtime.dispose();
   }
 
   Future<void> _sendMessage() async {
@@ -578,12 +764,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _syncMessages() async {
+    final conversationId = widget.conversationId;
     await widget.syncService.syncNow();
-    if (!mounted) return;
+    if (!mounted || widget.conversationId != conversationId) return;
+    await _resolveTitle();
+    if (!mounted || widget.conversationId != conversationId) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
     });
   }
 
@@ -604,44 +791,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
       backgroundColor: ChatColors.card,
       barrierColor: ChatColors.barrier,
       shape: const RoundedRectangleBorder(borderRadius: ChatRadii.sheetTop),
-      builder: (sheetContext) {
+      builder: (_) {
         return MessageActionSheet(
           message: message,
-          onReact: (emoji) {
-            Navigator.of(sheetContext).pop();
-            _reactToMessage(message, emoji);
-          },
-          onReply: () {
-            Navigator.of(sheetContext).pop();
-            _setReply(message);
-          },
-          onForward: () {
-            Navigator.of(sheetContext).pop();
-            _forwardMessage(message);
-          },
-          onStar: () {
-            Navigator.of(sheetContext).pop();
-            _pendingBackend('Starred messages');
-          },
+          onReact: (emoji) => _reactToMessage(message, emoji),
+          onReply: () => _setReply(message),
+          onForward: () => _forwardMessage(message),
+          onStar: () => _toggleStar(message),
           onCopy: message.hasText
               ? () {
-                  Navigator.of(sheetContext).pop();
                   Clipboard.setData(ClipboardData(text: message.body));
                   _toast('Copied to clipboard');
                 }
               : null,
-          onDelete: message.isMine
-              ? () {
-                  Navigator.of(sheetContext).pop();
-                  _deleteMessage(message);
-                }
-              : null,
-          onReport: !message.isMine
-              ? () {
-                  Navigator.of(sheetContext).pop();
-                  _pendingBackend('Reporting');
-                }
-              : null,
+          onDelete: message.isMine ? () => _deleteMessage(message) : null,
+          onReport: !message.isMine ? () => _reportMessage(message) : null,
         );
       },
     );
@@ -649,6 +813,41 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   void _pendingBackend(String feature) {
     _toast('$feature needs the final backend contract.');
+  }
+
+  Future<void> _toggleStar(ChatMessageView message) async {
+    if (message.deliveryState == DeliveryState.pending ||
+        message.deliveryState == DeliveryState.failed) {
+      _toast('You can star this message once it has sent.');
+      return;
+    }
+    final starred = await _interactions.toggleStar(message.id);
+    if (!mounted) return;
+    if (starred == null) {
+      _toast('Could not update the star.');
+      return;
+    }
+    setState(() {
+      if (starred) {
+        _starredMessageIds.add(message.id);
+      } else {
+        _starredMessageIds.remove(message.id);
+      }
+    });
+    _toast(starred ? 'Message starred.' : 'Message unstarred.');
+  }
+
+  Future<void> _reportMessage(ChatMessageView message) async {
+    final draft = await showReportMessageSheet(context);
+    if (draft == null || !mounted) return;
+
+    final reported = await _interactions.reportMessage(
+      messageId: message.id,
+      reason: draft.reasonValue,
+      description: draft.description,
+    );
+    if (!mounted) return;
+    _toast(reported ? 'Report submitted.' : 'Could not submit the report.');
   }
 
   /// Toggle an emoji [reaction] on [message] via the server RPC. Only synced
@@ -810,7 +1009,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   mediaType: 'video',
                 );
               case AttachmentOption.file:
-                _pendingBackend('File attachments');
+                await _pickGenericFileAttachment();
               case AttachmentOption.music:
                 await _shareMusicFile();
               case AttachmentOption.voiceNote:
@@ -853,6 +1052,39 @@ class _ConversationScreenState extends State<ConversationScreen> {
       fileName: picked.name,
       fileSizeBytes: await File(localPath).length(),
       viewOnce: viewOnce,
+      expiresAtMillis: _disappearingExpiryMillis(),
+    );
+    if (!mounted) return;
+    setState(() {
+      _messagesFuture = widget.messagesRepository.loadMessages(
+        widget.conversationId,
+      );
+    });
+    await _syncMessages();
+  }
+
+  Future<void> _pickGenericFileAttachment() async {
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
+
+    final result = await _genericFilePicker.pickAndStage();
+    if (!mounted || result.isCancelled) return;
+    if (result.isFailure) {
+      _toast(result.error!);
+      return;
+    }
+
+    final file = result.attachment!;
+    await widget.messagesRepository.queueAttachment(
+      conversationId: widget.conversationId,
+      senderName: widget.profile.displayName,
+      localPath: file.localPath,
+      mediaType: StagedGenericFileAttachment.mediaType,
+      mimeType: file.mimeType,
+      fileName: file.fileName,
+      fileSizeBytes: file.fileSizeBytes,
       expiresAtMillis: _disappearingExpiryMillis(),
     );
     if (!mounted) return;
@@ -1207,8 +1439,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
       showOfflineSnackBar(context);
       return;
     }
-    final ok = await _interactions.setDisappearingTimer(
+    final conversation = await widget.messagesRepository.loadConversation(
       widget.conversationId,
+    );
+    final serverConversationId = conversation?.serverConversationId;
+    final ok = await _interactions.setDisappearingTimer(
+      (serverConversationId != null && serverConversationId.isNotEmpty)
+          ? serverConversationId
+          : widget.conversationId,
       picked,
     );
     if (!mounted) return;
@@ -1216,6 +1454,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _toast('Could not update the timer.');
       return;
     }
+    await widget.messagesRepository.setConversationDisappearingSeconds(
+      conversationId: widget.conversationId,
+      seconds: picked,
+    );
+    if (!mounted) return;
     setState(() => _disappearingSeconds = picked);
     _toast(
       picked == 0
@@ -1310,6 +1553,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   final views = localMessagesToViews(
                     live,
                     currentUserKey: _currentUserKey,
+                    starredMessageIds: _starredMessageIds,
                   );
 
                   return ListView.builder(
@@ -1352,6 +1596,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               onSend: _sendMessage,
               onAttach: _openAttachmentOptions,
               onVoice: _recordAudioNote,
+              onTypingChanged: _onTypingChanged,
             ),
           ],
         ),

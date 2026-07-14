@@ -28,7 +28,10 @@ DeliveryState mapDeliveryState(MessageDeliveryState state) {
 /// exposes the other participant's profile, the conversation title doubles as
 /// the display name and there is no avatar/presence.
 ConversationView conversationSummaryToView(ConversationSummary summary) {
-  final presence = _presence(summary.otherUserPresence);
+  final presence = presenceStateFromWire(
+    summary.otherUserPresence,
+    lastSeenMillis: summary.otherUserLastSeenAtMillis,
+  );
   return ConversationView(
     id: summary.id,
     serverConversationId: summary.serverConversationId,
@@ -65,6 +68,7 @@ RecipientView recipientToView(MessageRecipient recipient) {
 List<ChatMessageView> localMessagesToViews(
   List<LocalMessage> messages, {
   required String currentUserKey,
+  Set<String> starredMessageIds = const <String>{},
 }) {
   final views = <ChatMessageView>[];
   for (var i = 0; i < messages.length; i++) {
@@ -82,6 +86,10 @@ List<ChatMessageView> localMessagesToViews(
         _senderKey(next) != _senderKey(message) ||
         (next.createdAtMillis - message.createdAtMillis) > _groupWindowMillis;
     final senderId = message.senderId ?? message.senderName;
+    final isMine =
+        senderId == currentUserKey || message.senderName == currentUserKey;
+    final readByUserId = message.readByUserId;
+    final readAtMillis = message.readAtMillis;
 
     views.add(
       ChatMessageView(
@@ -91,18 +99,18 @@ List<ChatMessageView> localMessagesToViews(
         senderName: message.senderName,
         senderAvatarUrl: message.senderAvatarUrl,
         createdAtMillis: message.createdAtMillis,
-        isMine:
-            senderId == currentUserKey || message.senderName == currentUserKey,
+        isMine: isMine,
         deliveryState: mapDeliveryState(message.deliveryState),
         body: message.body,
         media: _messageMedia(message),
         readReceipts: [
-          if (message.readAtMillis case final readAt?)
-            ReadReceiptView(userId: senderId, readAtMillis: readAt),
+          if (isMine && readByUserId != null && readAtMillis != null)
+            ReadReceiptView(userId: readByUserId, readAtMillis: readAtMillis),
         ],
         viewOnce: message.viewOnce,
         expiresAtMillis: message.expiresAtMillis,
         viewOnceSeen: message.viewOnceSeenAtMillis != null,
+        isStarred: starredMessageIds.contains(message.id),
         isFirstInGroup: isFirstInGroup,
         isLastInGroup: isLastInGroup,
       ),
@@ -146,7 +154,10 @@ MessageMedia? _messageMedia(LocalMessage message) {
 }
 
 PresenceState conversationPresence(ConversationSummary summary) {
-  return _presence(summary.otherUserPresence);
+  return presenceStateFromWire(
+    summary.otherUserPresence,
+    lastSeenMillis: summary.otherUserLastSeenAtMillis,
+  );
 }
 
 int? conversationLastSeenMillis(ConversationSummary summary) {
@@ -157,8 +168,31 @@ String _senderKey(LocalMessage message) {
   return message.senderId ?? message.senderName;
 }
 
-PresenceState _presence(String? raw) {
-  switch (raw?.trim().toLowerCase()) {
+/// Maps the backend presence value into UI state. A stale online row is treated
+/// as offline so a terminated client cannot leave a permanent green dot.
+PresenceState presenceStateFromWire(
+  String? raw, {
+  int? lastSeenMillis,
+  int? nowMillis,
+  int onlineTtlMillis = 90 * 1000,
+  int awayTtlMillis = 5 * 60 * 1000,
+}) {
+  final normalized = raw?.trim().toLowerCase();
+  if (lastSeenMillis != null) {
+    final now = nowMillis ?? DateTime.now().millisecondsSinceEpoch;
+    final age = now - lastSeenMillis;
+    final staleLiveStatus =
+        (normalized == 'online' ||
+            normalized == 'active_now' ||
+            normalized == 'active') &&
+        age > onlineTtlMillis;
+    final staleAwayStatus = normalized == 'away' && age > awayTtlMillis;
+    if (staleLiveStatus || staleAwayStatus) {
+      return PresenceState.offline;
+    }
+  }
+
+  switch (normalized) {
     case 'online':
       return PresenceState.online;
     case 'active_now':
@@ -168,5 +202,43 @@ PresenceState _presence(String? raw) {
       return PresenceState.away;
     default:
       return PresenceState.offline;
+  }
+}
+
+/// Maps the typing/activity wire value into UI state and drops stale rows when
+/// an idle update was missed.
+ChatActivity chatActivityFromWire(
+  String? raw, {
+  int? updatedAtMillis,
+  int? nowMillis,
+  int activityTtlMillis = 6 * 1000,
+}) {
+  if (updatedAtMillis != null) {
+    final now = nowMillis ?? DateTime.now().millisecondsSinceEpoch;
+    if (now - updatedAtMillis > activityTtlMillis) {
+      return ChatActivity.none;
+    }
+  }
+
+  switch (raw?.trim().toLowerCase()) {
+    case 'typing':
+      return ChatActivity.typing;
+    case 'emoji':
+      return ChatActivity.emoji;
+    case 'sticker':
+      return ChatActivity.sticker;
+    case 'voice_recording':
+    case 'recording':
+      return ChatActivity.voiceRecording;
+    case 'uploading_image':
+      return ChatActivity.uploadingImage;
+    case 'uploading_video':
+      return ChatActivity.uploadingVideo;
+    case 'uploading_file':
+      return ChatActivity.uploadingFile;
+    case 'focused':
+      return ChatActivity.focused;
+    default:
+      return ChatActivity.none;
   }
 }

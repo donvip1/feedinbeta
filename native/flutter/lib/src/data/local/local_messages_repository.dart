@@ -280,6 +280,25 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
   }
 
   @override
+  Future<void> setConversationDisappearingSeconds({
+    required String conversationId,
+    required int seconds,
+  }) async {
+    final raw = _conversationsBox.get(conversationId);
+    if (raw == null) return;
+
+    final conversation = ConversationSummary.fromJson(
+      Map<String, Object?>.from(raw),
+    );
+    await _conversationsBox.put(
+      conversationId,
+      conversation
+          .copyWith(disappearingSeconds: seconds < 0 ? 0 : seconds)
+          .toJson(),
+    );
+  }
+
+  @override
   Future<void> markConversationRead(String conversationId) async {
     final raw = _conversationsBox.get(conversationId);
     if (raw != null) {

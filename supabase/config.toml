@@ -15,6 +15,9 @@ verify_jwt = true
 [functions.stripe-webhook]
 verify_jwt = false
 
+[functions.paystack-checkout]
+verify_jwt = true
+
 [functions.credit-deduction]
 verify_jwt = true
 

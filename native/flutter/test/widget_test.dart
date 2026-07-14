@@ -546,6 +546,12 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
   }) async {}
 
   @override
+  Future<void> setConversationDisappearingSeconds({
+    required String conversationId,
+    required int seconds,
+  }) async {}
+
+  @override
   Future<void> markConversationRead(String conversationId) async {}
 
   @override

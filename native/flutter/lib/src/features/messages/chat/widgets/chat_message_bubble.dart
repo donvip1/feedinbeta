@@ -592,9 +592,8 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
 
   /// A subtle "Read HH:mm" footer under an own message once a local
   /// read-receipt exists. Driven entirely by [ChatMessageView.readReceipts];
-  /// renders nothing until that local state is populated (the backend receipt
-  /// contract is not finalised). Only shown on the last bubble of a run to
-  /// avoid repeating across a grouped block.
+  /// renders nothing until receipt state is materialized. Only shown on the
+  /// last bubble of a run to avoid repeating across a grouped block.
   Widget? _buildReadReceiptFooter() {
     if (!_isMine || !_message.isLastInGroup) return null;
     if (_message.readReceipts.isEmpty) return null;

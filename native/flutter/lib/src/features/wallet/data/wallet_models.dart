@@ -285,6 +285,78 @@ class CreatorMonetization {
   }
 }
 
+/// A masked, client-readable creator payout destination. Provider recipient
+/// codes and raw account details remain in the service-role-only secrets table.
+class PayoutDestination {
+  const PayoutDestination({
+    required this.id,
+    required this.provider,
+    required this.displayLabel,
+    required this.currency,
+    required this.status,
+    required this.isDefault,
+    this.accountLast4,
+    this.countryCode,
+  });
+
+  final String id;
+  final String provider;
+  final String displayLabel;
+  final String currency;
+  final String status;
+  final bool isDefault;
+  final String? accountLast4;
+  final String? countryCode;
+
+  bool get isActive => status == 'active';
+
+  factory PayoutDestination.fromJson(Map<String, Object?> json) {
+    return PayoutDestination(
+      id: json['id'].toString(),
+      provider: json['provider']?.toString() ?? 'paystack',
+      displayLabel: json['display_label']?.toString() ?? 'Bank account',
+      accountLast4: json['account_last4']?.toString(),
+      currency: json['currency']?.toString() ?? 'NGN',
+      countryCode: json['country_code']?.toString(),
+      status: (json['status']?.toString() ?? 'pending').toLowerCase(),
+      isDefault: json['is_default'] == true,
+    );
+  }
+}
+
+/// A bank returned by Paystack's Nigerian bank directory.
+class PaystackBank {
+  const PaystackBank({required this.name, required this.code});
+
+  final String name;
+  final String code;
+
+  factory PaystackBank.fromJson(Map<String, Object?> json) {
+    return PaystackBank(
+      name: json['name']?.toString() ?? 'Bank',
+      code: json['code']?.toString() ?? '',
+    );
+  }
+}
+
+/// Result of resolving an account number against a selected Paystack bank.
+class VerifiedPayoutAccount {
+  const VerifiedPayoutAccount({
+    required this.accountNumber,
+    required this.accountName,
+  });
+
+  final String accountNumber;
+  final String accountName;
+
+  factory VerifiedPayoutAccount.fromJson(Map<String, Object?> json) {
+    return VerifiedPayoutAccount(
+      accountNumber: json['account_number']?.toString() ?? '',
+      accountName: json['account_name']?.toString() ?? '',
+    );
+  }
+}
+
 /// A creator payout request row.
 ///
 /// Column mapping to live `creator_payout_requests`: `id`, `amount`,
@@ -297,6 +369,8 @@ class PayoutRequest {
     required this.status,
     required this.requestedAtMillis,
     this.payoutMethod,
+    this.providerReference,
+    this.failureReason,
     this.processedAtMillis,
   });
 
@@ -306,19 +380,102 @@ class PayoutRequest {
   final String status;
   final int requestedAtMillis;
   final String? payoutMethod;
+  final String? providerReference;
+  final String? failureReason;
   final int? processedAtMillis;
+
+  bool get isOpen =>
+      status == 'pending' || status == 'processing' || status == 'queued';
+
+  bool get isSuccessful =>
+      status == 'approved' || status == 'paid' || status == 'completed';
+
+  String get statusLabel => _humanizeType(status);
 
   factory PayoutRequest.fromJson(Map<String, Object?> json) {
     return PayoutRequest(
       id: json['id'].toString(),
       amount: _asDouble(json['amount']),
       currency: json['currency']?.toString() ?? 'USD',
-      status: json['status']?.toString() ?? 'pending',
+      status: (json['status']?.toString() ?? 'pending').toLowerCase(),
       payoutMethod: json['payout_method']?.toString(),
+      providerReference: json['provider_reference']?.toString(),
+      failureReason: json['failure_reason']?.toString(),
       requestedAtMillis: _asMillis(json['requested_at']),
       processedAtMillis: _asNullableMillis(json['processed_at']),
     );
   }
+}
+
+/// Hosted checkout category understood by the server-owned payment function.
+enum WalletCheckoutKind { credits, subscription }
+
+/// A typed checkout initialization response.
+///
+/// The Paystack function returns all fields required to safely resume and
+/// verify a hosted checkout after the app regains focus.
+class WalletCheckoutSession {
+  const WalletCheckoutSession({
+    required this.kind,
+    required this.itemId,
+    required this.authorizationUri,
+    required this.reference,
+    required this.paymentIntentId,
+    required this.idempotencyKey,
+    required this.reused,
+  });
+
+  final WalletCheckoutKind kind;
+  final String itemId;
+  final Uri authorizationUri;
+  final String reference;
+  final String paymentIntentId;
+  final String idempotencyKey;
+  final bool reused;
+}
+
+/// Successful response from the server-owned checkout verification action.
+class WalletCheckoutVerification {
+  const WalletCheckoutVerification({
+    required this.paymentIntentId,
+    required this.status,
+    required this.alreadyProcessed,
+    this.purchaseKind,
+    this.balanceAfter,
+    this.subscriptionId,
+  });
+
+  final String paymentIntentId;
+  final String status;
+  final bool alreadyProcessed;
+  final WalletCheckoutKind? purchaseKind;
+  final int? balanceAfter;
+  final String? subscriptionId;
+
+  bool get isCompleted => status == 'completed';
+}
+
+/// Result of refreshing wallet state after returning from hosted checkout.
+enum WalletCheckoutRefreshOutcome { confirmed, processing, failed }
+
+/// Raised when the provider verification action returns a known checkout
+/// failure. [isPaymentIncomplete] is retryable; other codes are treated as
+/// terminal for the current checkout attempt.
+class WalletCheckoutVerificationException implements Exception {
+  const WalletCheckoutVerificationException(
+    this.message, {
+    this.code,
+    this.cause,
+  });
+
+  final String message;
+  final String? code;
+  final Object? cause;
+
+  bool get isPaymentIncomplete => code == 'PAYMENT_NOT_COMPLETE';
+
+  @override
+  String toString() => 'WalletCheckoutVerificationException: $message';
 }
 
 /// Raised when a money-moving wallet operation cannot complete because the
@@ -376,8 +533,6 @@ String _humanizeType(String type) {
   if (type.isEmpty) return 'Transaction';
   final words = type.replaceAll('_', ' ').split(' ');
   return words
-      .map(
-        (w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}',
-      )
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
       .join(' ');
 }

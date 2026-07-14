@@ -52,26 +52,82 @@ class MessagesRemoteDataSource {
         .eq('conversation_id', serverConversationId)
         .order('created_at');
 
+    final attachments = await _fetchMessageAttachments(serverConversationId);
+
     // The other participant's last_read_at: every message I sent at or before
     // this timestamp has been read by them. This drives the outgoing-bubble
     // read tick without needing a per-message read column on `messages`.
-    final otherLastReadAtMillis = await _otherParticipantLastReadAtMillis(
+    final otherReadState = await _otherParticipantReadState(
       serverConversationId,
       viewerId,
     );
 
     return rows.whereType<Map>().map((row) {
+      final json = Map<String, Object?>.from(row);
+      final messageId = json['id']?.toString();
+      if (messageId != null) {
+        json['attachment'] = attachments[messageId];
+      }
       return RemoteMessage.fromJson(
-        Map<String, Object?>.from(row),
+        json,
         viewerId: viewerId,
-        otherLastReadAtMillis: otherLastReadAtMillis,
+        otherLastReadAtMillis: otherReadState?.readAtMillis,
+        otherReaderUserId: otherReadState?.userId,
       );
     }).toList();
   }
 
+  /// Loads the first live attachment for each message and signs its private
+  /// storage path. Attachment failures never hide the underlying thread.
+  Future<Map<String, Map<String, Object?>>> _fetchMessageAttachments(
+    String serverConversationId,
+  ) async {
+    try {
+      final client = Supabase.instance.client;
+      final rows = await client
+          .from('message_attachments')
+          .select(
+            'message_id, storage_bucket, storage_path, public_url, file_name, '
+            'file_size_bytes, mime_type, media_type, thumbnail_url, '
+            'duration_ms, deleted_at, created_at',
+          )
+          .eq('conversation_id', serverConversationId)
+          .order('created_at');
+
+      final byMessage = <String, Map<String, Object?>>{};
+      for (final raw in rows.whereType<Map>()) {
+        final attachment = Map<String, Object?>.from(raw);
+        if (attachment['deleted_at'] != null) continue;
+
+        final messageId = attachment['message_id']?.toString();
+        if (messageId == null || messageId.isEmpty) continue;
+
+        final bucket = attachment['storage_bucket']?.toString();
+        final path = attachment['storage_path']?.toString();
+        if (bucket != null &&
+            bucket.isNotEmpty &&
+            path != null &&
+            path.isNotEmpty) {
+          try {
+            attachment['signed_url'] = await client.storage
+                .from(bucket)
+                .createSignedUrl(path, 3600);
+          } catch (_) {
+            // Metadata is still useful when URL signing is temporarily down.
+          }
+        }
+        byMessage.putIfAbsent(messageId, () => attachment);
+      }
+      return byMessage;
+    } catch (_) {
+      // Older deployments may not have the attachment parity table yet.
+      return const <String, Map<String, Object?>>{};
+    }
+  }
+
   /// Most-recent `last_read_at` (epoch millis) across every *other* participant
   /// of [serverConversationId], or null when none have read yet.
-  Future<int?> _otherParticipantLastReadAtMillis(
+  Future<_ParticipantReadState?> _otherParticipantReadState(
     String serverConversationId,
     String? viewerId,
   ) async {
@@ -81,13 +137,15 @@ class MessagesRemoteDataSource {
           .select('user_id, last_read_at')
           .eq('conversation_id', serverConversationId);
 
-      int? latest;
+      _ParticipantReadState? latest;
       for (final row in rows.whereType<Map>()) {
         final userId = row['user_id']?.toString();
         if (userId == null || userId == viewerId) continue;
         final millis = _parseNullableMillis(row['last_read_at']);
         if (millis == null) continue;
-        if (latest == null || millis > latest) latest = millis;
+        if (latest == null || millis > latest.readAtMillis) {
+          latest = _ParticipantReadState(userId: userId, readAtMillis: millis);
+        }
       }
       return latest;
     } catch (_) {
@@ -124,6 +182,7 @@ class RemoteConversation {
     this.otherUserAvatarUrl,
     this.otherUserPresence,
     this.otherUserLastSeenAtMillis,
+    this.disappearingSeconds = 0,
   });
 
   final String serverConversationId;
@@ -135,6 +194,7 @@ class RemoteConversation {
   final String? otherUserAvatarUrl;
   final String? otherUserPresence;
   final int? otherUserLastSeenAtMillis;
+  final int disappearingSeconds;
 
   factory RemoteConversation.fromJson(Map<String, Object?> json) {
     final displayName = json['other_user_display_name']?.toString();
@@ -154,6 +214,8 @@ class RemoteConversation {
       otherUserLastSeenAtMillis: _parseNullableMillis(
         json['other_user_last_seen_at'],
       ),
+      disappearingSeconds:
+          int.tryParse(json['disappearing_seconds']?.toString() ?? '0') ?? 0,
       lastMessagePreview:
           json['last_message_content']?.toString() ??
           'Tap to send your first message.',
@@ -175,11 +237,13 @@ class RemoteMessage {
     this.senderAvatarUrl,
     this.messageType = 'text',
     this.readAtMillis,
+    this.readByUserId,
     this.mediaUrl,
     this.thumbnailUrl,
     this.mimeType,
     this.fileName,
     this.fileSizeBytes,
+    this.durationMs,
     this.viewOnce = false,
     this.expiresAtMillis,
     this.viewOnceSeenAtMillis,
@@ -195,15 +259,15 @@ class RemoteMessage {
   final String? senderAvatarUrl;
   final String messageType;
   final int? readAtMillis;
+  final String? readByUserId;
 
-  // Media fields are part of the contract for forward-compatibility with the
-  // `message_attachments` parity schema, but are always null when reading the
-  // live `messages` table, which has no media columns (see fetchMessages).
+  // Media fields are hydrated from the first live `message_attachments` row.
   final String? mediaUrl;
   final String? thumbnailUrl;
   final String? mimeType;
   final String? fileName;
   final int? fileSizeBytes;
+  final int? durationMs;
 
   // Ephemeral (view-once / disappearing) fields from the ephemeral migration.
   // Data is carried through to LocalMessage; no behaviour is wired off it yet.
@@ -215,6 +279,7 @@ class RemoteMessage {
     Map<String, Object?> json, {
     String? viewerId,
     int? otherLastReadAtMillis,
+    String? otherReaderUserId,
   }) {
     final profile = json['profiles'];
     final profileMap = profile is Map
@@ -226,6 +291,10 @@ class RemoteMessage {
     final senderId = json['sender_id'].toString();
     final createdAtMillis = _parseMillis(json['created_at']);
     final isMine = viewerId != null && senderId == viewerId;
+    final rawAttachment = json['attachment'];
+    final attachment = rawAttachment is Map
+        ? Map<String, Object?>.from(rawAttachment)
+        : null;
 
     // Read state for MY outgoing messages: read once the other participant's
     // last_read_at is at/after this message's timestamp. Incoming messages keep
@@ -252,13 +321,35 @@ class RemoteMessage {
       body: json['content']?.toString() ?? '',
       createdAtMillis: createdAtMillis,
       deliveryStateName: deliveryStateName,
-      messageType: json['message_type']?.toString() ?? 'text',
+      messageType:
+          attachment?['media_type']?.toString() ??
+          json['message_type']?.toString() ??
+          'text',
       readAtMillis: readAtMillis,
+      readByUserId: readAtMillis == null ? null : otherReaderUserId,
+      mediaUrl:
+          attachment?['signed_url']?.toString() ??
+          attachment?['public_url']?.toString(),
+      thumbnailUrl: attachment?['thumbnail_url']?.toString(),
+      mimeType: attachment?['mime_type']?.toString(),
+      fileName: attachment?['file_name']?.toString(),
+      fileSizeBytes: _parseNullableInt(attachment?['file_size_bytes']),
+      durationMs: _parseNullableInt(attachment?['duration_ms']),
       viewOnce: _parseBool(json['view_once']),
       expiresAtMillis: _parseNullableMillis(json['expires_at']),
       viewOnceSeenAtMillis: _parseNullableMillis(json['view_once_seen_at']),
     );
   }
+}
+
+class _ParticipantReadState {
+  const _ParticipantReadState({
+    required this.userId,
+    required this.readAtMillis,
+  });
+
+  final String userId;
+  final int readAtMillis;
 }
 
 /// Parses a Postgres boolean that may arrive as a Dart [bool] or a string
@@ -288,5 +379,12 @@ int _parseMillis(Object? value) {
 int? _parseNullableMillis(Object? value) {
   if (value == null) return null;
   if (value is DateTime) return value.millisecondsSinceEpoch;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
   return DateTime.tryParse(value.toString())?.millisecondsSinceEpoch;
+}
+
+int? _parseNullableInt(Object? value) {
+  if (value is int) return value;
+  return int.tryParse(value?.toString() ?? '');
 }

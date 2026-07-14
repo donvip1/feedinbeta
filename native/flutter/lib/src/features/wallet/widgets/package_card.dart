@@ -47,8 +47,7 @@ class WalletPackageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final symbol = currencySymbol(package.currency);
-    final perCreditText =
-        '$symbol${package.pricePerCredit.toStringAsFixed(4)}';
+    final perCreditText = '$symbol${package.pricePerCredit.toStringAsFixed(4)}';
 
     return Container(
       width: WalletSpacing.packageCardWidth,
@@ -68,7 +67,9 @@ class WalletPackageCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
             child: Row(
               children: [
-                if (package.isPopular || package.isPremium || package.isReseller)
+                if (package.isPopular ||
+                    package.isPremium ||
+                    package.isReseller)
                   _Pill(
                     label: package.isReseller
                         ? 'For Resellers'
@@ -200,7 +201,9 @@ class WalletPackageCard extends StatelessWidget {
                         ),
                         Text(
                           package.currency,
-                          style: WalletTextStyles.rowMuted.copyWith(fontSize: 11),
+                          style: WalletTextStyles.rowMuted.copyWith(
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -208,13 +211,12 @@ class WalletPackageCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          perCreditText,
-                          style: WalletTextStyles.rowTitle,
-                        ),
+                        Text(perCreditText, style: WalletTextStyles.rowTitle),
                         Text(
                           'per credit',
-                          style: WalletTextStyles.rowMuted.copyWith(fontSize: 11),
+                          style: WalletTextStyles.rowMuted.copyWith(
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -308,7 +310,11 @@ class WalletPackageCard extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.icon, required this.gradient});
+  const _Pill({
+    required this.label,
+    required this.icon,
+    required this.gradient,
+  });
   final String label;
   final IconData icon;
   final Gradient gradient;

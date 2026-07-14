@@ -519,8 +519,8 @@ String deliveryStateLabel(DeliveryState state) {
 ///
 /// Precedence: a live [activity] (typing/recording/etc.) wins; then coarse
 /// [presence]; otherwise a neutral placeholder so the row never renders empty
-/// while the backend presence signal is still unfinalised. [lastSeenMillis] is
-/// only consulted for the `offline` case and is optional.
+/// while no presence row has been materialized. [lastSeenMillis] is only
+/// consulted for the `offline` case and is optional.
 String chatPresenceSubtitle({
   required PresenceState presence,
   ChatActivity activity = ChatActivity.none,
@@ -581,6 +581,20 @@ String reportReasonLabel(ReportReason reason) {
     case ReportReason.other:
       return 'Other';
   }
+}
+
+/// Stable backend value accepted by `report_message`.
+String reportReasonValue(ReportReason reason) {
+  return switch (reason) {
+    ReportReason.spam => 'spam',
+    ReportReason.harassment => 'harassment',
+    ReportReason.hateSpeech => 'hate_speech',
+    ReportReason.violence => 'violence',
+    ReportReason.nudity => 'nudity',
+    ReportReason.scam => 'scam',
+    ReportReason.misinformation => 'misinformation',
+    ReportReason.other => 'other',
+  };
 }
 
 /// Formats a byte count as B / KB / MB (parity with web formatFileSize).
