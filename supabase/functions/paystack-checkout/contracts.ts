@@ -123,6 +123,19 @@ export function normalizeCurrency(value: unknown): string {
   return value.toUpperCase();
 }
 
+export function normalizeCatalogMoney(
+  amountMinor: unknown,
+  currency: unknown,
+): { amountMinor: number; currency: string } {
+  return {
+    amountMinor: parseSafeInteger(amountMinor, "catalog price", {
+      status: 500,
+      code: "CATALOG_ERROR",
+    }),
+    currency: normalizeCurrency(currency),
+  };
+}
+
 export function parseProviderCurrency(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z]{3}$/.test(value)) {
     throw new RequestError(
@@ -132,45 +145,6 @@ export function parseProviderCurrency(value: unknown): string {
     );
   }
   return value.toUpperCase();
-}
-
-export function toPaystackAmountMinor(
-  priceMinor: number,
-  currency: string,
-  ngnPerUnit: number | null,
-): number {
-  if (
-    !Number.isSafeInteger(priceMinor) || priceMinor <= 0 ||
-    priceMinor > maxNativeMinorAmount
-  ) {
-    throw new RequestError("Invalid catalog price", 500, "CATALOG_ERROR");
-  }
-
-  const normalizedCurrency = normalizeCurrency(currency);
-  if (normalizedCurrency === "NGN") return priceMinor;
-  if (normalizedCurrency !== "USD") {
-    throw new RequestError(
-      `Paystack checkout does not support ${normalizedCurrency} catalog prices`,
-      409,
-      "UNSUPPORTED_CURRENCY",
-    );
-  }
-  if (ngnPerUnit == null || !Number.isFinite(ngnPerUnit) || ngnPerUnit <= 0) {
-    throw new RequestError(
-      "NGN exchange rate is not configured",
-      503,
-      "EXCHANGE_RATE_UNAVAILABLE",
-    );
-  }
-
-  const amount = Math.round(priceMinor * ngnPerUnit);
-  if (
-    !Number.isSafeInteger(amount) || amount <= 0 ||
-    amount > maxNativeMinorAmount
-  ) {
-    throw new RequestError("Converted checkout amount is invalid", 500);
-  }
-  return amount;
 }
 
 export function toPaystackPlanInterval(

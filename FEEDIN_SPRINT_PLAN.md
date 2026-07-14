@@ -8,7 +8,7 @@
 
 - **Disappearing messages:** conversation timer details are live and client materialization respects the server contract.
 - **Private-chat polish/actions:** typing, presence/last-seen, double-blue receipts, starring, reporting, generic file attachments, and realtime receipt refresh are wired and tested.
-- **Wallet:** hosted credit/subscription checkout, return verification, seeded catalog, subscription lifecycle webhooks, bank destination setup, payout reservation/transfer/history, and idempotent provider ledgers are live. Runtime Paystack transactions still require the project owner to configure `PAYSTACK_SECRET_KEY` and an approved `PAYSTACK_NGN_PER_USD` Edge Function secret.
+- **Wallet:** hosted credit/subscription checkout, return verification, seeded catalog, subscription lifecycle webhooks, bank destination setup, payout reservation/transfer/history, and idempotent provider ledgers are live. Paystack runtime requires `PAYSTACK_SECRET_KEY`; checkout charges the catalog currency directly, so USD/international payments must be enabled for the current USD catalog. `PAYSTACK_NGN_PER_USD` is app-owned payout FX configuration, not a Paystack secret, and Nigerian bank withdrawals remain NGN.
 
 ---
 

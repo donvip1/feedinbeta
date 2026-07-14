@@ -1,22 +1,23 @@
 import {
   createPaystackReference,
+  normalizeCatalogMoney,
   parsePaystackMetadata,
   parseProviderCurrency,
   parsePurchaseType,
   requirePaystackCheckoutUrl,
   resolveIdempotencyKey,
   toPaystackPlanInterval,
-  toPaystackAmountMinor,
 } from "./contracts.ts";
 
-Deno.test("uses native minor-unit prices for NGN", () => {
-  const amount = toPaystackAmountMinor(250000, "NGN", null);
-  if (amount !== 250000) throw new Error(`Unexpected amount: ${amount}`);
-});
-
-Deno.test("converts native USD cents to NGN kobo", () => {
-  const amount = toPaystackAmountMinor(499, "USD", 1600);
-  if (amount !== 798400) throw new Error(`Unexpected amount: ${amount}`);
+Deno.test("keeps catalog amounts in their configured currency", () => {
+  const usd = normalizeCatalogMoney(499, "usd");
+  const ngn = normalizeCatalogMoney(250000, "NGN");
+  if (usd.amountMinor !== 499 || usd.currency !== "USD") {
+    throw new Error(`Unexpected USD catalog money: ${JSON.stringify(usd)}`);
+  }
+  if (ngn.amountMinor !== 250000 || ngn.currency !== "NGN") {
+    throw new Error(`Unexpected NGN catalog money: ${JSON.stringify(ngn)}`);
+  }
 });
 
 Deno.test("keeps legacy purchase type values", () => {

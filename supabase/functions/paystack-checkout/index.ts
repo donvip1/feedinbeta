@@ -6,6 +6,7 @@ import {
   checkoutExpiry,
   createPaystackReference,
   JsonRecord,
+  normalizeCatalogMoney,
   normalizeCurrency,
   parseBillingInterval,
   parsePaystackMetadata,
@@ -20,7 +21,6 @@ import {
   requirePaystackCheckoutUrl,
   resolveIdempotencyKey,
   safeProviderMessage,
-  toPaystackAmountMinor,
   toPaystackPlanInterval,
 } from "./contracts.ts";
 
@@ -70,18 +70,6 @@ function requiredEnv(name: string): string {
       `${name} is not configured`,
       500,
       "CONFIG_ERROR",
-    );
-  }
-  return value;
-}
-
-function requiredPaystackNgnRate(): number {
-  const value = Number(Deno.env.get("PAYSTACK_NGN_PER_USD"));
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new RequestError(
-      "NGN exchange rate is not configured",
-      503,
-      "EXCHANGE_RATE_UNAVAILABLE",
     );
   }
   return value;
@@ -507,12 +495,12 @@ serve(async (req) => {
         );
       }
 
-      priceMinor = parseSafeInteger(
+      const catalogMoney = normalizeCatalogMoney(
         creditPackage.price_cents,
-        "catalog price",
-        { status: 500, code: "CATALOG_ERROR" },
+        creditPackage.currency,
       );
-      catalogCurrency = normalizeCurrency(creditPackage.currency);
+      priceMinor = catalogMoney.amountMinor;
+      catalogCurrency = catalogMoney.currency;
       const baseCredits = parseSafeInteger(
         creditPackage.credits,
         "catalog credits",
@@ -547,11 +535,12 @@ serve(async (req) => {
         );
       }
 
-      priceMinor = parseSafeInteger(tier.price_cents, "catalog price", {
-        status: 500,
-        code: "CATALOG_ERROR",
-      });
-      catalogCurrency = normalizeCurrency(tier.currency);
+      const catalogMoney = normalizeCatalogMoney(
+        tier.price_cents,
+        tier.currency,
+      );
+      priceMinor = catalogMoney.amountMinor;
+      catalogCurrency = catalogMoney.currency;
       creditsAmount = parseSafeInteger(
         tier.subscription_credits ?? 0,
         "subscription credits",
@@ -562,23 +551,13 @@ serve(async (req) => {
       description = `${tier.name} subscription`;
     }
 
-    let ngnRate: number | null = null;
-    if (catalogCurrency !== "NGN") {
-      ngnRate = requiredPaystackNgnRate();
-    }
-    const amountMinor = toPaystackAmountMinor(
-      priceMinor,
-      catalogCurrency,
-      ngnRate,
-    );
-
     if (purchaseType === "subscription" && billingInterval) {
       if (!paystackPlanCode) {
         const createdPlanCode = await createPaystackPlan(
           paystackSecretKey,
           description,
-          amountMinor,
-          "NGN",
+          priceMinor,
+          catalogCurrency,
           billingInterval,
         );
         const { data: configuredPlanCode, error: configurePlanError } =
@@ -599,8 +578,8 @@ serve(async (req) => {
           await validatePaystackPlan(
             paystackSecretKey,
             paystackPlanCode,
-            amountMinor,
-            "NGN",
+            priceMinor,
+            catalogCurrency,
             billingInterval,
           );
         }
@@ -608,8 +587,8 @@ serve(async (req) => {
         await validatePaystackPlan(
           paystackSecretKey,
           paystackPlanCode,
-          amountMinor,
-          "NGN",
+          priceMinor,
+          catalogCurrency,
           billingInterval,
         );
       }
@@ -623,8 +602,8 @@ serve(async (req) => {
         p_item_id: itemId,
         p_provider: "paystack",
         p_idempotency_key: requestedIdempotencyKey,
-        p_amount_minor: amountMinor,
-        p_currency: "NGN",
+        p_amount_minor: priceMinor,
+        p_currency: catalogCurrency,
         p_credits_amount: creditsAmount,
         p_billing_interval: billingInterval,
         p_metadata: {
