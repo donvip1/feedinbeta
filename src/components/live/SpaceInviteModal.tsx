@@ -8,6 +8,7 @@ import { Search, UserPlus, X, Check, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/error-messages';
 
 interface SpaceInviteModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ interface SearchUser {
 
 interface PendingInvite {
   id: string;
-  invitee_id: string;
+  invited_user_id: string;
   status: string;
   user?: SearchUser;
 }
@@ -51,7 +52,7 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
       .eq('status', 'pending');
 
     if (data && data.length > 0) {
-      const userIds = data.map(i => i.invitee_id);
+      const userIds = data.map(i => i.invited_user_id);
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url')
@@ -61,7 +62,7 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
 
       setPendingInvites(data.map(i => ({
         ...i,
-        user: profileMap.get(i.invitee_id),
+        user: profileMap.get(i.invited_user_id),
       })));
     } else {
       setPendingInvites([]);
@@ -96,7 +97,7 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
       const { error } = await supabase.from('live_space_invitations').insert({
         space_id: spaceId,
         inviter_id: user.id,
-        invitee_id: inviteeId,
+        invited_user_id: inviteeId,
       });
 
       if (error) {
@@ -112,9 +113,10 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
             user_id: inviteeId,
             type: 'space_invite',
             title: 'Speaker Invitation',
-            content: `You've been invited to speak in a live space`,
+            message: `You've been invited to speak in a live space`,
             related_id: spaceId,
-            read: false,
+            related_type: 'space',
+            is_read: false,
           });
         } catch {
           // Ignore if notifications table doesn't exist
@@ -137,8 +139,8 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
         fetchPendingInvites();
         setSearchResults(prev => prev.filter(u => u.id !== inviteeId));
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send invitation');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to send invitation'));
     } finally {
       setInviting(null);
     }

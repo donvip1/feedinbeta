@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/error-messages';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 import { Loader2, Heart } from 'lucide-react';
 
 interface GiftAppreciationModalProps {
@@ -42,13 +44,13 @@ export const GiftAppreciationModal: React.FC<GiftAppreciationModalProps> = ({
   const submitAppreciation = useMutation({
     mutationFn: async (feedback: string) => {
       const updateField = isReceiver ? 'receiver_feedback' : 'sender_feedback';
-      
+      const payload: TablesUpdate<'gift_analytics'> = {
+        feedback_timestamp: new Date().toISOString(),
+      };
+      payload[updateField] = feedback;
       const { error } = await supabase
         .from('gift_analytics')
-        .update({
-          [updateField]: feedback,
-          feedback_timestamp: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', giftId);
 
       if (error) throw error;
@@ -59,9 +61,9 @@ export const GiftAppreciationModal: React.FC<GiftAppreciationModalProps> = ({
       toast.success('Appreciation sent!');
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to send appreciation', {
-        description: error.message,
+        description: getErrorMessage(error),
       });
     },
   });

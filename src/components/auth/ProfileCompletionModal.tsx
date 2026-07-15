@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Check, X, User, AtSign, Sparkles, AlertCircle } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import type { TablesUpdate } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/error-messages';
 
 interface ProfileCompletionModalProps {
   onComplete?: () => void;
@@ -149,7 +151,7 @@ export const ProfileCompletionModal = ({ onComplete }: ProfileCompletionModalPro
     setIsSubmitting(true);
 
     try {
-      const updates: Record<string, any> = {
+      const updates: TablesUpdate<'profiles'> = {
         updated_at: new Date().toISOString(),
         profile_completed: true,
       };
@@ -178,10 +180,12 @@ export const ProfileCompletionModal = ({ onComplete }: ProfileCompletionModalPro
 
       refreshStatus();
       onComplete?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error completing profile:', error);
+      const errorRecord = error as { code?: unknown };
+      const message = getErrorMessage(error);
       
-      if (error.message?.includes('duplicate') || error.code === '23505') {
+      if (message.includes('duplicate') || errorRecord.code === '23505') {
         toast({
           title: 'Username taken',
           description: 'This username is already in use. Please choose another.',
@@ -191,7 +195,7 @@ export const ProfileCompletionModal = ({ onComplete }: ProfileCompletionModalPro
       } else {
         toast({
           title: 'Error completing profile',
-          description: error.message || 'Please try again',
+          description: message || 'Please try again',
           variant: 'destructive',
         });
       }

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
-import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
+import { getErrorMessage, getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 import {
   Room,
   RoomEvent,
@@ -475,9 +475,9 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
             }));
           }
           console.log('[UnifiedLive] Tracks published');
-        } catch (mediaError: any) {
+        } catch (mediaError: unknown) {
           console.error('[UnifiedLive] Media error:', mediaError);
-          const friendly = getFriendlyError(mediaError.message || 'media');
+          const friendly = getFriendlyError(getErrorMessage(mediaError, 'media'));
           toast.error(friendly.title, { description: friendly.description });
           // Continue - can still listen/watch
         }
@@ -529,10 +529,11 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.log('[UnifiedLive] ✅ Joined successfully');
       return true;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[UnifiedLive] Error joining:', error);
-      const friendly = getFriendlyError(error?.message || 'connection');
-      if (isTemporaryError(error?.message || '')) {
+      const message = getErrorMessage(error, 'connection');
+      const friendly = getFriendlyError(message);
+      if (isTemporaryError(message)) {
         toast(friendly.title, { description: friendly.description });
       } else {
         toast.error(friendly.title, { description: friendly.description });
@@ -733,10 +734,11 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }));
         toast.success('Screen sharing started');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[UnifiedLive] Screen share error:', error);
       // User likely cancelled the screen picker
-      if (error.name !== 'NotAllowedError') {
+      const errorName = error instanceof Error ? error.name : '';
+      if (errorName !== 'NotAllowedError') {
         toast.error('Failed to share screen');
       }
     }
@@ -781,11 +783,11 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
           toast.info('Recording will be available shortly');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[UnifiedLive] Recording error:', error);
       // Revert state on error
       setState(prev => ({ ...prev, isRecording: action !== 'start' }));
-      toast.error(error.message || 'Recording failed');
+      toast.error(getErrorMessage(error, 'Recording failed'));
     }
   }, [state.role, state.isRecording]);
 
@@ -893,13 +895,13 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (roomInfo.type === 'audio_space') {
         await supabase
           .from('live_space_speakers')
-          .update({ is_muted: true, host_muted: true })
+          .update({ muted: true })
           .eq('space_id', roomInfo.id)
           .neq('user_id', currentUser.id);
       } else {
         await supabase
           .from('live_stream_viewers')
-          .update({ is_muted: true, host_muted: true })
+          .update({ is_mic_on: false, host_muted: true })
           .eq('stream_id', roomInfo.id)
           .neq('user_id', currentUser.id);
       }
@@ -945,13 +947,13 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (roomInfo.type === 'audio_space') {
         await supabase
           .from('live_space_speakers')
-          .update({ is_muted: false, host_muted: false })
+          .update({ muted: false })
           .eq('space_id', roomInfo.id)
           .neq('user_id', currentUser.id);
       } else {
         await supabase
           .from('live_stream_viewers')
-          .update({ is_muted: false, host_muted: false })
+          .update({ is_mic_on: true, host_muted: false })
           .eq('stream_id', roomInfo.id)
           .neq('user_id', currentUser.id);
       }
@@ -1037,7 +1039,6 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
           space_id: roomInfo.id,
           user_id: currentUser.id,
           content: `📢 ${message}`,
-          is_broadcast: true,
         });
       } else {
         await supabase.from('live_stream_comments').insert({

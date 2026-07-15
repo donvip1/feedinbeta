@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { pushNotificationManager } from '@/lib/push-notification-manager';
 import { notificationSounds } from '@/lib/notification-sounds';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 
 interface NotificationPreferences {
   push_enabled: boolean;
@@ -93,8 +94,17 @@ export function usePushNotifications() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        async (payload: any) => {
-          const notification = payload?.new;
+        async (payload: unknown) => {
+          const notification = (payload as {
+            new?: {
+              id?: string;
+              type?: string;
+              title?: string;
+              message?: string;
+              related_id?: string | null;
+              related_type?: string | null;
+            };
+          })?.new;
           if (!notification) return;
 
           // Check if this notification type is enabled
@@ -202,9 +212,13 @@ export function usePushNotifications() {
     setPreferences(prev => ({ ...prev, [key]: value }));
 
     try {
+      const payload: TablesUpdate<'notification_preferences'> = {
+        [key]: value,
+        updated_at: new Date().toISOString(),
+      };
       await supabase
         .from('notification_preferences')
-        .update({ [key]: value, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('user_id', user.id);
     } catch (error) {
       console.error('[Push] Error updating preference:', error);

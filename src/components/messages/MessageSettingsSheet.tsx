@@ -39,6 +39,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 interface MessageSettingsSheetProps {
   isOpen: boolean;
@@ -154,12 +155,13 @@ export const MessageSettingsSheet = ({
     setPrivacySettings(prev => ({ ...prev, [key]: value }));
     
     try {
+      const payload: TablesInsert<'privacy_settings'> = {
+        user_id: user.id,
+        [key]: value,
+      };
       const { error } = await supabase
         .from('privacy_settings')
-        .upsert({
-          user_id: user.id,
-          [key]: value,
-        }, {
+        .upsert(payload, {
           onConflict: 'user_id',
         });
 

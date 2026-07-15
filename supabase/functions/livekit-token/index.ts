@@ -20,7 +20,8 @@ async function generateLiveKitToken(
   roomName: string,
   participantIdentity: string,
   participantName: string,
-  isHost: boolean
+  isHost: boolean,
+  canPublish: boolean,
 ): Promise<string> {
   const encoder = new TextEncoder();
   const secretKey = encoder.encode(apiSecret);
@@ -33,9 +34,9 @@ async function generateLiveKitToken(
     video: {
       room: roomName,
       roomJoin: true,
-      canPublish: true,
+      canPublish,
       canSubscribe: true,
-      canPublishData: true,
+      canPublishData: canPublish,
       roomAdmin: isHost,
       roomRecord: isHost,
     },
@@ -47,7 +48,7 @@ async function generateLiveKitToken(
     jti: claims.jti.slice(0, 8) + '...',
     name: claims.name,
     room: claims.video.room,
-    canPublish: claims.video.canPublish,
+    canPublish,
     canSubscribe: claims.video.canSubscribe,
     isHost,
   });
@@ -80,7 +81,10 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) {
+    if (
+      !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL ||
+      !SUPABASE_URL || !SUPABASE_ANON_KEY
+    ) {
       console.error(`[LiveKit][${requestId}] Missing LiveKit credentials!`);
       return new Response(
         JSON.stringify({ error: "LiveKit not configured" }),
@@ -122,7 +126,7 @@ serve(async (req) => {
 
     // --- Parse request body ---
     const body = await req.json();
-    const { roomName } = body;
+    const roomName = typeof body.roomName === "string" ? body.roomName.trim() : "";
 
     if (!roomName) {
       return new Response(
@@ -133,46 +137,96 @@ serve(async (req) => {
 
     // Force identity to authenticated user's ID — never trust client input
     const participantIdentity = userId;
-    const participantName = profile?.display_name || body.participantName || 'User';
+    const requestedName = typeof body.participantName === "string"
+      ? body.participantName.trim().slice(0, 80)
+      : "";
+    const participantName = profile?.display_name || requestedName || "User";
 
     // Determine host status server-side by checking DB ownership
     let isHost = false;
+    let canPublish = false;
+    let authorized = false;
+    const uuid = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
     
     // Check if this is a space (space-{id}) or stream (stream-{id})
-    const spaceMatch = roomName.match(/^space-(.+)$/);
-    const streamMatch = roomName.match(/^stream-(.+)$/);
+    const spaceMatch = roomName.match(new RegExp(`^space-${uuid}$`, "i"));
+    const streamMatch = roomName.match(new RegExp(`^stream-${uuid}$`, "i"));
     
     if (spaceMatch) {
       const spaceId = spaceMatch[1];
       const { data: space } = await supabase
         .from('live_spaces')
-        .select('user_id')
+        .select('user_id, status')
         .eq('id', spaceId)
-        .single();
+        .maybeSingle();
+      authorized = Boolean(space && ['live', 'active'].includes(space.status));
       isHost = space?.user_id === userId;
+      if (isHost) {
+        canPublish = true;
+      } else if (authorized) {
+        const { data: speaker } = await supabase
+          .from('live_space_speakers')
+          .select('role, left_at')
+          .eq('space_id', spaceId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        canPublish = speaker?.left_at == null &&
+          ['host', 'co_host', 'speaker'].includes(speaker?.role ?? '');
+      }
     } else if (streamMatch) {
       const streamId = streamMatch[1];
       const { data: stream } = await supabase
         .from('live_streams')
-        .select('user_id')
+        .select('user_id, status')
         .eq('id', streamId)
-        .single();
+        .maybeSingle();
+      authorized = Boolean(stream && ['live', 'active'].includes(stream.status));
       isHost = stream?.user_id === userId;
+      canPublish = isHost;
     } else {
-      // For call rooms (call-{callId}), verify host server-side via call_logs.
-      // For all other room types, default to non-host. Never trust client-supplied isHost.
-      const callMatch = roomName.match(/^call-(.+)$/);
+      const callMatch = roomName.match(new RegExp(`^call-${uuid}$`, "i"));
       if (callMatch) {
         const callId = callMatch[1];
         const { data: callLog } = await supabase
           .from('call_logs')
-          .select('caller_id')
+          .select('caller_id, receiver_id, status')
           .eq('id', callId)
           .maybeSingle();
         isHost = callLog?.caller_id === userId;
+        authorized = Boolean(
+          callLog && ['initiated', 'ringing', 'accepted', 'answered', 'active'].includes(callLog.status) &&
+          [callLog.caller_id, callLog.receiver_id].includes(userId)
+        );
+        canPublish = authorized;
       } else {
-        isHost = false;
+        const groupCallMatch = roomName.match(new RegExp(`^group-call-${uuid}$`, "i"));
+        if (groupCallMatch) {
+          const callId = groupCallMatch[1];
+          const { data: groupCall } = await supabase
+            .from('group_calls')
+            .select('id, host_id, status')
+            .eq('id', callId)
+            .maybeSingle();
+          isHost = groupCall?.host_id === userId;
+          if (groupCall && groupCall.status === 'active') {
+            const { data: participant } = await supabase
+              .from('group_call_participants')
+              .select('user_id, left_at')
+              .eq('call_id', groupCall.id)
+              .eq('user_id', userId)
+              .maybeSingle();
+            authorized = isHost || Boolean(participant && participant.left_at == null);
+          }
+          canPublish = authorized;
+        }
       }
+    }
+
+    if (!authorized) {
+      return new Response(
+        JSON.stringify({ error: "You are not authorized to join this room" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // Ensure URL has wss:// prefix
@@ -181,7 +235,7 @@ serve(async (req) => {
       wsUrl = `wss://${wsUrl}`;
     }
 
-    console.log(`[LiveKit][${requestId}] Generating token for user ${userId.slice(0, 8)}... in room ${roomName}, isHost=${isHost}`);
+    console.log(`[LiveKit][${requestId}] Generating token for user ${userId.slice(0, 8)}... in room ${roomName}, isHost=${isHost}, canPublish=${canPublish}`);
 
     const livekitToken = await generateLiveKitToken(
       LIVEKIT_API_KEY,
@@ -189,7 +243,8 @@ serve(async (req) => {
       roomName,
       participantIdentity,
       participantName,
-      isHost
+      isHost,
+      canPublish,
     );
 
     console.log(`[LiveKit][${requestId}] ✅ Token generated successfully`);

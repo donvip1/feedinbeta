@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/error-messages';
 import { toast } from 'sonner';
 
 interface PostRecordingModalProps {
@@ -83,12 +84,6 @@ export const PostRecordingModal = ({
         media_urls: [recordingUrl],
         media_types: [roomType === 'audio_space' ? 'audio' : 'video'],
         post_type: roomType === 'audio_space' ? 'audio' : 'video',
-        metadata: {
-          source: 'live_recording',
-          original_title: title,
-          duration,
-          viewer_count: viewerCount,
-        },
       };
 
       const { error } = await supabase.from('posts').insert(postData);
@@ -101,9 +96,9 @@ export const PostRecordingModal = ({
       setTimeout(() => {
         onClose();
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Post to feed error:', error);
-      toast.error(error.message || 'Failed to post');
+      toast.error(getErrorMessage(error, 'Failed to post'));
     } finally {
       setIsPosting(false);
     }

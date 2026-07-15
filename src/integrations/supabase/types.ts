@@ -3603,7 +3603,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          invitee_id: string
+          invited_user_id: string
           inviter_id: string
           responded_at: string | null
           space_id: string | null
@@ -3612,7 +3612,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          invitee_id: string
+          invited_user_id: string
           inviter_id: string
           responded_at?: string | null
           space_id?: string | null
@@ -3621,7 +3621,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
-          invitee_id?: string
+          invited_user_id?: string
           inviter_id?: string
           responded_at?: string | null
           space_id?: string | null
@@ -3755,8 +3755,10 @@ export type Database = {
           joined_at: string | null
           left_at: string | null
           mic_allowed: boolean | null
+          muted: boolean
           role: string | null
           space_id: string | null
+          status: string
           user_id: string
         }
         Insert: {
@@ -3770,8 +3772,10 @@ export type Database = {
           joined_at?: string | null
           left_at?: string | null
           mic_allowed?: boolean | null
+          muted?: boolean
           role?: string | null
           space_id?: string | null
+          status?: string
           user_id: string
         }
         Update: {
@@ -3785,8 +3789,10 @@ export type Database = {
           joined_at?: string | null
           left_at?: string | null
           mic_allowed?: boolean | null
+          muted?: boolean
           role?: string | null
           space_id?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -5343,60 +5349,48 @@ export type Database = {
       }
       p2p_listings: {
         Row: {
-          auto_reply: string | null
-          country_code: string | null
           created_at: string
           credits_amount: number
-          credits_per_dollar: number | null
-          currency_code: string | null
+          currency: string
           id: string
-          is_international: boolean | null
-          max_amount: number | null
-          min_amount: number | null
           payment_method_id: string | null
           payment_window_minutes: number | null
-          price_usd: number
+          price_cents: number
+          reservation_expires_at: string | null
+          reserved_at: string | null
+          reserved_transaction_id: string | null
           seller_id: string
           status: string
-          terms: string | null
           updated_at: string
         }
         Insert: {
-          auto_reply?: string | null
-          country_code?: string | null
           created_at?: string
           credits_amount: number
-          credits_per_dollar?: number | null
-          currency_code?: string | null
+          currency?: string
           id?: string
-          is_international?: boolean | null
-          max_amount?: number | null
-          min_amount?: number | null
           payment_method_id?: string | null
           payment_window_minutes?: number | null
-          price_usd: number
+          price_cents: number
+          reservation_expires_at?: string | null
+          reserved_at?: string | null
+          reserved_transaction_id?: string | null
           seller_id: string
           status?: string
-          terms?: string | null
           updated_at?: string
         }
         Update: {
-          auto_reply?: string | null
-          country_code?: string | null
           created_at?: string
           credits_amount?: number
-          credits_per_dollar?: number | null
-          currency_code?: string | null
+          currency?: string
           id?: string
-          is_international?: boolean | null
-          max_amount?: number | null
-          min_amount?: number | null
           payment_method_id?: string | null
           payment_window_minutes?: number | null
-          price_usd?: number
+          price_cents?: number
+          reservation_expires_at?: string | null
+          reserved_at?: string | null
+          reserved_transaction_id?: string | null
           seller_id?: string
           status?: string
-          terms?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5538,65 +5532,77 @@ export type Database = {
       }
       p2p_transactions: {
         Row: {
-          buyer_confirmed_at: string | null
           buyer_id: string
-          cancellation_reason: string | null
+          cancelled_at: string | null
           cancelled_by: string | null
-          chat_enabled: boolean | null
+          completed_at: string | null
           created_at: string
           credits_amount: number
+          currency: string
           dispute_id: string | null
-          escrow_locked: boolean | null
+          escrow_locked: boolean
           expires_at: string | null
           id: string
-          last_activity_at: string | null
-          listing_id: string
-          price_usd: number
+          idempotency_key: string | null
+          listing_id: string | null
+          price_cents: number
+          proof_notes: string | null
+          proof_submitted_at: string | null
           proof_url: string | null
-          seller_confirmed_at: string | null
           seller_id: string
+          settled_at: string | null
+          settled_to: string | null
+          settlement_reason: string | null
           status: string
           updated_at: string
         }
         Insert: {
-          buyer_confirmed_at?: string | null
           buyer_id: string
-          cancellation_reason?: string | null
+          cancelled_at?: string | null
           cancelled_by?: string | null
-          chat_enabled?: boolean | null
+          completed_at?: string | null
           created_at?: string
           credits_amount: number
+          currency?: string
           dispute_id?: string | null
-          escrow_locked?: boolean | null
+          escrow_locked?: boolean
           expires_at?: string | null
           id?: string
-          last_activity_at?: string | null
-          listing_id: string
-          price_usd: number
+          idempotency_key?: string | null
+          listing_id?: string | null
+          price_cents: number
+          proof_notes?: string | null
+          proof_submitted_at?: string | null
           proof_url?: string | null
-          seller_confirmed_at?: string | null
           seller_id: string
+          settled_at?: string | null
+          settled_to?: string | null
+          settlement_reason?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
-          buyer_confirmed_at?: string | null
           buyer_id?: string
-          cancellation_reason?: string | null
+          cancelled_at?: string | null
           cancelled_by?: string | null
-          chat_enabled?: boolean | null
+          completed_at?: string | null
           created_at?: string
           credits_amount?: number
+          currency?: string
           dispute_id?: string | null
-          escrow_locked?: boolean | null
+          escrow_locked?: boolean
           expires_at?: string | null
           id?: string
-          last_activity_at?: string | null
-          listing_id?: string
-          price_usd?: number
+          idempotency_key?: string | null
+          listing_id?: string | null
+          price_cents?: number
+          proof_notes?: string | null
+          proof_submitted_at?: string | null
           proof_url?: string | null
-          seller_confirmed_at?: string | null
           seller_id?: string
+          settled_at?: string | null
+          settled_to?: string | null
+          settlement_reason?: string | null
           status?: string
           updated_at?: string
         }
@@ -5640,48 +5646,30 @@ export type Database = {
       }
       p2p_user_eligibility: {
         Row: {
-          buyer_ban_until: string | null
-          buyer_cancellation_count: number | null
-          created_at: string | null
-          first_p2p_trade_completed: boolean | null
-          has_purchased_pack: boolean | null
-          id: string
-          is_reseller: boolean | null
-          last_cancellation_at: string | null
-          min_trade_amount: number | null
-          total_trades: number | null
-          total_volume_usd: number | null
-          updated_at: string | null
+          can_buy: boolean
+          can_sell: boolean
+          completed_trades: number
+          dispute_count: number
+          first_p2p_trade_completed: boolean
+          updated_at: string
           user_id: string
         }
         Insert: {
-          buyer_ban_until?: string | null
-          buyer_cancellation_count?: number | null
-          created_at?: string | null
-          first_p2p_trade_completed?: boolean | null
-          has_purchased_pack?: boolean | null
-          id?: string
-          is_reseller?: boolean | null
-          last_cancellation_at?: string | null
-          min_trade_amount?: number | null
-          total_trades?: number | null
-          total_volume_usd?: number | null
-          updated_at?: string | null
+          can_buy?: boolean
+          can_sell?: boolean
+          completed_trades?: number
+          dispute_count?: number
+          first_p2p_trade_completed?: boolean
+          updated_at?: string
           user_id: string
         }
         Update: {
-          buyer_ban_until?: string | null
-          buyer_cancellation_count?: number | null
-          created_at?: string | null
-          first_p2p_trade_completed?: boolean | null
-          has_purchased_pack?: boolean | null
-          id?: string
-          is_reseller?: boolean | null
-          last_cancellation_at?: string | null
-          min_trade_amount?: number | null
-          total_trades?: number | null
-          total_volume_usd?: number | null
-          updated_at?: string | null
+          can_buy?: boolean
+          can_sell?: boolean
+          completed_trades?: number
+          dispute_count?: number
+          first_p2p_trade_completed?: boolean
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -8572,6 +8560,10 @@ export type Database = {
       }
     }
     Functions: {
+      p2p_start_transaction: {
+        Args: { p_idempotency_key: string; p_listing_id: string }
+        Returns: Database["public"]["Tables"]["p2p_transactions"]["Row"]
+      }
       add_credits_from_purchase: {
         Args: {
           p_amount: number

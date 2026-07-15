@@ -67,15 +67,15 @@ export const useP2PEligibility = () => {
 
       const hasPaymentMethod = (paymentMethods?.length ?? 0) > 0;
       const canSell = eligibilityData?.can_sell !== false;
-      const hasPurchasedPack = eligibilityData?.has_purchased_pack ?? false;
+      const hasPurchasedPack = false;
       const hasCompletedFirstTrade = eligibilityData?.first_p2p_trade_completed ?? false;
-      const isReseller = eligibilityData?.is_reseller ?? false;
-      const totalTrades = eligibilityData?.total_trades ?? 0;
-      const totalVolumeUsd = Number(eligibilityData?.total_volume_usd ?? 0);
+      const isReseller = false;
+      const totalTrades = eligibilityData?.completed_trades ?? 0;
+      const totalVolumeUsd = 0;
       const userCountry = paymentMethods?.[0]?.country_code ?? null;
       const userPhoneNumber = null;
-      const buyerCancellationCount = (eligibilityData as any)?.buyer_cancellation_count ?? 0;
-      const buyerBanUntil = (eligibilityData as any)?.buyer_ban_until ?? null;
+      const buyerCancellationCount = 0;
+      const buyerBanUntil = null;
 
       // Check if buyer is currently banned
       const isBuyerBanned = buyerBanUntil ? new Date(buyerBanUntil) > new Date() : false;

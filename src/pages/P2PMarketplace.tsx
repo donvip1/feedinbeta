@@ -14,6 +14,7 @@ import { EligibilityBanner } from '@/components/p2p/EligibilityBanner';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useP2PEligibility } from '@/hooks/useP2PEligibility';
 import { P2P_CONFIG } from '@/lib/p2p-config';
+import { getErrorMessage } from '@/lib/error-messages';
 
 const P2PMarketplace = () => {
   const navigate = useNavigate();
@@ -28,9 +29,7 @@ const P2PMarketplace = () => {
       const { data, error } = await supabase
         .from('p2p_listings')
         .select(
-          'id, seller_id, credits_amount, price_cents, currency, status, '
-          + 'created_at, seller:profiles!p2p_listings_seller_id_fkey('
-          + 'display_name, username, avatar_url)',
+          'id, seller_id, credits_amount, price_cents, currency, status, created_at, seller:profiles!p2p_listings_seller_id_fkey(display_name, username, avatar_url)',
         )
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -80,7 +79,7 @@ const P2PMarketplace = () => {
     }
     setProcessingId(listingId);
     try {
-      const { data, error } = await (supabase as any).rpc(
+      const { data, error } = await supabase.rpc(
         'p2p_start_transaction',
         {
           p_listing_id: listingId,
@@ -92,8 +91,8 @@ const P2PMarketplace = () => {
       if (!transaction?.id) throw new Error('The P2P transaction was not returned.');
       toast.success('Transaction created! Proceed with payment.');
       navigate(`/wallet/p2p/${transaction.id}`);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create transaction');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to create transaction'));
     } finally { setProcessingId(null); }
   };
 

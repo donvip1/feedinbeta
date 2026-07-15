@@ -9,6 +9,7 @@ import { Mic, Radio, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/error-messages';
 
 interface SpaceInvite {
   id: string;
@@ -42,7 +43,7 @@ export const SpaceInviteNotification = () => {
       const { data, error } = await supabase
         .from('live_space_invitations')
         .select('*')
-        .eq('invitee_id', user.id)
+        .eq('invited_user_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(1);
@@ -84,11 +85,10 @@ export const SpaceInviteNotification = () => {
         event: 'INSERT',
         schema: 'public',
         table: 'live_space_invitations',
-        filter: `invitee_id=eq.${user.id}`,
-      }, async (payload: any) => {
-        console.log('[SpaceInviteNotification] New invite received:', payload.new);
-        
-        const inviteData = payload.new;
+        filter: `invited_user_id=eq.${user.id}`,
+      }, async (payload: unknown) => {
+        const inviteData = (payload as { new: SpaceInvite }).new;
+        console.log('[SpaceInviteNotification] New invite received:', inviteData);
         
         // Fetch space and inviter details
         const [spaceResult, inviterResult] = await Promise.all([
@@ -121,10 +121,11 @@ export const SpaceInviteNotification = () => {
     // Also listen for broadcast invites (faster delivery)
     const broadcastChannel = supabase
       .channel(`space-invite-broadcast-${user.id}`)
-      .on('broadcast', { event: 'space-invite' }, async (payload: any) => {
+      .on('broadcast', { event: 'space-invite' }, async (payload: unknown) => {
         console.log('[SpaceInviteNotification] Broadcast invite received:', payload);
         
-        if (payload.payload?.invitee_id === user.id) {
+        const broadcast = payload as { payload?: { invitee_id?: string } };
+        if (broadcast.payload?.invitee_id === user.id) {
           // Refetch invite data
           fetchPendingInvites();
         }
@@ -159,10 +160,8 @@ export const SpaceInviteNotification = () => {
             space_id: invite.space_id,
             user_id: user.id,
             role: 'speaker',
-            is_muted: true, // Start muted
-            has_raised_hand: false,
-            host_muted: false,
-            mic_allowed: true,
+            status: 'active',
+            muted: true,
             joined_at: new Date().toISOString(),
             left_at: null,
           }, {
@@ -176,9 +175,9 @@ export const SpaceInviteNotification = () => {
       }
 
       setInvite(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[SpaceInviteNotification] Error responding:', error);
-      toast.error('Failed to respond to invitation');
+      toast.error(getErrorMessage(error, 'Failed to respond to invitation'));
     } finally {
       setResponding(false);
     }

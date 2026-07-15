@@ -1295,7 +1295,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     await supabase.from('live_space_invitations').insert({
       space_id: spaceId,
       inviter_id: user.id,
-      invitee_id: targetUserId,
+      invited_user_id: targetUserId,
       status: 'pending',
     });
 
