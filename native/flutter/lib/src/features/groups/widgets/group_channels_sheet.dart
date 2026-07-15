@@ -21,11 +21,11 @@ class GroupChannelsSheet extends StatefulWidget {
   final List<GroupChannelView> channels;
   final bool isLoading;
 
-  /// Open an existing channel by name.
-  final void Function(String channelName) onOpenChannel;
+  /// Open an existing channel.
+  final void Function(GroupChannelView channel) onOpenChannel;
 
   /// Create a new channel with the given (already-validated) name.
-  final Future<void> Function(String channelName) onCreateChannel;
+  final Future<GroupChannelView?> Function(String channelName) onCreateChannel;
 
   @override
   State<GroupChannelsSheet> createState() => _GroupChannelsSheetState();
@@ -49,7 +49,9 @@ class _GroupChannelsSheetState extends State<GroupChannelsSheet> {
     if (name.isEmpty || _creating) return;
     if (_existingNames.contains(name.toLowerCase())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A channel with that name already exists')),
+        const SnackBar(
+          content: Text('A channel with that name already exists'),
+        ),
       );
       return;
     }
@@ -94,8 +96,11 @@ class _GroupChannelsSheetState extends State<GroupChannelsSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.campaign_rounded,
-                        size: 20, color: GroupColors.primary),
+                    Icon(
+                      Icons.campaign_rounded,
+                      size: 20,
+                      color: GroupColors.primary,
+                    ),
                     SizedBox(width: GroupSpacing.sm),
                     Text(
                       'Channels',
@@ -156,7 +161,7 @@ class _GroupChannelsSheetState extends State<GroupChannelsSheet> {
         final channel = widget.channels[index];
         return _ChannelRow(
           channel: channel,
-          onTap: () => widget.onOpenChannel(channel.name),
+          onTap: () => widget.onOpenChannel(channel),
         );
       },
     );

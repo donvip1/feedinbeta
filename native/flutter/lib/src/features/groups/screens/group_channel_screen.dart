@@ -8,16 +8,15 @@ import '../widgets/group_composer.dart';
 
 /// A single broadcast/announcement channel inside a group (Telegram-style).
 ///
-/// Shows the channel's posts newest-at-the-bottom as announcement cards and a
-/// composer to broadcast a new post. Channels are modelled on the group's
-/// `messages` table (no dedicated channels table exists — see the data source /
-/// module report), so this reuses [GroupsRemoteDataSource] rather than a new
-/// backend seam.
+/// Shows a channel's posts and lets channel owners/admins broadcast updates.
 class GroupChannelScreen extends StatefulWidget {
   const GroupChannelScreen({
     super.key,
     required this.dataSource,
     required this.conversationId,
+    required this.channelId,
+    required this.canPost,
+    required this.isSubscribed,
     required this.channelName,
     required this.currentUserId,
     required this.onBack,
@@ -25,6 +24,9 @@ class GroupChannelScreen extends StatefulWidget {
 
   final GroupsRemoteDataSource dataSource;
   final String conversationId;
+  final String channelId;
+  final bool canPost;
+  final bool isSubscribed;
   final String channelName;
   final String currentUserId;
   final VoidCallback onBack;
@@ -38,6 +40,7 @@ class _GroupChannelScreenState extends State<GroupChannelScreen> {
   final _listController = ScrollController();
 
   List<GroupChannelPostView>? _posts;
+  late bool _subscribed = widget.isSubscribed;
 
   @override
   void initState() {
@@ -54,14 +57,15 @@ class _GroupChannelScreenState extends State<GroupChannelScreen> {
 
   Future<void> _loadPosts() async {
     final remote = await widget.dataSource.fetchChannelPosts(
-      conversationId: widget.conversationId,
-      channelName: widget.channelName,
+      channelId: widget.channelId,
     );
     if (!mounted) return;
     setState(() {
       _posts = remote
-          .map((p) =>
-              groupChannelPostToView(p, currentUserId: widget.currentUserId))
+          .map(
+            (p) =>
+                groupChannelPostToView(p, currentUserId: widget.currentUserId),
+          )
           .toList();
     });
   }
@@ -71,8 +75,7 @@ class _GroupChannelScreenState extends State<GroupChannelScreen> {
     if (text.trim().isEmpty) return;
     _composerController.clear();
     await widget.dataSource.postToChannel(
-      conversationId: widget.conversationId,
-      channelName: widget.channelName,
+      channelId: widget.channelId,
       body: text,
     );
     if (!mounted) return;
@@ -87,16 +90,27 @@ class _GroupChannelScreenState extends State<GroupChannelScreen> {
         bottom: false,
         child: Column(
           children: [
-            _ChannelHeader(name: widget.channelName, onBack: widget.onBack),
-            Expanded(child: _buildPosts()),
-            GroupComposer(
-              controller: _composerController,
-              onSend: _post,
+            _ChannelHeader(
+              name: widget.channelName,
+              onBack: widget.onBack,
+              subscribed: _subscribed,
+              onToggleSubscription: _toggleSubscription,
             ),
+            Expanded(child: _buildPosts()),
+            if (widget.canPost)
+              GroupComposer(controller: _composerController, onSend: _post),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _toggleSubscription() async {
+    final next = !_subscribed;
+    final changed = next
+        ? await widget.dataSource.subscribeToChannel(widget.channelId)
+        : await widget.dataSource.unsubscribeFromChannel(widget.channelId);
+    if (mounted && changed) setState(() => _subscribed = next);
   }
 
   Widget _buildPosts() {
@@ -130,10 +144,17 @@ class _GroupChannelScreenState extends State<GroupChannelScreen> {
 }
 
 class _ChannelHeader extends StatelessWidget {
-  const _ChannelHeader({required this.name, required this.onBack});
+  const _ChannelHeader({
+    required this.name,
+    required this.onBack,
+    required this.subscribed,
+    required this.onToggleSubscription,
+  });
 
   final String name;
   final VoidCallback onBack;
+  final bool subscribed;
+  final VoidCallback onToggleSubscription;
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +187,16 @@ class _ChannelHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: GroupSpacing.sm),
+          IconButton(
+            onPressed: onToggleSubscription,
+            tooltip: subscribed ? 'Unsubscribe' : 'Subscribe',
+            icon: Icon(
+              subscribed
+                  ? Icons.notifications_active
+                  : Icons.notifications_none,
+              color: GroupColors.foreground,
+            ),
+          ),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,

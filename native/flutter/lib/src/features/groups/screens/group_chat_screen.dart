@@ -19,10 +19,8 @@ import 'group_channel_screen.dart';
 /// to the live feature's go-live entry (this module must NOT depend on
 /// features/live). It receives the group's [conversationId] and a human-readable
 /// [groupTitle] so a group-scoped livestream can be started/labelled.
-typedef GroupGoLiveCallback = void Function({
-  required String conversationId,
-  required String groupTitle,
-});
+typedef GroupGoLiveCallback =
+    void Function({required String conversationId, required String groupTitle});
 
 /// The open group room: header, message list, composer, plus members / add /
 /// leave affordances, broadcast channels, and an optional "Go Live" entry.
@@ -108,7 +106,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   void _initRealtime() {
-    final realtime = widget.realtime ??
+    final realtime =
+        widget.realtime ??
         GroupRealtimeService.autoDetect(widget.conversationId);
     _realtime = realtime;
     _realtimeSub = realtime.messages.listen(_onRealtimeMessage);
@@ -132,8 +131,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         .fetchMessages(widget.conversationId);
     if (!mounted) return;
     setState(() {
-      _messages =
-          groupMessagesToViews(remote, currentUserId: widget.currentUserId);
+      _messages = groupMessagesToViews(
+        remote,
+        currentUserId: widget.currentUserId,
+      );
     });
   }
 
@@ -224,9 +225,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       builder: (sheetContext) => GroupChannelsSheet(
         channels: channels,
         isLoading: false,
-        onOpenChannel: (name) {
+        onOpenChannel: (channel) {
           Navigator.of(sheetContext).pop();
-          _openChannel(name);
+          _openChannel(channel);
         },
         onCreateChannel: (name) async {
           // Dismiss the sheet up-front (mirrors the add-members flow) so no
@@ -237,19 +238,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             name: name,
           );
           if (!mounted || created == null) return;
-          _openChannel(created);
+          _openChannel(groupChannelToView(created));
         },
       ),
     );
   }
 
-  void _openChannel(String channelName) {
+  void _openChannel(GroupChannelView channel) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (routeCtx) => GroupChannelScreen(
           dataSource: widget.dataSource,
           conversationId: widget.conversationId,
-          channelName: channelName,
+          channelId: channel.id,
+          channelName: channel.name,
+          canPost: channel.canPost,
+          isSubscribed: channel.isSubscribed,
           currentUserId: widget.currentUserId,
           onBack: () => Navigator.of(routeCtx).pop(),
         ),
@@ -332,7 +336,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         final ordered = messages.length - 1 - index;
         final view = messages[ordered];
         // A day header sits above the first message of each calendar day.
-        final showDate = ordered == 0 ||
+        final showDate =
+            ordered == 0 ||
             !groupIsSameDay(
               messages[ordered - 1].createdAtMillis,
               view.createdAtMillis,

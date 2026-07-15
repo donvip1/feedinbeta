@@ -134,18 +134,30 @@ class GroupMessageView {
 @immutable
 class GroupChannelView {
   const GroupChannelView({
+    required this.id,
+    required this.ownerId,
     required this.name,
     required this.updatedAtMillis,
     this.lastPostPreview = '',
     this.lastPostSenderName,
     this.postCount = 0,
+    this.description,
+    this.subscriberCount = 0,
+    this.isSubscribed = false,
+    this.canPost = false,
   });
 
+  final String id;
+  final String ownerId;
   final String name;
   final int updatedAtMillis;
   final String lastPostPreview;
   final String? lastPostSenderName;
   final int postCount;
+  final String? description;
+  final int subscriberCount;
+  final bool isSubscribed;
+  final bool canPost;
 
   String get initial {
     final trimmed = name.trim();
@@ -311,8 +323,14 @@ GroupCandidateView candidateToView(RemoteGroupCandidate candidate) {
 
 GroupChannelView groupChannelToView(RemoteGroupChannel channel) {
   return GroupChannelView(
+    id: channel.id,
+    ownerId: channel.ownerId,
     name: channel.name,
     updatedAtMillis: channel.updatedAtMillis,
+    description: channel.description,
+    subscriberCount: channel.subscriberCount,
+    isSubscribed: channel.isSubscribed,
+    canPost: channel.canPost,
     lastPostPreview: channel.lastPostBody ?? '',
     lastPostSenderName: channel.lastPostSenderName,
     postCount: channel.postCount,
@@ -374,8 +392,18 @@ String groupDateHeader(int millis) {
   if (deltaDays == 0) return 'Today';
   if (deltaDays == 1) return 'Yesterday';
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   final month = months[date.month - 1];
   return '$month ${date.day}, ${date.year}';
