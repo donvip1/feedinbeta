@@ -3807,6 +3807,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           ended_at: string | null
+          group_conversation_id: string | null
           hashtags: string[] | null
           id: string
           is_private: boolean | null
@@ -3830,6 +3831,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
+          group_conversation_id?: string | null
           hashtags?: string[] | null
           id?: string
           is_private?: boolean | null
@@ -3853,6 +3855,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
+          group_conversation_id?: string | null
           hashtags?: string[] | null
           id?: string
           is_private?: boolean | null
@@ -8680,6 +8683,14 @@ export type Database = {
       generate_stream_key: { Args: never; Returns: string }
       generate_unique_invite_code: { Args: never; Returns: string }
       get_active_sessions_count: { Args: never; Returns: number }
+      start_group_live_stream: {
+        Args: {
+          p_description?: string
+          p_group_conversation_id: string
+          p_title: string
+        }
+        Returns: Database["public"]["Tables"]["live_streams"]["Row"]
+      }
       get_conversations_with_details: {
         Args: { p_user_id: string }
         Returns: {

@@ -42,7 +42,7 @@ class LiveDataException implements Exception {
 /// present on the live schema:
 ///   * `live_streams`  : id, user_id, title, description, status, viewer_count,
 ///                       thumbnail_url, playback_url, started_at,
-///                       stream_features
+///                       stream_features, group_conversation_id
 ///   * `live_spaces`   : id, user_id, title, description, status, viewer_count,
 ///                       topic_category, started_at
 ///   * `live_stream_viewers`   : (stream_id, user_id) pk, joined_at, left_at
@@ -170,7 +170,7 @@ class LiveRemoteDataSource {
           .select(
             'id, user_id, title, description, status, viewer_count, '
             'thumbnail_url, playback_url, started_at, stream_features, '
-            '$_streamHostEmbed',
+            'group_conversation_id, $_streamHostEmbed',
           )
           .eq('status', 'live')
           .order('viewer_count', ascending: false)
@@ -220,7 +220,7 @@ class LiveRemoteDataSource {
           .select(
             'id, user_id, title, description, status, viewer_count, '
             'thumbnail_url, playback_url, started_at, stream_features, '
-            '$_streamHostEmbed',
+            'group_conversation_id, $_streamHostEmbed',
           )
           .eq('id', streamId)
           .maybeSingle();
@@ -228,6 +228,61 @@ class LiveRemoteDataSource {
       return LiveStreamSummary.fromJson(Map<String, Object?>.from(row));
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Starts a LiveKit stream scoped to a group conversation. The RPC verifies
+  /// membership and rejects direct (non-group) conversations server-side.
+  Future<LiveStreamSummary> startGroupLiveStream({
+    required String conversationId,
+    required String title,
+    String? description,
+  }) async {
+    final client = _client;
+    if (client == null) _throwUnavailable();
+    if (currentUserId == null) _throwSignIn('start a group livestream');
+    if (conversationId.trim().isEmpty) {
+      throw const LiveDataException('A group conversation is required.');
+    }
+
+    try {
+      final raw = await client.rpc(
+        'start_group_live_stream',
+        params: {
+          'p_group_conversation_id': conversationId,
+          'p_title': title,
+          'p_description': description,
+        },
+      );
+      final row = raw is List ? (raw.isEmpty ? null : raw.first) : raw;
+      if (row is! Map) {
+        throw const LiveDataException('The livestream was not created.');
+      }
+      return LiveStreamSummary.fromJson(Map<String, Object?>.from(row));
+    } catch (error) {
+      if (error is LiveDataException) rethrow;
+      throw LiveDataException(
+        'Could not start the group livestream.',
+        cause: error,
+      );
+    }
+  }
+
+  /// Marks a host-owned stream as ended before the host leaves LiveKit.
+  Future<void> endStream(String streamId) async {
+    final client = _client;
+    if (client == null) _throwUnavailable();
+    if (currentUserId == null) _throwSignIn('end this livestream');
+    try {
+      await client
+          .from(_streamsTable)
+          .update({
+            'status': 'ended',
+            'ended_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', streamId);
+    } catch (error) {
+      throw LiveDataException('Could not end the livestream.', cause: error);
     }
   }
 
@@ -439,10 +494,7 @@ class LiveRemoteDataSource {
   /// The caller keeps its optimistic in-memory list either way, but a `false`
   /// return means the change did not persist across sessions — the panel uses
   /// this to warn the host.
-  Future<bool> updateHostCards(
-    String streamId,
-    List<HostCard> cards,
-  ) async {
+  Future<bool> updateHostCards(String streamId, List<HostCard> cards) async {
     final client = _client;
     final userId = currentUserId;
     if (client == null || userId == null || streamId.isEmpty) return false;

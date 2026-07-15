@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/live_models.dart';
 import 'data/live_remote_data_source.dart';
+import 'live_stream_host_screen.dart';
 import 'live_space_room_screen.dart';
 import 'live_stream_viewer_screen.dart';
 import 'live_theme.dart';
@@ -63,10 +64,6 @@ class LiveScreen extends StatefulWidget {
 /// navigating to the full live browse screen. This is the integration point the
 /// Groups feature calls from a group's "Go Live" action (plan.md §E).
 ///
-/// Broadcasting is still flagged as not implemented (no camera / RTMP), so this
-/// surfaces the same clearly-labelled scaffold as the in-screen entry — now
-/// carrying the group context so a future broadcast backend can scope the
-/// created stream to [groupId].
 Future<void> showGoLiveSheet(
   BuildContext context, {
   String? groupId,
@@ -76,7 +73,11 @@ Future<void> showGoLiveSheet(
     context: context,
     backgroundColor: LiveTheme.surface,
     shape: const RoundedRectangleBorder(borderRadius: LiveTheme.sheetRadius),
-    builder: (_) => _GoLiveSheet(groupId: groupId, groupName: groupName),
+    builder: (_) => _GoLiveSheet(
+      groupId: groupId,
+      groupName: groupName,
+      dataSource: LiveRemoteDataSource.autoDetect(),
+    ),
   );
 }
 
@@ -527,22 +528,65 @@ class _LiveErrorState extends StatelessWidget {
   }
 }
 
-/// The "Go live" sheet. Broadcasting is intentionally NOT implemented: it needs
-/// a camera + RTMP/WebRTC dependency and server-owned ingest configuration
-/// (stream key / playback URL). This sheet clearly flags that so the entry point
-/// exists for parity without shipping a broken broadcast flow.
-///
-/// When [groupId] is set, the sheet is framed as starting a stream *inside* a
-/// group (plan.md §E). The group scoping is carried through here so that, once a
-/// broadcast backend exists, the created `live_streams` row can be tied to the
-/// group — that column does not yet exist on the schema (see the module report).
-class _GoLiveSheet extends StatelessWidget {
-  const _GoLiveSheet({this.groupId, this.groupName});
+class _GoLiveSheet extends StatefulWidget {
+  const _GoLiveSheet({this.groupId, this.groupName, required this.dataSource});
 
   final String? groupId;
   final String? groupName;
+  final LiveRemoteDataSource dataSource;
 
-  bool get _scopedToGroup => groupId != null && groupId!.isNotEmpty;
+  @override
+  State<_GoLiveSheet> createState() => _GoLiveSheetState();
+}
+
+class _GoLiveSheetState extends State<_GoLiveSheet> {
+  late final TextEditingController _title = TextEditingController(
+    text: (widget.groupName?.trim().isNotEmpty ?? false)
+        ? '${widget.groupName!.trim()} Live'
+        : 'Group livestream',
+  );
+  bool _starting = false;
+
+  bool get _scopedToGroup =>
+      widget.groupId != null && widget.groupId!.isNotEmpty;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    final groupId = widget.groupId;
+    if (groupId == null || groupId.isEmpty) return;
+    final title = _title.text.trim();
+    if (title.isEmpty) return;
+
+    setState(() => _starting = true);
+    try {
+      final stream = await widget.dataSource.startGroupLiveStream(
+        conversationId: groupId,
+        title: title,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => LiveStreamHostScreen(
+            stream: stream,
+            dataSource: widget.dataSource,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +635,7 @@ class _GoLiveSheet extends StatelessWidget {
             ),
             if (_scopedToGroup) ...[
               const SizedBox(height: 12),
-              _GroupScopeChip(groupName: groupName),
+              _GroupScopeChip(groupName: widget.groupName),
             ],
             const SizedBox(height: 16),
             Container(
@@ -601,50 +645,50 @@ class _GoLiveSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: LiveTheme.chipBorder),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.construction_rounded,
-                    color: LiveTheme.brandOrange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _scopedToGroup
-                          ? 'Group livestreams are coming soon. Going live '
-                                'needs camera capture and an RTMP/WebRTC '
-                                'broadcast dependency plus server-owned ingest '
-                                'config (stream key + playback URL) and a '
-                                'group-scoped stream column, which are not part '
-                                'of this build.'
-                          : 'Broadcasting from the app is coming soon. Going '
-                                'live needs camera capture and an RTMP/WebRTC '
-                                'broadcast dependency plus server-owned ingest '
-                                'config (stream key + playback URL), which is '
-                                'not part of this build.',
-                      style: const TextStyle(
+              child: _scopedToGroup
+                  ? TextField(
+                      controller: _title,
+                      maxLength: 120,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (_) => _start(),
+                      style: const TextStyle(color: LiveTheme.onSurface),
+                      decoration: const InputDecoration(
+                        labelText: 'Livestream title',
+                        labelStyle: TextStyle(color: LiveTheme.onSurfaceMuted),
+                        border: OutlineInputBorder(),
+                      ),
+                    )
+                  : const Text(
+                      'Start a livestream from a group chat to keep it scoped '
+                      'to that group.',
+                      style: TextStyle(
                         color: LiveTheme.onSurfaceMuted,
                         fontSize: 13,
                         height: 1.4,
                       ),
                     ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: _starting
+                    ? null
+                    : _scopedToGroup
+                    ? _start
+                    : () => Navigator.of(context).maybePop(),
                 style: FilledButton.styleFrom(
                   backgroundColor: LiveTheme.surfaceRaised,
                   foregroundColor: LiveTheme.onSurface,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: const Text('Got it'),
+                child: Text(
+                  _starting
+                      ? 'Starting...'
+                      : _scopedToGroup
+                      ? 'Go Live'
+                      : 'Got it',
+                ),
               ),
             ),
           ],

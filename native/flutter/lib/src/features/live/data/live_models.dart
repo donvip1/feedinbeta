@@ -55,7 +55,12 @@ class HostCard {
 
   bool get hasLink => link != null && link!.trim().isNotEmpty;
 
-  HostCard copyWith({String? emoji, String? title, String? body, String? link}) {
+  HostCard copyWith({
+    String? emoji,
+    String? title,
+    String? body,
+    String? link,
+  }) {
     return HostCard(
       id: id,
       emoji: emoji ?? this.emoji,
@@ -184,6 +189,7 @@ class LiveStreamSummary {
     this.startedAtMillis,
     this.host,
     this.hostCards = const [],
+    this.groupConversationId,
   });
 
   final String id;
@@ -199,6 +205,9 @@ class LiveStreamSummary {
   final String? playbackUrl;
   final int? startedAtMillis;
   final LiveProfile? host;
+
+  /// Present when the stream is restricted to a group conversation.
+  final String? groupConversationId;
 
   /// Host-published PULSE spotlight cards, decoded from
   /// `stream_features.host_cards`. Empty when the column is absent or the host
@@ -225,6 +234,7 @@ class LiveStreamSummary {
       startedAtMillis: _parseNullableMillis(json['started_at']),
       host: LiveProfile.tryFromEmbed(json['profiles'] ?? json['host']),
       hostCards: hostCardsFromFeatures(json['stream_features']),
+      groupConversationId: text('group_conversation_id'),
     );
   }
 
@@ -241,6 +251,7 @@ class LiveStreamSummary {
       startedAtMillis: startedAtMillis,
       host: host,
       hostCards: hostCards ?? this.hostCards,
+      groupConversationId: groupConversationId,
     );
   }
 }
