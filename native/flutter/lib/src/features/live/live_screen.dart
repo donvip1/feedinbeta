@@ -569,8 +569,9 @@ class _GoLiveSheetState extends State<_GoLiveSheet> {
         title: title,
       );
       if (!mounted) return;
-      Navigator.of(context).pop();
-      await Navigator.of(context).push(
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      await navigator.push(
         MaterialPageRoute<void>(
           builder: (_) => LiveStreamHostScreen(
             stream: stream,
