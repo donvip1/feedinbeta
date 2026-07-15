@@ -1,6 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import 'p2p_models.dart';
+
+typedef P2PRpcInvoker =
+    Future<dynamic> Function(
+      String functionName,
+      Map<String, Object?> parameters,
+    );
+typedef P2PIdempotencyKeyFactory = String Function();
 
 /// Live data access for the P2P credit marketplace.
 ///
@@ -14,17 +22,14 @@ import 'p2p_models.dart';
 /// * [isConfigured] / [_client] guard every call.
 /// * reads degrade to empty lists / neutral values when Supabase is not
 ///   configured or there is no authenticated user.
-/// * writes become no-ops in the same conditions.
-///
-/// BACKEND GAP: there are no P2P escrow/transfer RPCs in the live schema. The
-/// credit-moving side of a trade (lock escrow, release credits, refund) must be
-/// done server-side (RLS forbids clients writing arbitrary `user_credits`).
-/// Until those RPCs exist, [initiatePurchase], [releaseCredits] and
-/// [cancelTransaction] insert/patch the tracking rows the client is allowed to
-/// touch and surface a [P2PBackendUnavailable] for the money-moving step so the
-/// UI can show an honest "pending backend" state rather than silently succeed.
+/// * transaction and dispute mutations run through server-authoritative RPCs.
 class P2PRemoteDataSource {
-  const P2PRemoteDataSource({required this.isConfigured});
+  const P2PRemoteDataSource({
+    required this.isConfigured,
+    P2PRpcInvoker? rpcInvoker,
+    P2PIdempotencyKeyFactory? idempotencyKeyFactory,
+  }) : _rpcInvoker = rpcInvoker,
+       _idempotencyKeyFactory = idempotencyKeyFactory;
 
   /// Detects configuration from whether the Supabase singleton is initialised,
   /// mirroring the social-graph data source factory.
@@ -33,6 +38,8 @@ class P2PRemoteDataSource {
   }
 
   final bool isConfigured;
+  final P2PRpcInvoker? _rpcInvoker;
+  final P2PIdempotencyKeyFactory? _idempotencyKeyFactory;
 
   static const _listingsTable = 'p2p_listings';
   static const _transactionsTable = 'p2p_transactions';
@@ -43,8 +50,7 @@ class P2PRemoteDataSource {
   static const _userCreditsTable = 'user_credits';
   static const _profilesTable = 'profiles';
 
-  static const _profileEmbed =
-      'id, display_name, username, avatar_url';
+  static const _profileEmbed = 'id, display_name, username, avatar_url';
 
   static bool _supabaseAvailable() {
     try {
@@ -65,6 +71,27 @@ class P2PRemoteDataSource {
   }
 
   String? get currentUserId => _client?.auth.currentUser?.id;
+
+  Future<dynamic> _rpc(
+    String functionName,
+    Map<String, Object?> parameters,
+  ) async {
+    final invoker = _rpcInvoker;
+    if (invoker != null) {
+      return invoker(functionName, parameters);
+    }
+    final client = _client;
+    if (client == null) {
+      throw StateError('Supabase is not configured.');
+    }
+    return client.rpc<dynamic>(functionName, params: parameters);
+  }
+
+  bool get _canInvokeRpc {
+    if (_rpcInvoker != null) return true;
+    final client = _client;
+    return client != null && client.auth.currentUser != null;
+  }
 
   // --- Credits ------------------------------------------------------------
 
@@ -266,98 +293,100 @@ class P2PRemoteDataSource {
         .toList();
   }
 
-  /// Initiate a purchase against [listing]. Inserts the `p2p_transactions`
-  /// tracking row the buyer is allowed to create (RLS: "Buyers can create p2p
-  /// transactions"). Returns the created transaction.
-  ///
-  /// BACKEND GAP: this does NOT lock seller credits into escrow — that requires
-  /// a server-side RPC (clients cannot mutate the seller's `user_credits`). The
-  /// returned transaction therefore starts `pending` with `escrow_locked` left
-  /// to whatever the backend sets. Throws [P2PBackendUnavailable] if the insert
-  /// is refused so the UI can present an honest failure.
-  Future<P2PTransaction?> initiatePurchase(P2PListing listing) async {
-    final client = _client;
-    final userId = currentUserId;
-    if (client == null || userId == null) return null;
-
-    try {
-      final inserted = await client
-          .from(_transactionsTable)
-          .insert({
-            'listing_id': listing.id,
-            'buyer_id': userId,
-            'seller_id': listing.sellerId,
-            'credits_amount': listing.creditsAmount,
-            'price_cents': listing.priceCents,
-            'currency': listing.currency,
-            'status': 'pending',
-          })
-          .select(
-            'id, listing_id, buyer_id, seller_id, credits_amount, '
-            'price_cents, currency, status, escrow_locked, expires_at, '
-            'created_at',
-          )
-          .maybeSingle();
-      if (inserted == null) return null;
-      return P2PTransaction.fromJson(Map<String, Object?>.from(inserted));
-    } on PostgrestException catch (error) {
-      throw P2PBackendUnavailable(
-        'Could not start this order. Escrow requires a server-side transfer '
-        'that is not available yet.',
-        cause: error,
-      );
-    }
+  /// Start a transaction and lock the listing's credits server-side.
+  Future<P2PTransaction?> initiatePurchase(
+    P2PListing listing, {
+    String? idempotencyKey,
+  }) async {
+    if (!_canInvokeRpc) return null;
+    final listingId = _requiredValue(listing.id, label: 'listing');
+    final key = _requiredValue(
+      idempotencyKey ?? _idempotencyKeyFactory?.call() ?? const Uuid().v4(),
+      label: 'idempotency key',
+    );
+    final row = await _invokeRowRpc(
+      functionName: 'p2p_start_transaction',
+      parameters: {'p_listing_id': listingId, 'p_idempotency_key': key},
+      operation: 'start this order',
+      nestedKey: 'transaction',
+      requiredColumns: _transactionRequiredColumns,
+    );
+    return P2PTransaction.fromJson(row);
   }
 
-  /// Mark a transaction's payment proof as submitted (buyer side).
-  ///
-  /// BACKEND GAP: the live schema has no UPDATE policy on `p2p_transactions`
-  /// (only INSERT for buyers + SELECT for parties), so a client-side status
-  /// change is refused by RLS and affects zero rows. We `select()` the row back
-  /// and throw [P2PBackendUnavailable] when the change did not persist, so the
-  /// UI shows an honest "needs a server contract" state instead of a fake
-  /// success. Wire this to a `submit_p2p_payment_proof` RPC when available.
-  Future<void> markProofSubmitted(String transactionId) =>
-      _updateTransactionStatus(transactionId, 'proof_submitted');
+  /// Submit payment proof and return the updated transaction.
+  Future<P2PTransaction> submitPaymentProof({
+    required String transactionId,
+    required String proofUrl,
+    String? notes,
+  }) {
+    return _submitPaymentProof(
+      transactionId: transactionId,
+      proofUrl: _requiredValue(proofUrl, label: 'payment proof URL'),
+      notes: notes,
+    );
+  }
 
-  /// Cancel a transaction (buyer or seller). Same RLS caveat as
-  /// [markProofSubmitted]: credit refunds and the status flip are a backend
-  /// concern, so an unpermitted no-op is surfaced honestly.
-  Future<void> cancelTransaction(String transactionId) =>
-      _updateTransactionStatus(transactionId, 'cancelled');
+  /// Backward-compatible entry point for marking buyer payment as submitted.
+  Future<void> markProofSubmitted(String transactionId) async {
+    await _submitPaymentProof(transactionId: transactionId, proofUrl: null);
+  }
 
-  /// Attempts a client-side status change and verifies it persisted. Throws
-  /// [P2PBackendUnavailable] when RLS refuses the write (row unchanged / not
-  /// returned) or the RPC/table is missing.
-  Future<void> _updateTransactionStatus(
+  Future<P2PTransaction> _submitPaymentProof({
+    required String transactionId,
+    required String? proofUrl,
+    String? notes,
+  }) async {
+    _requireRpcAccess('submit payment proof');
+    final row = await _invokeRowRpc(
+      functionName: 'p2p_submit_payment_proof',
+      parameters: {
+        'p_transaction_id': _requiredValue(transactionId, label: 'transaction'),
+        'p_proof_url': proofUrl,
+        'p_notes': _trimmedOrNull(notes),
+      },
+      operation: 'submit payment proof',
+      nestedKey: 'transaction',
+      requiredColumns: _transactionRequiredColumns,
+    );
+    return P2PTransaction.fromJson(row);
+  }
+
+  /// Release escrowed credits to the buyer (seller only).
+  Future<P2PTransaction> releaseCredits(String transactionId) async {
+    _requireRpcAccess('release credits');
+    final row = await _invokeRowRpc(
+      functionName: 'p2p_release_credits',
+      parameters: {
+        'p_transaction_id': _requiredValue(transactionId, label: 'transaction'),
+      },
+      operation: 'release credits',
+      nestedKey: 'transaction',
+      requiredColumns: _transactionRequiredColumns,
+    );
+    return P2PTransaction.fromJson(row);
+  }
+
+  /// Cancel a transaction, preserving the original void-returning API.
+  Future<void> cancelTransaction(String transactionId) async {
+    await cancelTransactionWithResult(transactionId);
+  }
+
+  /// Cancel a transaction and return the server-updated transaction.
+  Future<P2PTransaction> cancelTransactionWithResult(
     String transactionId,
-    String status,
   ) async {
-    final client = _client;
-    final userId = currentUserId;
-    if (client == null || userId == null) {
-      throw const P2PBackendUnavailable('Sign in to update this order.');
-    }
-    try {
-      final updated = await client
-          .from(_transactionsTable)
-          .update({'status': status})
-          .eq('id', transactionId)
-          .select('id, status')
-          .maybeSingle();
-      if (updated == null || updated['status']?.toString() != status) {
-        throw const P2PBackendUnavailable(
-          'This step needs a server-side transfer that is not available yet. '
-          'Your order status is managed by the backend.',
-        );
-      }
-    } on PostgrestException catch (error) {
-      throw P2PBackendUnavailable(
-        'Could not update this order. It needs a server-side contract that is '
-        'not available in this build yet.',
-        cause: error,
-      );
-    }
+    _requireRpcAccess('cancel this order');
+    final row = await _invokeRowRpc(
+      functionName: 'p2p_cancel_transaction',
+      parameters: {
+        'p_transaction_id': _requiredValue(transactionId, label: 'transaction'),
+      },
+      operation: 'cancel this order',
+      nestedKey: 'transaction',
+      requiredColumns: _transactionRequiredColumns,
+    );
+    return P2PTransaction.fromJson(row);
   }
 
   // --- Payment methods ----------------------------------------------------
@@ -513,32 +542,132 @@ class P2PRemoteDataSource {
     required String transactionId,
     required String reason,
   }) async {
-    final client = _client;
-    final userId = currentUserId;
-    if (client == null || userId == null) return null;
+    if (!_canInvokeRpc) return null;
+    final row = await _invokeRowRpc(
+      functionName: 'p2p_open_dispute',
+      parameters: {
+        'p_transaction_id': _requiredValue(transactionId, label: 'transaction'),
+        'p_reason': _requiredValue(reason, label: 'dispute reason'),
+      },
+      operation: 'open this dispute',
+      nestedKey: 'dispute',
+      requiredColumns: _disputeRequiredColumns,
+    );
+    return P2PDispute.fromJson(row);
+  }
 
-    final inserted = await client
-        .from(_disputesTable)
-        .insert({
-          'transaction_id': transactionId,
-          'initiated_by': userId,
-          'reason': reason,
-          'status': 'open',
-        })
-        .select(
-          'id, transaction_id, initiated_by, moderator_id, reason, status, '
-          'resolution, created_at, resolved_at',
-        )
-        .maybeSingle();
+  void _requireRpcAccess(String operation) {
+    if (!_canInvokeRpc) {
+      throw P2PBackendUnavailable('Sign in to $operation.');
+    }
+  }
 
-    if (inserted == null) return null;
-    return P2PDispute.fromJson(Map<String, Object?>.from(inserted));
+  Future<Map<String, Object?>> _invokeRowRpc({
+    required String functionName,
+    required Map<String, Object?> parameters,
+    required String operation,
+    required String nestedKey,
+    required Set<String> requiredColumns,
+  }) async {
+    try {
+      final result = await _rpc(functionName, parameters);
+      return _parseRpcRow(
+        result,
+        operation: operation,
+        nestedKey: nestedKey,
+        requiredColumns: requiredColumns,
+      );
+    } on P2PBackendUnavailable {
+      rethrow;
+    } on PostgrestException catch (error) {
+      throw P2PBackendUnavailable(
+        _postgrestMessage(error, fallback: 'Could not $operation.'),
+        cause: error,
+      );
+    } catch (error) {
+      throw P2PBackendUnavailable('Could not $operation.', cause: error);
+    }
   }
 }
 
-/// Raised when a money-moving P2P operation cannot complete because the
-/// required server-side RPC (escrow lock / credit release / refund) does not
-/// exist in the live schema. The UI treats this as a soft, honest failure.
+const _transactionRequiredColumns = {
+  'id',
+  'buyer_id',
+  'seller_id',
+  'credits_amount',
+  'price_cents',
+  'currency',
+  'status',
+  'escrow_locked',
+  'created_at',
+};
+
+const _disputeRequiredColumns = {
+  'id',
+  'transaction_id',
+  'initiated_by',
+  'status',
+  'created_at',
+};
+
+Map<String, Object?> _parseRpcRow(
+  dynamic response, {
+  required String operation,
+  required String nestedKey,
+  required Set<String> requiredColumns,
+}) {
+  Object? candidate = response;
+  if (candidate is List) {
+    if (candidate.length != 1) {
+      throw P2PBackendUnavailable(
+        'Could not $operation because the server returned '
+        '${candidate.length} rows.',
+      );
+    }
+    candidate = candidate.single;
+  }
+  if (candidate is Map && candidate[nestedKey] is Map) {
+    candidate = candidate[nestedKey];
+  }
+  if (candidate is! Map) {
+    throw P2PBackendUnavailable(
+      'Could not $operation because the server returned an invalid response.',
+    );
+  }
+
+  final row = Map<String, Object?>.from(candidate);
+  final missing = requiredColumns.where((column) {
+    final value = row[column];
+    return value == null || value.toString().trim().isEmpty;
+  }).toList();
+  if (missing.isNotEmpty) {
+    throw P2PBackendUnavailable(
+      'Could not $operation because the server response was missing '
+      '${missing.join(', ')}.',
+    );
+  }
+  return row;
+}
+
+String _requiredValue(String value, {required String label}) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    throw P2PBackendUnavailable('A valid $label is required.');
+  }
+  return trimmed;
+}
+
+String? _trimmedOrNull(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+String _postgrestMessage(PostgrestException error, {required String fallback}) {
+  final message = error.message.trim();
+  return message.isEmpty ? fallback : message;
+}
+
+/// Raised when a server-authoritative P2P operation cannot complete.
 class P2PBackendUnavailable implements Exception {
   const P2PBackendUnavailable(this.message, {this.cause});
   final String message;

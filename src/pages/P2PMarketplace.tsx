@@ -4,9 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Globe } from 'lucide-react';
 import { BackButton } from '@/components/navigation/BackButton';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -20,25 +18,22 @@ import { P2P_CONFIG } from '@/lib/p2p-config';
 const P2PMarketplace = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { formatCreditsValue, userLocation } = useCurrency();
+  const { formatCreditsValue } = useCurrency();
   const { eligibility } = useP2PEligibility();
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [showRegionOnly, setShowRegionOnly] = useState(true);
-
-  const userCountry = eligibility.userCountry || (typeof userLocation === 'string' ? userLocation : userLocation?.countryCode) || 'NG';
 
   const { data: listings, isLoading: listingsLoading } = useQuery({
-    queryKey: ['p2p-listings', showRegionOnly, userCountry],
+    queryKey: ['p2p-listings'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('p2p_listings')
-        .select('*, profiles(display_name, username, avatar_url)')
+        .select(
+          'id, seller_id, credits_amount, price_cents, currency, status, '
+          + 'created_at, seller:profiles!p2p_listings_seller_id_fkey('
+          + 'display_name, username, avatar_url)',
+        )
         .eq('status', 'active')
         .order('created_at', { ascending: false });
-      if (showRegionOnly && userCountry) {
-        query = query.eq('country_code', userCountry);
-      }
-      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -75,7 +70,7 @@ const P2PMarketplace = () => {
     enabled: !!user,
   });
 
-  const handleBuyCredits = async (listingId: string, sellerId: string, creditsAmount: number, priceUsd: number) => {
+  const handleBuyCredits = async (listingId: string) => {
     if (!user) { toast.error('Please sign in to buy credits'); return; }
     if (!eligibility.canBuy) {
       if (eligibility.isBuyerBanned) {
@@ -89,18 +84,18 @@ const P2PMarketplace = () => {
     }
     setProcessingId(listingId);
     try {
-      const { data, error } = await supabase.from('p2p_transactions').insert({
-        listing_id: listingId, buyer_id: user.id, seller_id: sellerId,
-        credits_amount: creditsAmount, price_usd: priceUsd,
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      }).select().single();
+      const { data, error } = await (supabase as any).rpc(
+        'p2p_start_transaction',
+        {
+          p_listing_id: listingId,
+          p_idempotency_key: `web-p2p-${crypto.randomUUID()}`,
+        },
+      );
       if (error) throw error;
-      const { error: escrowError } = await supabase.functions.invoke('p2p-escrow', {
-        body: { action: 'create_transaction', transactionId: data.id },
-      });
-      if (escrowError) throw escrowError;
+      const transaction = Array.isArray(data) ? data[0] : data;
+      if (!transaction?.id) throw new Error('The P2P transaction was not returned.');
       toast.success('Transaction created! Proceed with payment.');
-      navigate(`/wallet/p2p/${data.id}`);
+      navigate(`/wallet/p2p/${transaction.id}`);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create transaction');
     } finally { setProcessingId(null); }
@@ -153,19 +148,9 @@ const P2PMarketplace = () => {
           </TabsList>
 
           <TabsContent value="listings" className="mt-3 space-y-3">
-            {/* Region toggle */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {listings?.length || 0} available
-              </span>
-              <button
-                onClick={() => setShowRegionOnly(!showRegionOnly)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Globe className="w-3 h-3" />
-                {showRegionOnly ? userCountry : 'All'}
-              </button>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {listings?.length || 0} available
+            </p>
 
             {listingsLoading ? (
               <div className="space-y-px">
@@ -175,12 +160,7 @@ const P2PMarketplace = () => {
               </div>
             ) : listings?.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">No listings{showRegionOnly ? ` in ${userCountry}` : ''}</p>
-                {showRegionOnly && (
-                  <button onClick={() => setShowRegionOnly(false)} className="text-xs text-primary mt-1 hover:underline">
-                    View all regions
-                  </button>
-                )}
+                <p className="text-sm">No active listings</p>
               </div>
             ) : (
               <div className="divide-y divide-border/50">
@@ -188,7 +168,6 @@ const P2PMarketplace = () => {
                   <P2PListingCard
                     key={listing.id}
                     listing={listing}
-                    userCountry={userCountry}
                     onBuy={handleBuyCredits}
                     isProcessing={processingId === listing.id}
                   />
@@ -213,7 +192,8 @@ const P2PMarketplace = () => {
                     <div>
                       <p className="text-sm font-medium">{tx.credits_amount.toLocaleString()} credits</p>
                       <p className="text-xs text-muted-foreground">
-                        {tx.buyer_id === user?.id ? 'Buying' : 'Selling'} · ${tx.price_usd}
+                        {tx.buyer_id === user?.id ? 'Buying' : 'Selling'} ·{' '}
+                        {tx.currency} {(Number(tx.price_cents) / 100).toFixed(2)}
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground capitalize">

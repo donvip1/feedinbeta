@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -17,16 +16,6 @@ interface P2PProofUploaderProps {
   onUploadSuccess?: () => void;
 }
 
-interface UploadedProof {
-  id: string;
-  file_url: string;
-  file_type: string;
-  proof_type: string;
-  description: string | null;
-  created_at: string;
-  verified: boolean;
-}
-
 export const P2PProofUploader = ({
   transactionId,
   proofType,
@@ -34,7 +23,6 @@ export const P2PProofUploader = ({
   description,
   onUploadSuccess,
 }: P2PProofUploaderProps) => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -99,31 +87,19 @@ export const P2PProofUploader = ({
         .from('p2p-proofs')
         .getPublicUrl(filePath);
 
-      // Save proof record
-      const { error: insertError } = await supabase
-        .from('p2p_payment_proofs')
-        .insert({
-          transaction_id: transactionId,
-          uploaded_by: user?.id,
-          proof_type: proofType,
-          file_url: publicUrl,
-          file_type: selectedFile.type,
-          description: proofDescription || null,
-        });
-
-      if (insertError) throw insertError;
-
-      // Update transaction status if it's a payment proof
-      if (proofType === 'payment') {
-        await supabase
-          .from('p2p_transactions')
-          .update({ 
-            status: 'proof_submitted',
-            proof_url: publicUrl,
-            last_activity_at: new Date().toISOString()
-          })
-          .eq('id', transactionId);
+      if (proofType !== 'payment') {
+        throw new Error('Only buyer payment proofs are supported.');
       }
+
+      const { error } = await (supabase as any).rpc(
+        'p2p_submit_payment_proof',
+        {
+          p_transaction_id: transactionId,
+          p_proof_url: publicUrl,
+          p_notes: proofDescription || null,
+        },
+      );
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Proof uploaded successfully');

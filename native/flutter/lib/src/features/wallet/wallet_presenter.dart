@@ -72,6 +72,42 @@ class WalletPresenter extends ChangeNotifier {
   List<CreditTransaction> get filteredTransactions =>
       _transactions.where(_transactionFilter.matches).toList();
 
+  // --- Finance buyback ---
+  WalletLoadState _buybackState = WalletLoadState.idle;
+  WalletLoadState get buybackState => _buybackState;
+  List<FinanceBuybackRequest> _buybackRequests = const [];
+  List<FinanceBuybackRequest> get buybackRequests => _buybackRequests;
+
+  WalletLoadState _buybackMutationState = WalletLoadState.idle;
+  WalletLoadState get buybackMutationState => _buybackMutationState;
+  String? _cancelingBuybackRequestId;
+  String? get cancelingBuybackRequestId => _cancelingBuybackRequestId;
+
+  bool get hasPendingFinanceBuyback =>
+      _buybackRequests.any((request) => request.isPending);
+
+  bool get canRequestFinanceBuyback => financeBuybackBlockedReason == null;
+
+  String? get financeBuybackBlockedReason {
+    if (_buybackState == WalletLoadState.idle ||
+        _buybackState == WalletLoadState.loading) {
+      return 'Buyback history is still loading.';
+    }
+    if (_buybackState == WalletLoadState.error) {
+      return 'Refresh buyback history before submitting a request.';
+    }
+    if (_buybackMutationState == WalletLoadState.loading) {
+      return 'A finance buyback update is in progress.';
+    }
+    if (hasPendingFinanceBuyback) {
+      return 'You already have a pending finance buyback request.';
+    }
+    if (_balance.balance <= 0) {
+      return 'You do not have credits available for buyback.';
+    }
+    return null;
+  }
+
   // --- Subscription tiers ---
   WalletLoadState _tiersState = WalletLoadState.idle;
   WalletLoadState get tiersState => _tiersState;
@@ -206,6 +242,19 @@ class WalletPresenter extends ChangeNotifier {
       _transactionsState = WalletLoadState.ready;
     } catch (_) {
       _transactionsState = WalletLoadState.error;
+    }
+    _safeNotify();
+  }
+
+  Future<void> loadFinanceBuybacks() async {
+    if (_buybackState == WalletLoadState.loading) return;
+    _buybackState = WalletLoadState.loading;
+    _safeNotify();
+    try {
+      _buybackRequests = await _data.fetchFinanceBuybackRequests();
+      _buybackState = WalletLoadState.ready;
+    } catch (_) {
+      _buybackState = WalletLoadState.error;
     }
     _safeNotify();
   }
@@ -449,6 +498,63 @@ class WalletPresenter extends ChangeNotifier {
     giftType: giftType,
     creditValue: creditValue,
   );
+
+  Future<void> requestFinanceBuyback({required int creditsAmount}) async {
+    final blockedReason = financeBuybackBlockedReason;
+    if (blockedReason != null) {
+      throw WalletBackendUnavailable(blockedReason);
+    }
+    if (creditsAmount <= 0) {
+      throw const WalletBackendUnavailable('Enter a valid number of credits.');
+    }
+    if (creditsAmount > _balance.balance) {
+      throw const WalletBackendUnavailable(
+        'You do not have enough credits for this buyback request.',
+      );
+    }
+
+    _buybackMutationState = WalletLoadState.loading;
+    _safeNotify();
+    try {
+      await _data.requestFinanceBuyback(creditsAmount: creditsAmount);
+      await Future.wait([loadFinanceBuybacks(), refreshAfterMutation()]);
+      _buybackMutationState = WalletLoadState.ready;
+      _safeNotify();
+    } catch (_) {
+      _buybackMutationState = WalletLoadState.error;
+      _safeNotify();
+      rethrow;
+    }
+  }
+
+  Future<void> cancelFinanceBuyback(FinanceBuybackRequest request) async {
+    if (!request.isPending) {
+      throw const WalletBackendUnavailable(
+        'Only pending buyback requests can be canceled.',
+      );
+    }
+    if (_buybackMutationState == WalletLoadState.loading) {
+      throw const WalletBackendUnavailable(
+        'A finance buyback update is already in progress.',
+      );
+    }
+
+    _buybackMutationState = WalletLoadState.loading;
+    _cancelingBuybackRequestId = request.id;
+    _safeNotify();
+    try {
+      await _data.cancelFinanceBuyback(request.id);
+      await Future.wait([loadFinanceBuybacks(), refreshAfterMutation()]);
+      _buybackMutationState = WalletLoadState.ready;
+      _cancelingBuybackRequestId = null;
+      _safeNotify();
+    } catch (_) {
+      _buybackMutationState = WalletLoadState.error;
+      _cancelingBuybackRequestId = null;
+      _safeNotify();
+      rethrow;
+    }
+  }
 
   Future<PayoutRequest> requestPayout({required double amount}) async {
     final blockedReason = payoutBlockedReason;

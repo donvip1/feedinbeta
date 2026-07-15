@@ -8,32 +8,19 @@ import 'data/wallet_models.dart';
 import 'wallet_presenter.dart';
 import 'wallet_theme.dart';
 import 'widgets/balance_card.dart';
+import 'widgets/buyback_section.dart';
 import 'widgets/package_card.dart';
-import 'widgets/payout_destination_sheet.dart';
-import 'widgets/payout_section.dart';
-import 'widgets/send_credits_sheet.dart';
-import 'widgets/subscription_card.dart';
 import 'widgets/transaction_list.dart';
 import 'widgets/wallet_common.dart';
 
 typedef WalletCheckoutLauncher = Future<bool> Function(Uri uri);
 
-/// Top-level Wallet screen: credit/token balance, buy credits, gift/transfer,
-/// subscriptions, transaction history, and (for monetized creators) payouts.
-///
-/// Owns a [WalletPresenter] (auto-detecting the Supabase singleton) and drives
-/// the presentational wallet widgets via [ListenableBuilder]. Push it as a route
-/// from Profile or Settings. Everything degrades to honest empty states when
-/// signed-out / unconfigured; money moves surface a soft failure via snackbar
-/// when the server-side contract isn't available.
+/// Top-level deposit-only Wallet screen: credit balance, credit packages,
+/// P2P selling, finance-team buyback, and transaction history.
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key, this.presenter, this.checkoutLauncher});
 
-  /// Optional injected presenter (e.g. for tests). When null the screen creates
-  /// and owns one.
   final WalletPresenter? presenter;
-
-  /// Optional external-browser launcher used by focused widget tests.
   final WalletCheckoutLauncher? checkoutLauncher;
 
   @override
@@ -46,7 +33,6 @@ class _WalletScreenState extends State<WalletScreen>
   late final bool _ownsPresenter;
   final GlobalKey _packagesKey = GlobalKey();
   String? _busyPackageId;
-  String? _busyTierId;
   bool _checkoutWasBackgrounded = false;
   bool _checkingCheckout = false;
 
@@ -77,9 +63,7 @@ class _WalletScreenState extends State<WalletScreen>
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
-        if (_presenter.hasPendingCheckout) {
-          _checkoutWasBackgrounded = true;
-        }
+        if (_presenter.hasPendingCheckout) _checkoutWasBackgrounded = true;
       case AppLifecycleState.detached:
         break;
     }
@@ -90,11 +74,8 @@ class _WalletScreenState extends State<WalletScreen>
     await Future.wait([
       _presenter.loadPackages(),
       _presenter.loadTransactions(),
-      _presenter.loadTiers(),
+      _presenter.loadFinanceBuybacks(),
     ]);
-    if (_presenter.isMonetizedCreator) {
-      await _presenter.loadPayouts();
-    }
   }
 
   void _snack(String message) {
@@ -104,39 +85,16 @@ class _WalletScreenState extends State<WalletScreen>
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String? _activeTierName() {
-    final id = _presenter.activeTierId;
-    if (id == null) return null;
-    for (final tier in _presenter.tiers) {
-      if (tier.id == id) return tier.name;
-    }
-    return null;
-  }
-
   void _scrollToPackages() {
-    final ctx = _packagesKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 350),
-        alignment: 0.05,
-      );
-    }
-  }
-
-  Future<void> _openSend() async {
-    final sent = await SendCreditsSheet.show(
+    final context = _packagesKey.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
       context,
-      presenter: _presenter,
-      balance: _presenter.balance,
+      duration: const Duration(milliseconds: 350),
+      alignment: 0.05,
     );
-    if (sent == true) await _presenter.refreshAfterMutation();
   }
 
-  /// Opens the P2P credit marketplace. The wallet is the natural entry point:
-  /// users buy credits from the store here and can trade them peer-to-peer
-  /// there. Refreshes the balance/ledger on return since a trade may have
-  /// moved credits.
   Future<void> _openP2P() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -185,13 +143,13 @@ class _WalletScreenState extends State<WalletScreen>
     }
   }
 
-  Future<void> _buy(CreditPackage pkg) async {
-    setState(() => _busyPackageId = pkg.id);
+  Future<void> _buy(CreditPackage package) async {
+    setState(() => _busyPackageId = package.id);
     try {
-      final checkout = await _presenter.startCreditCheckout(pkg.id);
+      final checkout = await _presenter.startCreditCheckout(package.id);
       await _openCheckout(checkout);
-    } on WalletBackendUnavailable catch (e) {
-      _snack(e.message);
+    } on WalletBackendUnavailable catch (error) {
+      _snack(error.message);
     } catch (_) {
       _snack('Could not start checkout. Please try again.');
     } finally {
@@ -199,123 +157,55 @@ class _WalletScreenState extends State<WalletScreen>
     }
   }
 
-  Future<void> _subscribe(SubscriptionTier tier) async {
-    setState(() => _busyTierId = tier.id);
+  Future<bool> _requestFinanceBuyback(int creditsAmount) async {
     try {
-      final checkout = await _presenter.startSubscriptionCheckout(tier.id);
-      await _openCheckout(checkout);
-    } on WalletBackendUnavailable catch (e) {
-      _snack(e.message);
+      await _presenter.requestFinanceBuyback(creditsAmount: creditsAmount);
+      _snack('Buyback request submitted.');
+      return true;
+    } on WalletBackendUnavailable catch (error) {
+      _snack(error.message);
     } catch (_) {
-      _snack('Could not start the subscription. Please try again.');
-    } finally {
-      if (mounted) setState(() => _busyTierId = null);
+      _snack('Could not submit the buyback request.');
     }
+    return false;
   }
 
-  Future<void> _openPayout() async {
-    final blockedReason = _presenter.payoutBlockedReason;
-    if (blockedReason != null) {
-      _snack(blockedReason);
-      return;
-    }
-
-    final controller = TextEditingController();
-    String? validationMessage;
-    final amount = await showDialog<double>(
+  Future<void> _cancelFinanceBuyback(FinanceBuybackRequest request) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: WalletColors.card,
-          title: const Text(
-            'Request payout',
-            style: TextStyle(color: WalletColors.foreground),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Available: ${formatMoney(_presenter.monetization.availableBalance, 'USD')}',
-                style: WalletTextStyles.rowMuted,
-              ),
-              const SizedBox(height: WalletSpacing.md),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                style: const TextStyle(color: WalletColors.foreground),
-                decoration: InputDecoration(
-                  labelText: 'Amount (USD)',
-                  labelStyle: const TextStyle(
-                    color: WalletColors.mutedForeground,
-                  ),
-                  errorText: validationMessage,
-                  suffixIcon: TextButton(
-                    onPressed: () {
-                      controller.text = _presenter.monetization.availableBalance
-                          .toStringAsFixed(2);
-                      setDialogState(() => validationMessage = null);
-                    },
-                    child: const Text('Max'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final parsed = double.tryParse(controller.text.trim());
-                if (parsed == null ||
-                    !parsed.isFinite ||
-                    parsed < kMinimumCreatorPayoutUsd) {
-                  setDialogState(
-                    () => validationMessage = 'The minimum payout is \$10.00.',
-                  );
-                  return;
-                }
-                if (parsed > _presenter.monetization.availableBalance) {
-                  setDialogState(
-                    () => validationMessage =
-                        'Amount exceeds your available balance.',
-                  );
-                  return;
-                }
-                Navigator.of(ctx).pop(parsed);
-              },
-              child: const Text('Request'),
-            ),
-          ],
+      builder: (context) => AlertDialog(
+        backgroundColor: WalletColors.card,
+        title: const Text(
+          'Cancel buyback request?',
+          style: TextStyle(color: WalletColors.foreground),
         ),
+        content: Text(
+          '${formatCredits(request.creditsAmount)} credits will return to your '
+          'available balance.',
+          style: WalletTextStyles.rowMuted,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancel request'),
+          ),
+        ],
       ),
     );
-    controller.dispose();
-    if (amount == null || amount <= 0) return;
-    try {
-      await _presenter.requestPayout(amount: amount);
-      _snack('Payout requested.');
-    } on WalletBackendUnavailable catch (e) {
-      _snack(e.message);
-    } catch (_) {
-      _snack('Could not request the payout.');
-    }
-  }
+    if (confirmed != true) return;
 
-  Future<void> _openPayoutDestination() async {
-    final destination = await PayoutDestinationSheet.show(
-      context,
-      presenter: _presenter,
-    );
-    if (destination == null || !mounted) return;
-    _snack('Payout account saved.');
-    await _presenter.loadPayouts();
+    try {
+      await _presenter.cancelFinanceBuyback(request);
+      _snack('Buyback request canceled.');
+    } on WalletBackendUnavailable catch (error) {
+      _snack(error.message);
+    } catch (_) {
+      _snack('Could not cancel the buyback request.');
+    }
   }
 
   @override
@@ -348,7 +238,7 @@ class _WalletScreenState extends State<WalletScreen>
       body: ListenableBuilder(
         listenable: _presenter,
         builder: (context, _) {
-          final p = _presenter;
+          final presenter = _presenter;
           return RefreshIndicator(
             onRefresh: _load,
             color: WalletColors.primary,
@@ -357,43 +247,36 @@ class _WalletScreenState extends State<WalletScreen>
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
                 WalletBalanceCard(
-                  balance: p.balance,
-                  onSend: () => _openSend(),
+                  balance: presenter.balance,
                   onBuy: _scrollToPackages,
-                  onWithdraw: p.isMonetizedCreator ? () => _openPayout() : null,
-                  tierName: _activeTierName(),
                 ),
-                if (p.checkoutState != WalletCheckoutState.idle) ...[
+                if (presenter.checkoutState != WalletCheckoutState.idle) ...[
                   const SizedBox(height: 12),
-                  _checkoutBanner(p),
+                  _checkoutBanner(presenter),
                 ],
-                if (p.overviewState == WalletLoadState.error) ...[
+                if (presenter.overviewState == WalletLoadState.error) ...[
                   const SizedBox(height: 12),
                   WalletInlineError(
                     message:
-                        'Could not refresh your wallet or subscription status. '
+                        'Could not refresh your wallet balance. '
                         'Pull to retry or tap below.',
-                    onRetry: _presenter.loadOverview,
+                    onRetry: presenter.loadOverview,
                   ),
                 ],
                 const SizedBox(height: 16),
-
-                // Peer-to-peer marketplace entry.
                 WalletNavTile(
                   icon: Icons.storefront_rounded,
-                  title: 'P2P marketplace',
-                  subtitle: 'Buy & sell credits with other users',
+                  title: 'Sell credits P2P',
+                  subtitle: 'List and trade credits with other users',
                   onTap: _openP2P,
                 ),
                 const SizedBox(height: 20),
-
-                // Buy credits / tokens
                 Container(key: _packagesKey),
-                const WalletSectionHeader(title: 'Buy credits'),
+                const WalletSectionHeader(title: 'Feedin credit packages'),
                 const SizedBox(height: 8),
-                if (p.packagesState == WalletLoadState.loading)
+                if (presenter.packagesState == WalletLoadState.loading)
                   const WalletLoading()
-                else if (p.packagesState == WalletLoadState.error)
+                else if (presenter.packagesState == WalletLoadState.error)
                   WalletEmptyState(
                     icon: Icons.error_outline_rounded,
                     title: 'Couldn\'t load packages',
@@ -401,79 +284,40 @@ class _WalletScreenState extends State<WalletScreen>
                     action: WalletSecondaryButton(
                       label: 'Retry',
                       icon: Icons.refresh_rounded,
-                      onPressed: _presenter.loadPackages,
+                      onPressed: presenter.loadPackages,
                     ),
                   )
-                else if (p.packages.isEmpty)
+                else if (presenter.packages.isEmpty)
                   _emptyLine('No credit packages available yet.')
                 else
-                  ...p.packages.map(
-                    (pkg) => Padding(
+                  ...presenter.packages.map(
+                    (package) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: WalletPackageCard(
-                        package: pkg,
-                        onPurchase: () => _buy(pkg),
-                        busy: _busyPackageId == pkg.id,
+                        package: package,
+                        onPurchase: () => _buy(package),
+                        busy: _busyPackageId == package.id,
                       ),
                     ),
                   ),
                 const SizedBox(height: 20),
-
-                // Subscription tiers
-                if (p.tiersState == WalletLoadState.loading ||
-                    p.tiersState == WalletLoadState.error ||
-                    p.tiers.isNotEmpty) ...[
-                  const WalletSectionHeader(title: 'Subscriptions'),
-                  const SizedBox(height: 8),
-                  if (p.tiersState == WalletLoadState.loading)
-                    const WalletLoading()
-                  else if (p.tiersState == WalletLoadState.error)
-                    WalletEmptyState(
-                      icon: Icons.error_outline_rounded,
-                      title: 'Couldn\'t load plans',
-                      subtitle: 'Check your connection and try again.',
-                      action: WalletSecondaryButton(
-                        label: 'Retry',
-                        icon: Icons.refresh_rounded,
-                        onPressed: _presenter.loadTiers,
-                      ),
-                    )
-                  else
-                    ...p.tiers.map(
-                      (tier) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: WalletSubscriptionCard(
-                          tier: tier,
-                          onSubscribe: () => _subscribe(tier),
-                          isCurrent: p.activeTierId == tier.id,
-                          busy: _busyTierId == tier.id,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                ],
-
-                if (p.isMonetizedCreator) ...[
-                  WalletPayoutSection(
-                    monetization: p.monetization,
-                    requests: p.payoutRequests,
-                    state: p.payoutState,
-                    requestState: p.payoutRequestState,
-                    blockedReason: p.payoutBlockedReason,
-                    destination: p.defaultPayoutDestination,
-                    onRequest: p.canRequestPayout ? _openPayout : null,
-                    onConfigureDestination: _openPayoutDestination,
-                    onRetry: p.loadPayouts,
-                  ),
-                  const SizedBox(height: 20),
-                ],
-
-                // Transaction history
-                const WalletSectionHeader(title: 'Transactions'),
+                WalletBuybackSection(
+                  balance: presenter.balance,
+                  requests: presenter.buybackRequests,
+                  state: presenter.buybackState,
+                  mutationState: presenter.buybackMutationState,
+                  blockedReason: presenter.financeBuybackBlockedReason,
+                  cancelingRequestId: presenter.cancelingBuybackRequestId,
+                  onRequest: _requestFinanceBuyback,
+                  onCancel: _cancelFinanceBuyback,
+                  onRetry: presenter.loadFinanceBuybacks,
+                ),
+                const SizedBox(height: 20),
+                const WalletSectionHeader(title: 'Transaction history'),
                 const SizedBox(height: 8),
-                if (p.transactionsState == WalletLoadState.loading)
+                if (presenter.transactionsState == WalletLoadState.loading)
                   const WalletLoading()
-                else if (p.transactionsState == WalletLoadState.error)
+                else if (presenter.transactionsState == WalletLoadState.error)
                   WalletEmptyState(
                     icon: Icons.error_outline_rounded,
                     title: 'Couldn\'t load transactions',
@@ -481,14 +325,14 @@ class _WalletScreenState extends State<WalletScreen>
                     action: WalletSecondaryButton(
                       label: 'Retry',
                       icon: Icons.refresh_rounded,
-                      onPressed: _presenter.loadTransactions,
+                      onPressed: presenter.loadTransactions,
                     ),
                   )
                 else
                   WalletTransactionList(
-                    transactions: p.filteredTransactions,
-                    filter: p.transactionFilter,
-                    onFilterChanged: p.setTransactionFilter,
+                    transactions: presenter.filteredTransactions,
+                    filter: presenter.transactionFilter,
+                    onFilterChanged: presenter.setTransactionFilter,
                   ),
               ],
             ),

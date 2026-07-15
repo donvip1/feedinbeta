@@ -1,7 +1,13 @@
 import React, { useEffect, useState, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
@@ -60,7 +66,6 @@ const Groups = lazy(() => import("./pages/Groups"));
 const GroupDetail = lazy(() => import("./pages/GroupDetail"));
 const GroupChat = lazy(() => import("./pages/GroupChat"));
 const GroupJoin = lazy(() => import("./pages/GroupJoin"));
-const Subscription = lazy(() => import("./pages/Subscription"));
 const Credits = lazy(() => import("./pages/Credits"));
 const SavedPosts = lazy(() => import("./pages/SavedPosts"));
 const Promote = lazy(() => import("./pages/Promote"));
@@ -104,7 +109,6 @@ const StoryDetail = lazy(() => import("./pages/StoryDetail"));
 const LiveStreamDetail = lazy(() => import("./pages/LiveStreamDetail"));
 const AdminWallet = lazy(() => import("./pages/AdminWallet"));
 const SessionManagement = lazy(() => import("./pages/SessionManagement"));
-const CreatorPayouts = lazy(() => import("./pages/CreatorPayouts"));
 const Promotions = lazy(() => import("./pages/Promotions"));
 const Install = lazy(() => import("./pages/Install"));
 const MusicDiscovery = lazy(() => import("./pages/MusicDiscovery"));
@@ -394,12 +398,12 @@ const App = () => {
             {/* Wallet & Credits */}
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/wallet/credits" element={<Credits />} />
-            <Route path="/wallet/subscription" element={<Subscription />} />
+            <Route path="/wallet/subscription" element={<Navigate to="/wallet/credits" replace />} />
             <Route path="/wallet/p2p" element={<P2PMarketplace />} />
             <Route path="/wallet/p2p/:transactionId" element={<P2PTransaction />} />
             <Route path="/p2p/payment-methods" element={<P2PPaymentMethods />} />
             <Route path="/wallet/admin" element={<AdminWallet />} />
-            <Route path="/wallet/creator-payouts" element={<CreatorPayouts />} />
+            <Route path="/wallet/creator-payouts" element={<Navigate to="/wallet/admin" replace />} />
             
             {/* Posts & Content Management */}
             <Route path="/saved" element={<SavedPosts />} />

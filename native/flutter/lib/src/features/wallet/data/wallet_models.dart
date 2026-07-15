@@ -4,7 +4,7 @@
 /// `supabase/migrations/20260624000500_native_money_p2p_schema.sql`:
 /// `user_credits`, `credit_packages`, `credit_transactions`, `payment_history`,
 /// `subscription_tiers`, `user_subscriptions`, `creator_monetization`,
-/// `creator_payout_requests`.
+/// `creator_payout_requests`, `finance_credit_buyback_requests`.
 ///
 /// Where the web components need richer data than the live schema provides
 /// (e.g. per-package promotion labels, discount percentages, "isPopular"),
@@ -407,6 +407,63 @@ class PayoutRequest {
   }
 }
 
+/// A request for Feedin's finance team to buy credits back from the user.
+///
+/// The buyback migration is additive to the original wallet schema. The
+/// required client-facing fields are `id`, `credits_amount`, `status`, and a
+/// request timestamp (`requested_at` or `created_at`).
+class FinanceBuybackRequest {
+  const FinanceBuybackRequest({
+    required this.id,
+    required this.creditsAmount,
+    required this.status,
+    required this.requestedAtMillis,
+    this.updatedAtMillis,
+    this.resolvedAtMillis,
+    this.note,
+  });
+
+  final String id;
+  final int creditsAmount;
+  final String status;
+  final int requestedAtMillis;
+  final int? updatedAtMillis;
+  final int? resolvedAtMillis;
+  final String? note;
+
+  bool get isPending => status == 'pending';
+
+  bool get isSuccessful =>
+      status == 'approved' || status == 'paid' || status == 'completed';
+
+  bool get isCanceled => status == 'canceled' || status == 'cancelled';
+
+  String get statusLabel => _humanizeType(status);
+
+  factory FinanceBuybackRequest.fromJson(Map<String, Object?> json) {
+    return FinanceBuybackRequest(
+      id: json['id'].toString(),
+      creditsAmount: _asInt(
+        json['credits_amount'] ?? json['credit_amount'] ?? json['amount'],
+      ),
+      status: (json['status']?.toString() ?? 'pending').toLowerCase(),
+      requestedAtMillis: _asMillis(json['requested_at'] ?? json['created_at']),
+      updatedAtMillis: _asNullableMillis(json['updated_at']),
+      resolvedAtMillis: _asNullableMillis(
+        json['completed_at'] ??
+            json['processed_at'] ??
+            json['reviewed_at'] ??
+            json['canceled_at'] ??
+            json['cancelled_at'],
+      ),
+      note:
+          json['finance_note']?.toString() ??
+          json['review_notes']?.toString() ??
+          json['failure_reason']?.toString(),
+    );
+  }
+}
+
 /// Hosted checkout category understood by the server-owned payment function.
 enum WalletCheckoutKind { credits, subscription }
 
@@ -480,8 +537,8 @@ class WalletCheckoutVerificationException implements Exception {
 
 /// Raised when a money-moving wallet operation cannot complete because the
 /// required server-side contract (purchase edge function / transfer / gift /
-/// payout RPC) is not available in the live schema. The UI treats this as a
-/// soft, honest failure rather than pretending success.
+/// payout / buyback RPC) is not available in the live schema. The UI treats
+/// this as a soft, honest failure rather than pretending success.
 class WalletBackendUnavailable implements Exception {
   const WalletBackendUnavailable(this.message, {this.cause});
   final String message;

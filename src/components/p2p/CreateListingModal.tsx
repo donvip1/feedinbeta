@@ -6,13 +6,10 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Coins, Info, AlertCircle, Globe, Lock } from 'lucide-react';
-import { P2P_CONFIG, creditsToUsdForSelling, getCountryByCode } from '@/lib/p2p-config';
+import { Plus, Coins, Info, AlertCircle, Lock } from 'lucide-react';
+import { P2P_CONFIG, creditsToUsdForSelling } from '@/lib/p2p-config';
 import { useP2PEligibility } from '@/hooks/useP2PEligibility';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,36 +19,31 @@ interface CreateListingModalProps {
 
 export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => {
   const { user } = useAuth();
-  const { formatPrice, convertFromUSD, currencySymbol, userLocation } = useCurrency();
+  const { convertFromUSD, currencySymbol } = useCurrency();
   const { eligibility } = useP2PEligibility();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   
-  // Get user's country
-  const { data: profile } = useQuery({
-    queryKey: ['profile-country', user?.id],
+  const { data: paymentMethod } = useQuery({
+    queryKey: ['p2p-default-payment-method', user?.id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('profiles')
-        .select('country')
-        .eq('id', user?.id)
-        .single();
+        .from('p2p_payment_methods')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('is_default', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       return data;
     },
     enabled: !!user?.id,
   });
-
-  const userCountry = profile?.country || (typeof userLocation === 'string' ? userLocation : userLocation?.countryCode) || 'NG';
-  const countryInfo = getCountryByCode(userCountry);
   
   // Form state
   const [creditsAmount, setCreditsAmount] = useState('');
   const [priceUsd, setPriceUsd] = useState('');
-  const [minAmount, setMinAmount] = useState(eligibility.minTradeAmount.toString());
-  const [maxAmount, setMaxAmount] = useState('');
-  const [paymentWindow, setPaymentWindow] = useState('30');
-  const [terms, setTerms] = useState('');
 
   // Calculate rate using P2P sell rate (85 credits = $1)
   const credits = parseInt(creditsAmount) || 0;
@@ -84,15 +76,10 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
         .insert({
           seller_id: user?.id,
           credits_amount: credits,
-          price_usd: price,
-          min_amount: minAmount ? parseInt(minAmount) : eligibility.minTradeAmount,
-          max_amount: maxAmount ? parseInt(maxAmount) : null,
-          payment_window_minutes: parseInt(paymentWindow) || 30,
-          terms: terms || null,
-          country_code: userCountry,
-          currency_code: countryInfo?.currency || 'USD',
-          credits_per_dollar: P2P_CONFIG.SELL_RATE,
-          is_international: false,
+          price_cents: Math.round(price * 100),
+          currency: 'USD',
+          payment_method_id: paymentMethod?.id ?? null,
+          status: 'active',
         });
 
       if (error) throw error;
@@ -111,10 +98,6 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
   const resetForm = () => {
     setCreditsAmount('');
     setPriceUsd('');
-    setMinAmount(eligibility.minTradeAmount.toString());
-    setMaxAmount('');
-    setPaymentWindow('30');
-    setTerms('');
   };
 
   const handleQuickAmount = (percentage: number) => {
@@ -169,11 +152,6 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
                   Add Payment Method
                 </Button>
               )}
-              {!eligibility.userCountry && (
-                <Button variant="outline" onClick={() => navigate('/settings/account')} className="flex-1">
-                  Set Country
-                </Button>
-              )}
             </div>
           </div>
         </DialogContent>
@@ -198,21 +176,15 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Region Lock Badge */}
+          {/* Settlement currency */}
           <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
             <Lock className="h-4 w-4 text-primary" />
             <div className="flex-1">
-              <span className="text-sm font-medium flex items-center gap-2">
-                <Globe className="h-3 w-3" />
-                {countryInfo?.name || userCountry} Only
-              </span>
+              <span className="text-sm font-medium">USD listing value</span>
               <p className="text-xs text-muted-foreground">
-                Only users in {countryInfo?.name || userCountry} can buy
+                Buyer and seller agree the external payment method in the trade
               </p>
             </div>
-            <Badge variant="outline" className="text-xs">
-              {countryInfo?.currency || 'USD'}
-            </Badge>
           </div>
 
           {/* Available Balance */}
@@ -271,7 +243,7 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
             />
             {price > 0 && (
               <p className="text-sm text-muted-foreground">
-                ≈ {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} in {countryInfo?.currency || 'local currency'}
+                ≈ {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </p>
             )}
           </div>
@@ -292,69 +264,6 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
               )}
             </div>
           )}
-
-          {/* Min/Max Limits */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Min Amount</Label>
-              <Input
-                type="number"
-                placeholder={eligibility.minTradeAmount.toString()}
-                value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
-                min={eligibility.minTradeAmount}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Amount (optional)</Label>
-              <Input
-                type="number"
-                placeholder="No limit"
-                value={maxAmount}
-                onChange={(e) => setMaxAmount(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Payment Window */}
-          <div className="space-y-2">
-            <Label>Payment Window</Label>
-            <Select value={paymentWindow} onValueChange={setPaymentWindow}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15">15 minutes</SelectItem>
-                <SelectItem value="30">30 minutes</SelectItem>
-                <SelectItem value="60">1 hour</SelectItem>
-                <SelectItem value="120">2 hours</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Time allowed for buyer to make payment
-            </p>
-          </div>
-
-          {/* Terms */}
-          <div className="space-y-2">
-            <Label>Terms & Instructions (optional)</Label>
-            <Textarea
-              placeholder="E.g., Payment must be from a verified account..."
-              value={terms}
-              onChange={(e) => setTerms(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          {/* International Coming Soon */}
-          <div className="flex items-center gap-2 p-3 bg-yellow-500/10 rounded-lg">
-            <Globe className="w-4 h-4 text-yellow-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-600">PayPal International</p>
-              <p className="text-xs text-muted-foreground">Coming soon for cross-border trades</p>
-            </div>
-            <Badge variant="outline" className="text-xs">Soon</Badge>
-          </div>
 
           {/* Info Note */}
           <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg text-sm">

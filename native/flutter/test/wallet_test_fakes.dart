@@ -10,6 +10,7 @@ class FakeWalletDataSource implements WalletDataSource {
   CreatorMonetization monetization = CreatorMonetization.empty;
   List<PayoutRequest> payoutRequests = const [];
   List<PayoutDestination> payoutDestinations = const [];
+  List<FinanceBuybackRequest> financeBuybackRequests = const [];
   List<PaystackBank> payoutBanks = const [];
   VerifiedPayoutAccount? verifiedPayoutAccount;
   PayoutDestination? savedPayoutDestination;
@@ -20,10 +21,19 @@ class FakeWalletDataSource implements WalletDataSource {
   Object? verificationError;
   PayoutRequest? payoutResponse;
   Object? payoutError;
+  FinanceBuybackRequest? financeBuybackResponse;
+  Object? financeBuybackRequestError;
+  Object? financeBuybackCancelError;
 
   int verifyCalls = 0;
   int payoutCalls = 0;
+  int fetchTiersCalls = 0;
+  int fetchPayoutRequestsCalls = 0;
+  int financeBuybackRequestCalls = 0;
+  int financeBuybackCancelCalls = 0;
   String? verifiedReference;
+  int? requestedFinanceBuybackCredits;
+  String? canceledFinanceBuybackRequestId;
 
   @override
   Future<CreditBalance> fetchBalance() async => balance;
@@ -37,7 +47,10 @@ class FakeWalletDataSource implements WalletDataSource {
   }
 
   @override
-  Future<List<SubscriptionTier>> fetchTiers() async => tiers;
+  Future<List<SubscriptionTier>> fetchTiers() async {
+    fetchTiersCalls++;
+    return tiers;
+  }
 
   @override
   Future<UserSubscription?> fetchActiveSubscription() async {
@@ -49,7 +62,15 @@ class FakeWalletDataSource implements WalletDataSource {
 
   @override
   Future<List<PayoutRequest>> fetchMyPayoutRequests({int limit = 20}) async {
+    fetchPayoutRequestsCalls++;
     return payoutRequests.take(limit).toList();
+  }
+
+  @override
+  Future<List<FinanceBuybackRequest>> fetchFinanceBuybackRequests({
+    int limit = 20,
+  }) async {
+    return financeBuybackRequests.take(limit).toList();
   }
 
   @override
@@ -135,6 +156,45 @@ class FakeWalletDataSource implements WalletDataSource {
       ...payoutRequests.where((request) => request.id != response.id),
     ];
     return response;
+  }
+
+  @override
+  Future<void> requestFinanceBuyback({required int creditsAmount}) async {
+    financeBuybackRequestCalls++;
+    requestedFinanceBuybackCredits = creditsAmount;
+    final error = financeBuybackRequestError;
+    if (error != null) throw error;
+    final response = financeBuybackResponse;
+    if (response == null) {
+      throw StateError('Missing finance buyback response');
+    }
+    financeBuybackRequests = [
+      response,
+      ...financeBuybackRequests.where((request) => request.id != response.id),
+    ];
+  }
+
+  @override
+  Future<void> cancelFinanceBuyback(String requestId) async {
+    financeBuybackCancelCalls++;
+    canceledFinanceBuybackRequestId = requestId;
+    final error = financeBuybackCancelError;
+    if (error != null) throw error;
+    financeBuybackRequests = [
+      for (final request in financeBuybackRequests)
+        if (request.id == requestId)
+          FinanceBuybackRequest(
+            id: request.id,
+            creditsAmount: request.creditsAmount,
+            status: 'canceled',
+            requestedAtMillis: request.requestedAtMillis,
+            updatedAtMillis: request.updatedAtMillis,
+            resolvedAtMillis: request.resolvedAtMillis,
+            note: request.note,
+          )
+        else
+          request,
+    ];
   }
 }
 

@@ -65,21 +65,15 @@ export const useP2PEligibility = () => {
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Fetch user profile for country and phone
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('country, phone_number')
-        .eq('id', user.id)
-        .single();
-
       const hasPaymentMethod = (paymentMethods?.length ?? 0) > 0;
+      const canSell = eligibilityData?.can_sell !== false;
       const hasPurchasedPack = eligibilityData?.has_purchased_pack ?? false;
       const hasCompletedFirstTrade = eligibilityData?.first_p2p_trade_completed ?? false;
       const isReseller = eligibilityData?.is_reseller ?? false;
       const totalTrades = eligibilityData?.total_trades ?? 0;
       const totalVolumeUsd = Number(eligibilityData?.total_volume_usd ?? 0);
-      const userCountry = profile?.country ?? null;
-      const userPhoneNumber = profile?.phone_number ?? null;
+      const userCountry = paymentMethods?.[0]?.country_code ?? null;
+      const userPhoneNumber = null;
       const buyerCancellationCount = (eligibilityData as any)?.buyer_cancellation_count ?? 0;
       const buyerBanUntil = (eligibilityData as any)?.buyer_ban_until ?? null;
 
@@ -94,25 +88,20 @@ export const useP2PEligibility = () => {
 
       // Determine if can trade and reasons
       const reasons: string[] = [];
-      
+
       if (!hasPaymentMethod) {
         reasons.push('Add a payment method to start trading');
       }
-      
-      if (!userCountry) {
-        reasons.push('Set your country in profile settings');
-      }
-
-      if (!userPhoneNumber) {
-        reasons.push('Add your phone number in profile settings');
+      if (!canSell) {
+        reasons.push('P2P selling is not enabled for this account');
       }
 
       if (isBuyerBanned) {
         reasons.push(`You are banned from buying until ${new Date(buyerBanUntil!).toLocaleDateString()}`);
       }
 
-      const profileIncomplete = !userCountry || !userPhoneNumber;
-      const canTrade = hasPaymentMethod && !!userCountry && !!userPhoneNumber;
+      const profileIncomplete = !hasPaymentMethod;
+      const canTrade = canSell && hasPaymentMethod;
       const canBuy = canTrade && !isBuyerBanned;
 
       return {

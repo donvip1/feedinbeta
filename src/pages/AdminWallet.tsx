@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BackButton } from '@/components/navigation/BackButton';
+import { FinanceBuybackPanel } from '@/components/admin/finance-buyback/FinanceBuybackPanel';
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -730,6 +731,8 @@ const AdminWallet = () => {
             </CardContent>
           </Card>
         </div>
+
+        <FinanceBuybackPanel canManageBuybacks={canManageCredits === true} />
 
         {/* 70/30 Profit Split Overview */}
         <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-accent/5">

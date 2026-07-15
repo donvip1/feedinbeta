@@ -44,6 +44,10 @@ export const usePaystack = ({ type, onSuccess }: UsePaystackOptions) => {
   const initializePayment = async (itemId: string) => {
     try {
       setLoading(itemId);
+      if (type !== 'credits') {
+        toast.error('Paystack currently supports Feedin credit purchases only.');
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {

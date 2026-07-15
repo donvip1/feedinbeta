@@ -10,7 +10,7 @@ import { useTheme } from 'next-themes';
 
 import { 
   ArrowLeft, User, Shield, Bell, Lock, Trash2, ChevronRight, LogOut,
-  TrendingUp, UsersRound, Wallet, Coins, Crown, Bookmark, HardDrive,
+  TrendingUp, UsersRound, Wallet, Coins, Bookmark, HardDrive,
   Globe, HelpCircle, Users, Radio, ShieldCheck, Briefcase, Smartphone,
   Download, Banknote, Moon, Sun, BarChart3, Gift, Rocket, Info, FileText,
   Scale, RefreshCw, CheckCircle2, Loader2, ChevronDown, type LucideIcon
@@ -279,7 +279,6 @@ const Settings = () => {
       iconColor: 'text-green-500',
       items: [
         { icon: Wallet, title: 'Wallet & Credits', description: 'Balance, buy & send', route: '/wallet', color: 'text-green-500' },
-        { icon: Crown, title: 'Subscription Plans', description: 'Premium features', route: '/wallet/subscription', color: 'text-yellow-500' },
         { icon: Coins, title: 'Buy Credits', route: '/wallet/credits', color: 'text-amber-500' },
         { icon: TrendingUp, title: 'P2P Marketplace', description: 'Peer-to-peer trading', route: '/wallet/p2p', color: 'text-blue-500' },
         { icon: Banknote, title: 'Payment Methods', description: 'Bank accounts for P2P', route: '/p2p/payment-methods', color: 'text-cyan-500' },
@@ -336,7 +335,6 @@ const Settings = () => {
     items: [
       { icon: Shield, title: 'Admin Panel', description: 'P2P, disputes & roles', route: '/admin/panel', color: 'text-primary' },
       { icon: ShieldCheck, title: 'FeedIn Wallet', description: 'Platform credits', route: '/wallet/admin', color: 'text-emerald-500' },
-      { icon: Banknote, title: 'Creator Payouts', route: '/wallet/creator-payouts', color: 'text-green-500' },
       { icon: TrendingUp, title: 'Analytics', description: 'MAU, DAU & revenue', route: '/admin/analytics', color: 'text-blue-500' },
       { icon: Trash2, title: 'Deleted Posts', description: 'Search & restore', route: '/admin/deleted-posts', color: 'text-red-500' },
     ],

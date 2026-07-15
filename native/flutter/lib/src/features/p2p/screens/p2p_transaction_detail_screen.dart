@@ -10,7 +10,8 @@ import '../widgets/p2p_transaction_timeline.dart';
 import 'p2p_transaction_chat_screen.dart';
 
 /// Full detail view for a single transaction: summary, progress timeline,
-/// primary actions (submit proof / cancel), chat entry, and dispute state.
+/// primary actions (submit proof / release / cancel), chat entry, and dispute
+/// state.
 /// Combines the web `P2PTransactionTimeline`, `P2PDisputePanel`,
 /// `CancelOrderModal`, and the chat entry point into one native screen.
 class P2PTransactionDetailScreen extends StatefulWidget {
@@ -45,15 +46,21 @@ class _P2PTransactionDetailScreenState
   }
 
   Future<void> _submitProof() async {
+    final proof = await _promptPaymentProof();
+    if (proof == null) return;
     setState(() => _busy = true);
     try {
-      await widget.dataSource.markProofSubmitted(_transaction.id);
+      final transaction = await widget.dataSource.submitPaymentProof(
+        transactionId: _transaction.id,
+        proofUrl: proof.proofUrl,
+        notes: proof.notes,
+      );
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _transaction = _clone(status: 'proof_submitted');
+        _transaction = transaction;
       });
-      _toast('Payment proof marked as submitted.');
+      _toast('Payment proof submitted.');
     } on P2PBackendUnavailable catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -65,16 +72,43 @@ class _P2PTransactionDetailScreenState
     }
   }
 
-  Future<void> _cancel() async {
-    final reason = await _promptCancel();
-    if (reason == null) return;
+  Future<void> _releaseCredits() async {
+    final confirmed = await _confirmRelease();
+    if (!confirmed) return;
     setState(() => _busy = true);
     try {
-      await widget.dataSource.cancelTransaction(_transaction.id);
+      final transaction = await widget.dataSource.releaseCredits(
+        _transaction.id,
+      );
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _transaction = _clone(status: 'cancelled');
+        _transaction = transaction;
+      });
+      _toast('Credits released to the buyer.');
+    } on P2PBackendUnavailable catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast('Could not release credits. Please try again.');
+    }
+  }
+
+  Future<void> _cancel() async {
+    final confirmed = await _confirmCancellation();
+    if (!confirmed) return;
+    setState(() => _busy = true);
+    try {
+      final transaction = await widget.dataSource.cancelTransactionWithResult(
+        _transaction.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _transaction = transaction;
       });
       _toast('Order cancelled.');
     } on P2PBackendUnavailable catch (error) {
@@ -92,28 +126,78 @@ class _P2PTransactionDetailScreenState
     final reason = await _promptDisputeReason();
     if (reason == null) return;
     setState(() => _busy = true);
-    final dispute = await widget.dataSource.openDispute(
-      transactionId: _transaction.id,
-      reason: reason,
-    );
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _transaction = _clone(status: 'disputed');
-      _disputeFuture = Future.value(dispute);
-    });
-    _toast('Dispute opened. A moderator will review it.');
+    try {
+      final dispute = await widget.dataSource.openDispute(
+        transactionId: _transaction.id,
+        reason: reason,
+      );
+      if (!mounted) return;
+      if (dispute == null) {
+        setState(() => _busy = false);
+        _toast('Sign in to open a dispute.');
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _transaction = _clone(status: 'disputed');
+        _disputeFuture = Future.value(dispute);
+      });
+      _toast('Dispute opened. A moderator will review it.');
+    } on P2PBackendUnavailable catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast('Could not open this dispute. Please try again.');
+    }
   }
 
-  Future<String?> _promptCancel() {
-    final controller = TextEditingController();
-    return showModalBottomSheet<String>(
+  Future<_PaymentProofInput?> _promptPaymentProof() {
+    return showModalBottomSheet<_PaymentProofInput>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black87,
-      builder: (sheetContext) => _CancelSheet(controller: controller),
+      builder: (sheetContext) => const _PaymentProofSheet(),
     );
+  }
+
+  Future<bool> _confirmRelease() async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black87,
+      builder: (sheetContext) => _ConfirmationSheet(
+        title: 'Release credits',
+        message:
+            'Confirm that the buyer payment has reached your account. '
+            'This will transfer the escrowed credits to the buyer.',
+        confirmLabel: 'Release credits',
+        confirmIcon: Icons.lock_open_outlined,
+        confirmColor: P2PTheme.success,
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<bool> _confirmCancellation() async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black87,
+      builder: (sheetContext) => const _ConfirmationSheet(
+        title: 'Cancel order',
+        message:
+            'Cancel this transaction and return the escrowed credits to the '
+            'seller?',
+        confirmLabel: 'Cancel order',
+        confirmIcon: Icons.close,
+        confirmColor: P2PTheme.danger,
+      ),
+    );
+    return confirmed ?? false;
   }
 
   Future<String?> _promptDisputeReason() {
@@ -212,6 +296,7 @@ class _P2PTransactionDetailScreenState
                     isBuyer: _isBuyer,
                     busy: _busy,
                     onSubmitProof: _submitProof,
+                    onReleaseCredits: _releaseCredits,
                     onCancel: _cancel,
                     onOpenDispute: _openDispute,
                     onChat: _openChat,
@@ -418,7 +503,10 @@ class _DisputeSection extends StatelessWidget {
               ),
               if (dispute.resolution != null) ...[
                 const SizedBox(height: 4),
-                Text('Resolution: ${dispute.resolution}', style: P2PTheme.muted),
+                Text(
+                  'Resolution: ${dispute.resolution}',
+                  style: P2PTheme.muted,
+                ),
               ],
             ],
           ),
@@ -434,6 +522,7 @@ class _Actions extends StatelessWidget {
     required this.isBuyer,
     required this.busy,
     required this.onSubmitProof,
+    required this.onReleaseCredits,
     required this.onCancel,
     required this.onOpenDispute,
     required this.onChat,
@@ -443,6 +532,7 @@ class _Actions extends StatelessWidget {
   final bool isBuyer;
   final bool busy;
   final VoidCallback onSubmitProof;
+  final VoidCallback onReleaseCredits;
   final VoidCallback onCancel;
   final VoidCallback onOpenDispute;
   final VoidCallback onChat;
@@ -458,12 +548,21 @@ class _Actions extends StatelessWidget {
         children: [
           if (isBuyer && status == 'pending')
             P2PPrimaryButton(
-              label: 'Mark payment sent',
+              label: 'Submit payment proof',
               icon: Icons.receipt_long_outlined,
               busy: busy,
               onPressed: onSubmitProof,
             ),
           if (isBuyer && status == 'pending')
+            const SizedBox(height: P2PTheme.sm),
+          if (!isBuyer && status == 'proof_submitted')
+            P2PPrimaryButton(
+              label: 'Release credits',
+              icon: Icons.lock_open_outlined,
+              busy: busy,
+              onPressed: onReleaseCredits,
+            ),
+          if (!isBuyer && status == 'proof_submitted')
             const SizedBox(height: P2PTheme.sm),
           P2PPrimaryButton(
             label: 'Open transaction chat',
@@ -542,23 +641,42 @@ class _SecondaryButton extends StatelessWidget {
   }
 }
 
-/// Cancel-order sheet requiring a >= 10 char reason (mirrors web
-/// `CancelOrderModal`). Returns the reason on confirm, null otherwise.
-class _CancelSheet extends StatefulWidget {
-  const _CancelSheet({required this.controller});
-  final TextEditingController controller;
+class _PaymentProofInput {
+  const _PaymentProofInput({required this.proofUrl, this.notes});
 
-  @override
-  State<_CancelSheet> createState() => _CancelSheetState();
+  final String proofUrl;
+  final String? notes;
 }
 
-class _CancelSheetState extends State<_CancelSheet> {
+class _PaymentProofSheet extends StatefulWidget {
+  const _PaymentProofSheet();
+
+  @override
+  State<_PaymentProofSheet> createState() => _PaymentProofSheetState();
+}
+
+class _PaymentProofSheetState extends State<_PaymentProofSheet> {
+  final _proofUrlController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  bool get _isValid {
+    final uri = Uri.tryParse(_proofUrlController.text.trim());
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
+  }
+
+  @override
+  void dispose() {
+    _proofUrlController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final length = widget.controller.text.trim().length;
-    final valid = length >= 10;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         decoration: const BoxDecoration(
           color: P2PTheme.card,
@@ -571,78 +689,62 @@ class _CancelSheetState extends State<_CancelSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: const [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: P2PTheme.danger,
-                    size: 20,
-                  ),
-                  SizedBox(width: P2PTheme.sm),
-                  Text(
-                    'Cancel order',
-                    style: TextStyle(
-                      color: P2PTheme.danger,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
+              const Text('Submit payment proof', style: P2PTheme.sectionTitle),
               const SizedBox(height: P2PTheme.sm),
               const Text(
-                'Please provide a reason for cancelling this order.',
+                'Add the secure URL for your payment receipt or confirmation.',
                 style: P2PTheme.muted,
               ),
               const SizedBox(height: P2PTheme.md),
               TextField(
-                controller: widget.controller,
+                controller: _proofUrlController,
                 onChanged: (_) => setState(() {}),
-                maxLines: 4,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
                 style: P2PTheme.body,
                 cursorColor: P2PTheme.primary,
-                decoration: InputDecoration(
-                  hintText: 'Explain why (minimum 10 characters)…',
-                  hintStyle:
-                      P2PTheme.muted.copyWith(color: P2PTheme.faintForeground),
-                  filled: true,
-                  fillColor: P2PTheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: P2PTheme.chipRadius,
-                    borderSide: const BorderSide(color: P2PTheme.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: P2PTheme.chipRadius,
-                    borderSide: const BorderSide(color: P2PTheme.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: P2PTheme.chipRadius,
-                    borderSide: const BorderSide(color: P2PTheme.primary),
-                  ),
+                decoration: _sheetInputDecoration(
+                  hintText: 'https://...',
+                  labelText: 'Proof URL',
                 ),
               ),
-              const SizedBox(height: 4),
-              Text('$length/10 characters minimum', style: P2PTheme.meta),
+              const SizedBox(height: P2PTheme.sm),
+              TextField(
+                controller: _notesController,
+                maxLines: 3,
+                style: P2PTheme.body,
+                cursorColor: P2PTheme.primary,
+                decoration: _sheetInputDecoration(
+                  hintText: 'Reference or payment details',
+                  labelText: 'Notes (optional)',
+                ),
+              ),
               const SizedBox(height: P2PTheme.md),
               Row(
                 children: [
                   Expanded(
                     child: _SecondaryButton(
-                      label: 'Keep order',
-                      icon: Icons.undo,
+                      label: 'Go back',
+                      icon: Icons.arrow_back,
                       color: P2PTheme.mutedForeground,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
                   const SizedBox(width: P2PTheme.sm),
                   Expanded(
-                    child: _SecondaryButton(
-                      label: 'Cancel order',
-                      icon: Icons.close,
-                      color: P2PTheme.danger,
-                      onPressed: valid
-                          ? () => Navigator.of(context)
-                              .pop(widget.controller.text.trim())
+                    child: P2PPrimaryButton(
+                      label: 'Submit proof',
+                      icon: Icons.receipt_long_outlined,
+                      onPressed: _isValid
+                          ? () {
+                              final notes = _notesController.text.trim();
+                              Navigator.of(context).pop(
+                                _PaymentProofInput(
+                                  proofUrl: _proofUrlController.text.trim(),
+                                  notes: notes.isEmpty ? null : notes,
+                                ),
+                              );
+                            }
                           : null,
                     ),
                   ),
@@ -654,6 +756,93 @@ class _CancelSheetState extends State<_CancelSheet> {
       ),
     );
   }
+}
+
+class _ConfirmationSheet extends StatelessWidget {
+  const _ConfirmationSheet({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.confirmIcon,
+    required this.confirmColor,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final IconData confirmIcon;
+  final Color confirmColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: P2PTheme.card,
+        borderRadius: P2PTheme.sheetTop,
+      ),
+      padding: const EdgeInsets.all(P2PTheme.lg),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: P2PTheme.sectionTitle),
+            const SizedBox(height: P2PTheme.sm),
+            Text(message, style: P2PTheme.muted),
+            const SizedBox(height: P2PTheme.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: _SecondaryButton(
+                    label: 'Go back',
+                    icon: Icons.arrow_back,
+                    color: P2PTheme.mutedForeground,
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                ),
+                const SizedBox(width: P2PTheme.sm),
+                Expanded(
+                  child: _SecondaryButton(
+                    label: confirmLabel,
+                    icon: confirmIcon,
+                    color: confirmColor,
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _sheetInputDecoration({
+  required String hintText,
+  required String labelText,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    labelText: labelText,
+    hintStyle: P2PTheme.muted.copyWith(color: P2PTheme.faintForeground),
+    labelStyle: P2PTheme.muted,
+    filled: true,
+    fillColor: P2PTheme.surface,
+    border: OutlineInputBorder(
+      borderRadius: P2PTheme.chipRadius,
+      borderSide: const BorderSide(color: P2PTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: P2PTheme.chipRadius,
+      borderSide: const BorderSide(color: P2PTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: P2PTheme.chipRadius,
+      borderSide: const BorderSide(color: P2PTheme.primary),
+    ),
+  );
 }
 
 /// Dispute-reason picker sheet. Returns the selected reason value.

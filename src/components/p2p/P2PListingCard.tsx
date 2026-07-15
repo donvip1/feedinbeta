@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useCurrency } from '@/context/CurrencyContext';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -9,36 +7,28 @@ interface P2PListingCardProps {
     id: string;
     seller_id: string;
     credits_amount: number;
-    price_usd: number;
-    min_amount?: number;
-    max_amount?: number;
-    payment_window_minutes?: number;
-    terms?: string;
+    price_cents: number;
+    currency: string;
     created_at: string;
-    country_code?: string;
-    currency_code?: string;
-    is_international?: boolean;
-    profiles?: {
+    seller?: {
       display_name: string | null;
       username: string | null;
       avatar_url: string | null;
     };
   };
-  userCountry?: string;
-  onBuy: (listingId: string, sellerId: string, credits: number, price: number) => void;
+  onBuy: (listingId: string) => void;
   isProcessing?: boolean;
 }
 
-export const P2PListingCard = ({ listing, userCountry, onBuy, isProcessing }: P2PListingCardProps) => {
+export const P2PListingCard = ({ listing, onBuy, isProcessing }: P2PListingCardProps) => {
   const { user } = useAuth();
-  const { convertFromUSD, currencySymbol } = useCurrency();
-  const [showTerms, setShowTerms] = useState(false);
-
   const isOwnListing = user?.id === listing.seller_id;
-  const creditsPerDollar = Math.round(listing.credits_amount / listing.price_usd);
-  const localPrice = convertFromUSD(listing.price_usd);
-  const isSameCountry = !userCountry || listing.country_code === userCountry;
-  const sellerName = listing.profiles?.display_name || listing.profiles?.username || 'Seller';
+  const price = listing.price_cents / 100;
+  const creditsPerUnit = price > 0
+    ? Math.round(listing.credits_amount / price)
+    : listing.credits_amount;
+  const sellerName =
+    listing.seller?.display_name || listing.seller?.username || 'Seller';
 
   return (
     <div className="py-3.5 px-1">
@@ -48,57 +38,36 @@ export const P2PListingCard = ({ listing, userCountry, onBuy, isProcessing }: P2
           <p className="text-sm font-medium truncate">{sellerName}</p>
           <p className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(listing.created_at), { addSuffix: true })}
-            {listing.country_code && <span className="ml-1.5">· {listing.country_code}</span>}
           </p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-semibold">{listing.credits_amount.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground">
-            {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            {listing.currency} {price.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
         </div>
       </div>
 
       {/* Meta row */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2.5">
-        <span>{creditsPerDollar}/$ rate</span>
-        {listing.payment_window_minutes && <span>{listing.payment_window_minutes}m window</span>}
-        {(listing.min_amount || listing.max_amount) && (
-          <span>
-            {listing.min_amount && `${listing.min_amount}`}
-            {listing.min_amount && listing.max_amount && '–'}
-            {listing.max_amount && `${listing.max_amount}`}
-          </span>
-        )}
+        <span>{creditsPerUnit}/{listing.currency} rate</span>
+        <span>30m payment window</span>
         <span>Escrow</span>
       </div>
 
-      {/* Terms toggle */}
-      {listing.terms && (
-        <div className="mb-2.5">
-          <button onClick={() => setShowTerms(!showTerms)} className="text-xs text-primary hover:underline">
-            {showTerms ? 'Hide terms' : 'Terms'}
-          </button>
-          {showTerms && (
-            <p className="mt-1 text-xs text-muted-foreground">{listing.terms}</p>
-          )}
-        </div>
-      )}
-
       {/* Action */}
-      {!isSameCountry ? (
-        <p className="text-xs text-muted-foreground">Region locked</p>
-      ) : (
-        <Button
-          size="sm"
-          variant={isOwnListing ? "outline" : "default"}
-          className="h-8 text-xs"
-          onClick={() => onBuy(listing.id, listing.seller_id, listing.credits_amount, listing.price_usd)}
-          disabled={isOwnListing || isProcessing || !isSameCountry}
-        >
-          {isOwnListing ? 'Your listing' : isProcessing ? 'Processing…' : 'Buy'}
-        </Button>
-      )}
+      <Button
+        size="sm"
+        variant={isOwnListing ? "outline" : "default"}
+        className="h-8 text-xs"
+        onClick={() => onBuy(listing.id)}
+        disabled={isOwnListing || isProcessing}
+      >
+        {isOwnListing ? 'Your listing' : isProcessing ? 'Processing…' : 'Buy'}
+      </Button>
     </div>
   );
 };

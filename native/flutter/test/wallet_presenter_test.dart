@@ -126,6 +126,68 @@ void main() {
     },
   );
 
+  test('submits and cancels a pending finance buyback', () async {
+    const pending = FinanceBuybackRequest(
+      id: 'buyback-id',
+      creditsAmount: 250,
+      status: 'pending',
+      requestedAtMillis: 1,
+    );
+    final data = FakeWalletDataSource()
+      ..balance = const CreditBalance(
+        balance: 500,
+        lifetimeEarned: 500,
+        lifetimeSpent: 0,
+      )
+      ..financeBuybackResponse = pending;
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadOverview();
+    await presenter.loadFinanceBuybacks();
+    expect(presenter.canRequestFinanceBuyback, isTrue);
+
+    await presenter.requestFinanceBuyback(creditsAmount: 250);
+
+    expect(data.financeBuybackRequestCalls, 1);
+    expect(data.requestedFinanceBuybackCredits, 250);
+    expect(presenter.buybackRequests.single.id, 'buyback-id');
+    expect(presenter.hasPendingFinanceBuyback, isTrue);
+    expect(presenter.canRequestFinanceBuyback, isFalse);
+
+    await presenter.cancelFinanceBuyback(pending);
+
+    expect(data.financeBuybackCancelCalls, 1);
+    expect(data.canceledFinanceBuybackRequestId, 'buyback-id');
+    expect(presenter.buybackRequests.single.isCanceled, isTrue);
+    expect(presenter.hasPendingFinanceBuyback, isFalse);
+    expect(presenter.buybackMutationState, WalletLoadState.ready);
+  });
+
+  test('rejects a finance buyback above the credit balance', () async {
+    final data = FakeWalletDataSource()
+      ..balance = const CreditBalance(
+        balance: 100,
+        lifetimeEarned: 100,
+        lifetimeSpent: 0,
+      );
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadOverview();
+    await presenter.loadFinanceBuybacks();
+
+    expect(
+      () => presenter.requestFinanceBuyback(creditsAmount: 101),
+      throwsA(
+        isA<WalletBackendUnavailable>().having(
+          (error) => error.message,
+          'message',
+          'You do not have enough credits for this buyback request.',
+        ),
+      ),
+    );
+    expect(data.financeBuybackRequestCalls, 0);
+  });
+
   test('submits a payout and refreshes request history', () async {
     const request = PayoutRequest(
       id: 'payout-id',

@@ -6,22 +6,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Wallet as WalletIcon, Crown, ShoppingCart, Shield, Code, Star, Sparkles, Zap } from 'lucide-react';
-import { RolePlanBadge } from '@/components/profile/RolePlanBadge';
+import { HandCoins, ShoppingCart, Wallet as WalletIcon } from 'lucide-react';
 import { BackButton } from '@/components/navigation/BackButton';
-import { format } from 'date-fns';
 import { GiftsTab } from '@/components/wallet/GiftsTab';
 import { WalletTabs } from '@/components/wallet/WalletTabs';
 import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { PackageCard } from '@/components/wallet/PackageCard';
-import { SubscriptionCard } from '@/components/wallet/SubscriptionCard';
 import { TransactionList } from '@/components/wallet/TransactionList';
-import { WithdrawTab } from '@/components/wallet/WithdrawTab';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -38,13 +33,13 @@ const Wallet = () => {
   const [recipientUsername, setRecipientUsername] = useState('');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [buybackCredits, setBuybackCredits] = useState('');
+  const [buybackBusy, setBuybackBusy] = useState(false);
 
   // Subscribe to silent refresh from navigation
   usePageRefresh('wallet', useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['user-credits'] });
     queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['user-subscription'] });
   }, [queryClient]));
 
   useEffect(() => {
@@ -138,23 +133,23 @@ const Wallet = () => {
     ttl: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Subscription with caching
-  const { data: subscription } = useCachedQuery({
-    cacheKey: `subscription:${user?.id}`,
-    queryKey: ['user-subscription', user?.id],
+  const { data: buybackRequests } = useCachedQuery({
+    cacheKey: `finance-buybacks:${user?.id}`,
+    queryKey: ['finance-buybacks', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('user_subscriptions')
-        .select('*, subscription_tiers(*)')
+        .from('finance_credit_buyback_requests' as any)
+        .select(
+          'id, credits_amount, usd_amount_cents, status, submitted_at, settled_at',
+        )
         .eq('user_id', user?.id)
-        .eq('status', 'active')
-        .single();
-        
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
+        .order('submitted_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
     enabled: !!user,
-    ttl: 30 * 60 * 1000, // 30 minutes
+    ttl: 60 * 1000,
   });
 
   // Packages with caching
@@ -164,23 +159,6 @@ const Wallet = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('credit_packages')
-        .select('*')
-        .eq('is_active', true)
-        .order('price', { ascending: true });
-      
-      if (error) throw error;
-      return data;
-    },
-    ttl: 60 * 60 * 1000, // 1 hour
-  });
-
-  // Subscription tiers with caching
-  const { data: tiers } = useCachedQuery({
-    cacheKey: 'subscription_tiers',
-    queryKey: ['subscription-tiers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('subscription_tiers')
         .select('*')
         .eq('is_active', true)
         .order('price', { ascending: true });
@@ -271,16 +249,6 @@ const Wallet = () => {
     }
   };
 
-  const getTierInfo = () => {
-    const tier = Array.isArray(subscription?.subscription_tiers)
-      ? subscription.subscription_tiers[0]
-      : subscription?.subscription_tiers;
-    
-    return tier || null;
-  };
-
-  const tierInfo = getTierInfo();
-
   const handlePurchasePackage = async (packageId: string, _priceId: string) => {
     try {
       setLoadingPackage(packageId);
@@ -314,36 +282,74 @@ const Wallet = () => {
     }
   };
 
-  const handleSubscribe = async (tierId: string, _priceId: string) => {
-    try {
-      setLoadingTier(tierId);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (!currentUser) {
-        navigate('/auth');
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('paystack-checkout', {
-        body: {
-          type: 'subscription',
-          itemId: tierId,
-        },
+  const handleBuybackRequest = async () => {
+    const amount = Number.parseInt(buybackCredits, 10);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Enter the number of credits you want Feedin to buy back.',
+        variant: 'destructive',
       });
+      return;
+    }
+    if (amount > (credits?.balance ?? 0)) {
+      toast({
+        title: 'Insufficient credits',
+        description: 'The request cannot exceed your available credit balance.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
+    setBuybackBusy(true);
+    try {
+      const { error } = await (supabase as any).rpc(
+        'request_finance_buyback',
+        {
+          p_credits_amount: amount,
+          p_idempotency_key: `web-buyback-${crypto.randomUUID()}`,
+        },
+      );
       if (error) throw error;
-
-      if (data?.authorization_url) {
-        window.location.href = data.authorization_url;
-      }
+      setBuybackCredits('');
+      queryClient.invalidateQueries({ queryKey: ['finance-buybacks'] });
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
+      toast({
+        title: 'Buyback requested',
+        description: 'Feedin finance will record the USD settlement after review.',
+      });
     } catch (error: any) {
       toast({
-        title: 'Subscription Failed',
-        description: error.message || 'Failed to start subscription',
+        title: 'Request failed',
+        description: error.message || 'Could not submit the finance buyback request.',
         variant: 'destructive',
       });
     } finally {
-      setLoadingTier(null);
+      setBuybackBusy(false);
+    }
+  };
+
+  const cancelBuyback = async (requestId: string) => {
+    setBuybackBusy(true);
+    try {
+      const { error } = await (supabase as any).rpc(
+        'cancel_finance_buyback',
+        { p_request_id: requestId },
+      );
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['finance-buybacks'] });
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
+      toast({ title: 'Buyback request cancelled' });
+    } catch (error: any) {
+      toast({
+        title: 'Cancellation failed',
+        description: error.message || 'Could not cancel this request.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBuybackBusy(false);
     }
   };
 
@@ -380,56 +386,14 @@ const Wallet = () => {
               balance={credits?.balance || 0}
               totalEarned={credits?.total_earned || 0}
               totalSpent={credits?.total_spent || 0}
-              tierName={tierInfo?.name}
               currencySymbol={currencySymbol}
               exchangeRate={exchangeRate}
               currencyCode={currentCurrency}
               onSendClick={() => setIsSendModalOpen(true)}
               onBuyClick={() => setActiveTab('buy')}
-              onWithdrawClick={() => setActiveTab('withdraw')}
             />
-
-            {/* Active Subscription Card */}
-            {subscription && tierInfo && (
-              <Card className="border-primary/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Crown className="w-4 h-4 text-primary" />
-                    Active Subscription
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Plan</span>
-                    <span className="font-semibold">{tierInfo.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Price</span>
-                    <span className="font-semibold">${tierInfo.price}/month</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Status</span>
-                    <Badge variant="secondary" className="bg-green-500/20 text-green-500">
-                      {subscription.status}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Renews</span>
-                    <span className="text-sm">{format(new Date(subscription.current_period_end), 'MMM d, yyyy')}</span>
-                  </div>
-                  {/* Badge earned */}
-                  <div className="flex justify-between items-center pt-2 border-t border-border">
-                    <span className="text-sm text-muted-foreground">Your Badge</span>
-                    {user?.id && <RolePlanBadge userId={user.id} />}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         )}
-
-        {/* Withdraw Tab */}
-        {activeTab === 'withdraw' && <WithdrawTab />}
 
         {/* Gifts Tab */}
         {activeTab === 'gifts' && <GiftsTab />}
@@ -466,59 +430,93 @@ const Wallet = () => {
           </div>
         )}
 
-        {/* Subscribe Tab */}
-        {activeTab === 'subscribe' && (
-          <div className="space-y-5">
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-1">Subscription Plans</h2>
-              <p className="text-sm text-muted-foreground">Unlock premium features</p>
-            </div>
-
-            {/* Horizontal scrollable subscriptions on mobile */}
-            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 min-w-max sm:min-w-0">
-                {tiers?.map((tier) => (
-                  <SubscriptionCard
-                    key={tier.id}
-                    id={tier.id}
-                    name={tier.name}
-                    price={tier.price}
-                    interval={tier.interval}
-                    features={(tier.features as string[]) || []}
-                    isPopular={tier.name === 'Pro'}
-                    isCurrentPlan={subscription?.tier_id === tier.id}
-                    isLoading={loadingTier === tier.id}
-                    onSubscribe={() => handleSubscribe(tier.id, tier.stripe_price_id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Marketplace Tab */}
         {activeTab === 'marketplace' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5" />
-                P2P Marketplace
-              </CardTitle>
-              <CardDescription>
-                Buy and sell credits directly with other users
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={() => navigate('/wallet/p2p')}
-                className="w-full"
-                size="lg"
-              >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Visit Marketplace
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  P2P Marketplace
+                </CardTitle>
+                <CardDescription>
+                  Buy and sell credits directly with other users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={() => navigate('/wallet/p2p')}
+                  className="w-full"
+                  size="lg"
+                >
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Visit Marketplace
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HandCoins className="w-5 h-5" />
+                  Feedin finance buyback
+                </CardTitle>
+                <CardDescription>
+                  Hold credits for review and receive the approved value in USD
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="finance-buyback-credits">Credits to sell</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="finance-buyback-credits"
+                      inputMode="numeric"
+                      value={buybackCredits}
+                      onChange={(event) => setBuybackCredits(event.target.value)}
+                      placeholder="1000"
+                    />
+                    <Button onClick={handleBuybackRequest} disabled={buybackBusy}>
+                      Request
+                    </Button>
+                  </div>
+                </div>
+
+                {(buybackRequests?.length ?? 0) > 0 && (
+                  <div className="divide-y divide-border">
+                    {buybackRequests?.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex items-center justify-between gap-3 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">
+                            {Number(request.credits_amount).toLocaleString()} credits
+                          </p>
+                          <p className="text-xs capitalize text-muted-foreground">
+                            {String(request.status).replaceAll('_', ' ')}
+                            {request.usd_amount_cents
+                              ? ` · $${(Number(request.usd_amount_cents) / 100).toFixed(2)}`
+                              : ''}
+                          </p>
+                        </div>
+                        {request.status === 'pending' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={buybackBusy}
+                            onClick={() => cancelBuyback(request.id)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* History Tab */}

@@ -107,6 +107,34 @@ void main() {
     expect(request.statusLabel, 'Pending');
   });
 
+  test('parses a finance buyback request response', () {
+    final request = WalletServerContract.parseFinanceBuybackRequest({
+      'request': {
+        'id': 'buyback-id',
+        'credits_amount': 250,
+        'status': 'pending',
+        'created_at': '2026-07-15T12:00:00Z',
+      },
+    });
+
+    expect(request, isNotNull);
+    expect(request!.creditsAmount, 250);
+    expect(request.isPending, isTrue);
+    expect(request.statusLabel, 'Pending');
+    expect(
+      WalletServerContract.financeBuybackRequestRpc,
+      'request_finance_buyback',
+    );
+    expect(
+      WalletServerContract.financeBuybackCancelRpc,
+      'cancel_finance_buyback',
+    );
+    expect(
+      WalletServerContract.financeBuybackRequestsTable,
+      'finance_credit_buyback_requests',
+    );
+  });
+
   test('parses payout bank and destination responses', () {
     final banks = WalletServerContract.parsePaystackBanks({
       'status': true,

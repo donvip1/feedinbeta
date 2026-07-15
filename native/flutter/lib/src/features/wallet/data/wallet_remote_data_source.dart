@@ -51,6 +51,14 @@ abstract interface class WalletDataSource {
   });
 
   Future<PayoutRequest> requestPayout({required double amount});
+
+  Future<List<FinanceBuybackRequest>> fetchFinanceBuybackRequests({
+    int limit = 20,
+  });
+
+  Future<void> requestFinanceBuyback({required int creditsAmount});
+
+  Future<void> cancelFinanceBuyback(String requestId);
 }
 
 /// Central definition of the native wallet's server-owned contracts.
@@ -60,6 +68,9 @@ abstract final class WalletServerContract {
   static const creatorPayoutRequestsTable = 'creator_payout_requests';
   static const creatorPayoutDestinationsTable = 'creator_payout_destinations';
   static const payoutFunction = 'paystack-withdrawal';
+  static const financeBuybackRequestsTable = 'finance_credit_buyback_requests';
+  static const financeBuybackRequestRpc = 'request_finance_buyback';
+  static const financeBuybackCancelRpc = 'cancel_finance_buyback';
 
   static const checkoutTypeKey = 'type';
   static const checkoutItemIdKey = 'itemId';
@@ -79,6 +90,9 @@ abstract final class WalletServerContract {
   static const payoutSaveDestinationAction = 'save-creator-payout-destination';
   static const payoutProcessAction = 'process-creator-payout';
   static const payoutRequestIdKey = 'request_id';
+  static const financeBuybackCreditsParam = 'p_credits_amount';
+  static const financeBuybackIdempotencyParam = 'p_idempotency_key';
+  static const financeBuybackRequestIdParam = 'p_request_id';
 
   static WalletCheckoutSession parseCheckoutSession(
     Object? raw, {
@@ -175,6 +189,23 @@ abstract final class WalletServerContract {
     final row = nested ?? data;
     if (row['id'] == null || row['amount'] == null) return null;
     return PayoutRequest.fromJson(row);
+  }
+
+  static FinanceBuybackRequest? parseFinanceBuybackRequest(Object? raw) {
+    final data = _objectMap(raw);
+    if (data == null) return null;
+    final serverError = _string(data['error']);
+    if (serverError != null) {
+      throw WalletBackendUnavailable(serverError);
+    }
+
+    final nested =
+        _objectMap(data['request']) ??
+        _objectMap(data['buyback']) ??
+        _objectMap(data['data']);
+    final row = nested ?? data;
+    if (row['id'] == null || row['credits_amount'] == null) return null;
+    return FinanceBuybackRequest.fromJson(row);
   }
 
   static List<PaystackBank> parsePaystackBanks(Object? raw) {
@@ -307,6 +338,8 @@ class WalletRemoteDataSource implements WalletDataSource {
       WalletServerContract.creatorPayoutRequestsTable;
   static const _payoutDestinationsTable =
       WalletServerContract.creatorPayoutDestinationsTable;
+  static const _financeBuybackRequestsTable =
+      WalletServerContract.financeBuybackRequestsTable;
 
   static bool _supabaseAvailable() {
     try {
@@ -829,6 +862,138 @@ class WalletRemoteDataSource implements WalletDataSource {
     return row == null
         ? null
         : PayoutRequest.fromJson(Map<String, Object?>.from(row));
+  }
+
+  // --- Finance-team credit buyback ---------------------------------------
+
+  @override
+  Future<List<FinanceBuybackRequest>> fetchFinanceBuybackRequests({
+    int limit = 20,
+  }) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) return const [];
+
+    final rows = await client
+        .from(_financeBuybackRequestsTable)
+        .select()
+        .eq('user_id', userId);
+    final requests =
+        rows
+            .whereType<Map>()
+            .map(
+              (row) => FinanceBuybackRequest.fromJson(
+                Map<String, Object?>.from(row),
+              ),
+            )
+            .toList()
+          ..sort(
+            (left, right) =>
+                right.requestedAtMillis.compareTo(left.requestedAtMillis),
+          );
+    return requests.length <= limit ? requests : requests.take(limit).toList();
+  }
+
+  @override
+  Future<void> requestFinanceBuyback({required int creditsAmount}) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletBackendUnavailable(
+        'Sign in to request a finance buyback.',
+      );
+    }
+    if (creditsAmount <= 0) {
+      throw const WalletBackendUnavailable('Enter a valid number of credits.');
+    }
+
+    final userKey = userId.length > 8 ? userId.substring(0, 8) : userId;
+    final idempotencyKey =
+        'native-buyback-$userKey-$creditsAmount-'
+        '${DateTime.now().microsecondsSinceEpoch}';
+    try {
+      await client.rpc<dynamic>(
+        WalletServerContract.financeBuybackRequestRpc,
+        params: {
+          WalletServerContract.financeBuybackCreditsParam: creditsAmount,
+          WalletServerContract.financeBuybackIdempotencyParam: idempotencyKey,
+        },
+      );
+    } on PostgrestException catch (error) {
+      throw _mapFinanceBuybackError(error);
+    }
+  }
+
+  @override
+  Future<void> cancelFinanceBuyback(String requestId) async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) {
+      throw const WalletBackendUnavailable(
+        'Sign in to cancel a finance buyback.',
+      );
+    }
+    if (requestId.trim().isEmpty) {
+      throw const WalletBackendUnavailable(
+        'The buyback request could not be identified.',
+      );
+    }
+
+    try {
+      await client.rpc<dynamic>(
+        WalletServerContract.financeBuybackCancelRpc,
+        params: {WalletServerContract.financeBuybackRequestIdParam: requestId},
+      );
+    } on PostgrestException catch (error) {
+      throw _mapFinanceBuybackError(error, canceling: true);
+    }
+  }
+
+  WalletBackendUnavailable _mapFinanceBuybackError(
+    PostgrestException error, {
+    bool canceling = false,
+  }) {
+    final message = error.message.toLowerCase();
+    if (_isMissingContract(error)) {
+      return WalletBackendUnavailable(
+        'Finance buyback is not available in this build yet.',
+        cause: error,
+      );
+    }
+    if (message.contains('insufficient') || message.contains('balance')) {
+      return WalletBackendUnavailable(
+        'You do not have enough credits for this buyback request.',
+        cause: error,
+      );
+    }
+    if (message.contains('pending') || message.contains('already')) {
+      return WalletBackendUnavailable(
+        canceling
+            ? 'Only pending buyback requests can be canceled.'
+            : 'You already have a pending finance buyback request.',
+        cause: error,
+      );
+    }
+    if (message.contains('cancel') || message.contains('status')) {
+      return WalletBackendUnavailable(
+        'Only pending buyback requests can be canceled.',
+        cause: error,
+      );
+    }
+    if (message.contains('amount') ||
+        message.contains('minimum') ||
+        message.contains('positive')) {
+      return WalletBackendUnavailable(
+        'Enter a valid number of credits.',
+        cause: error,
+      );
+    }
+    return WalletBackendUnavailable(
+      canceling
+          ? 'Could not cancel the finance buyback request.'
+          : 'Could not submit the finance buyback request.',
+      cause: error,
+    );
   }
 
   WalletBackendUnavailable _mapPayoutError(PostgrestException error) {

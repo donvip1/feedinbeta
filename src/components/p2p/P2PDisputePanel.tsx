@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { AlertTriangle, Shield, Upload, CheckCircle, XCircle, Clock, FileImage } from 'lucide-react';
+import { AlertTriangle, Shield, Upload, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface P2PDisputePanelProps {
@@ -84,18 +84,18 @@ export const P2PDisputePanel = ({
         evidenceUrl = publicUrl;
       }
 
-      // Create the dispute
-      const evidenceUrls = evidenceUrl ? [evidenceUrl] : [];
-      const { error } = await supabase
-        .from('p2p_disputes')
-        .insert({
-          transaction_id: transactionId,
-          initiated_by: user?.id,
-          reason,
-          description,
-          buyer_evidence_urls: isBuyer ? evidenceUrls : [],
-          seller_evidence_urls: isSeller ? evidenceUrls : [],
-        });
+      const details = [
+        reason,
+        description.trim(),
+        evidenceUrl ? `Evidence: ${evidenceUrl}` : '',
+      ].filter(Boolean).join(' | ');
+      const { error } = await (supabase as any).rpc(
+        'p2p_open_dispute',
+        {
+          p_transaction_id: transactionId,
+          p_reason: details,
+        },
+      );
 
       if (error) throw error;
     },
@@ -111,44 +111,6 @@ export const P2PDisputePanel = ({
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create dispute');
-    },
-  });
-
-  // Upload additional evidence
-  const uploadEvidenceMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `disputes/${transactionId}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('p2p-proofs')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('p2p-proofs')
-        .getPublicUrl(filePath);
-
-      // Update dispute with new evidence
-      const fieldToUpdate = isBuyer ? 'buyer_evidence_urls' : 'seller_evidence_urls';
-      const currentUrls = isBuyer ? dispute?.buyer_evidence_urls : dispute?.seller_evidence_urls;
-      
-      const { error } = await supabase
-        .from('p2p_disputes')
-        .update({
-          [fieldToUpdate]: [...(currentUrls || []), publicUrl],
-        })
-        .eq('id', dispute?.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Evidence uploaded');
-      queryClient.invalidateQueries({ queryKey: ['p2p-dispute', transactionId] });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to upload evidence');
     },
   });
 
@@ -222,13 +184,6 @@ export const P2PDisputePanel = ({
             </p>
           </div>
 
-          {dispute.description && (
-            <div>
-              <Label className="text-muted-foreground">Description</Label>
-              <p>{dispute.description}</p>
-            </div>
-          )}
-
           {dispute.moderator_id && (
             <div className="p-3 bg-blue-500/10 rounded-lg">
               <div className="flex items-center gap-2">
@@ -236,92 +191,15 @@ export const P2PDisputePanel = ({
                 <span className="font-medium">Moderator Assigned</span>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                A moderator is reviewing this dispute. They can see all chat messages and evidence.
+                A moderator is reviewing this dispute and the transaction history.
               </p>
             </div>
           )}
-
-          {/* Evidence Section */}
-          <div className="space-y-2">
-            <Label className="text-muted-foreground">Evidence</Label>
-            
-            {/* Buyer Evidence */}
-            {dispute.buyer_evidence_urls?.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">From Buyer:</p>
-                <div className="flex gap-2 flex-wrap">
-                  {dispute.buyer_evidence_urls.map((url: string, idx: number) => (
-                    <a
-                      key={idx}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-primary hover:underline"
-                    >
-                      <FileImage className="w-4 h-4" />
-                      Evidence {idx + 1}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Seller Evidence */}
-            {dispute.seller_evidence_urls?.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">From Seller:</p>
-                <div className="flex gap-2 flex-wrap">
-                  {dispute.seller_evidence_urls.map((url: string, idx: number) => (
-                    <a
-                      key={idx}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-primary hover:underline"
-                    >
-                      <FileImage className="w-4 h-4" />
-                      Evidence {idx + 1}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Upload more evidence */}
-            {dispute.status !== 'resolved' && dispute.status !== 'cancelled' && (
-              <div className="pt-2">
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="hidden"
-                  id="evidence-upload"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadEvidenceMutation.mutate(file);
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById('evidence-upload')?.click()}
-                  disabled={uploadEvidenceMutation.isPending}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {uploadEvidenceMutation.isPending ? 'Uploading...' : 'Add Evidence'}
-                </Button>
-              </div>
-            )}
-          </div>
 
           {/* Resolution */}
           {dispute.resolution && (
             <div className="p-3 bg-muted rounded-lg">
               <p className="font-medium">{getResolutionLabel(dispute.resolution)}</p>
-              {dispute.resolution_notes && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {dispute.resolution_notes}
-                </p>
-              )}
             </div>
           )}
         </CardContent>

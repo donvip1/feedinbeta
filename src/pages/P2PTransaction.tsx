@@ -2,14 +2,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useCurrency } from '@/context/CurrencyContext';
 import { useP2PEligibility } from '@/hooks/useP2PEligibility';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { ArrowLeft, Coins, DollarSign, Check, X, MessageCircle, FileImage, Shield, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Coins, DollarSign, Check, X, MessageCircle, FileImage } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { P2PChat } from '@/components/p2p/P2PChat';
 import { P2PDisputePanel } from '@/components/p2p/P2PDisputePanel';
@@ -23,7 +22,6 @@ const P2PTransaction = () => {
   const { transactionId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { formatPrice, convertFromUSD, currencySymbol } = useCurrency();
   const { eligibility, refetch: refetchEligibility } = useP2PEligibility();
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState(false);
@@ -89,9 +87,10 @@ const P2PTransaction = () => {
   const handleConfirmPayment = async () => {
     setProcessing(true);
     try {
-      const { error } = await supabase.functions.invoke('p2p-escrow', {
-        body: { action: 'confirm_payment', transactionId },
-      });
+      const { error } = await (supabase as any).rpc(
+        'p2p_release_credits',
+        { p_transaction_id: transactionId },
+      );
       if (error) throw error;
       toast.success('Payment confirmed! Credits transferred.');
       queryClient.invalidateQueries({ queryKey: ['p2p-transaction', transactionId] });
@@ -106,13 +105,10 @@ const P2PTransaction = () => {
   const handleCancel = async (reason?: string) => {
     setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('p2p-escrow', {
-        body: { 
-          action: 'cancel_transaction', 
-          transactionId,
-          cancellationReason: reason,
-        },
-      });
+      const { data, error } = await (supabase as any).rpc(
+        'p2p_cancel_transaction',
+        { p_transaction_id: transactionId },
+      );
       if (error) throw error;
       
       // Show warning if applicable
@@ -136,6 +132,7 @@ const P2PTransaction = () => {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-500',
+      awaiting_payment: 'bg-yellow-500',
       proof_submitted: 'bg-blue-500',
       completed: 'bg-green-500',
       cancelled: 'bg-muted',
@@ -152,7 +149,6 @@ const P2PTransaction = () => {
     );
   }
 
-  const localPrice = convertFromUSD(transaction.price_usd);
   const chatDisabled = ['completed', 'cancelled'].includes(transaction.status);
 
   return (
@@ -188,8 +184,10 @@ const P2PTransaction = () => {
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <DollarSign className="w-5 h-5 mx-auto mb-1 text-green-500" />
-                <p className="text-2xl font-bold">{currencySymbol}{localPrice.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">~${transaction.price_usd} USD</p>
+                <p className="text-2xl font-bold">
+                  {transaction.currency} {(Number(transaction.price_cents) / 100).toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground">External settlement</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
@@ -221,7 +219,7 @@ const P2PTransaction = () => {
             <P2PTransactionTimeline transaction={transaction} isBuyer={isBuyer} />
 
             {/* Action Buttons */}
-            {isBuyer && transaction.status === 'pending' && (
+            {isBuyer && ['pending', 'awaiting_payment'].includes(transaction.status) && (
               <div className="flex gap-2">
                 <CancelOrderModal
                   onConfirm={handleCancel}
@@ -249,7 +247,7 @@ const P2PTransaction = () => {
               </div>
             )}
 
-            {isSeller && transaction.status === 'pending' && (
+            {isSeller && ['pending', 'awaiting_payment'].includes(transaction.status) && (
               <Button variant="outline" onClick={() => handleCancel()} disabled={processing}>
                 Cancel Transaction
               </Button>
@@ -279,7 +277,7 @@ const P2PTransaction = () => {
           </TabsContent>
 
           <TabsContent value="proofs" className="mt-4 space-y-4">
-            {isBuyer && transaction.status === 'pending' && (
+            {isBuyer && ['pending', 'awaiting_payment'].includes(transaction.status) && (
               <P2PProofUploader
                 transactionId={transactionId!}
                 proofType="payment"
@@ -298,7 +296,7 @@ const P2PTransaction = () => {
                   {proofs.map((proof: any) => (
                     <a
                       key={proof.id}
-                      href={proof.file_url}
+                      href={proof.proof_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 p-3 bg-muted rounded-lg hover:bg-muted/80"
@@ -310,11 +308,6 @@ const P2PTransaction = () => {
                           {format(new Date(proof.created_at), 'PPp')}
                         </p>
                       </div>
-                      {proof.verified && (
-                        <Badge variant="outline" className="gap-1">
-                          <Shield className="w-3 h-3" /> Verified
-                        </Badge>
-                      )}
                     </a>
                   ))}
                 </CardContent>

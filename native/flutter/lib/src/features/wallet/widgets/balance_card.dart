@@ -6,21 +6,21 @@ import 'wallet_common.dart';
 
 /// Hero balance card (web `wallet/BalanceCard.tsx`).
 ///
-/// Shows the big credit balance, its ≈USD value, lifetime in/out stats, an
-/// optional current-tier label, and the three primary actions (Send / Buy /
-/// Withdraw). Rendered on a brand gradient to match the dark-premium look.
+/// Shows the big credit balance, its ≈USD value, lifetime in/out stats, and the
+/// active wallet actions. Legacy send/payout hooks remain optional so the
+/// deposit-only wallet can expose only credit purchases.
 class WalletBalanceCard extends StatelessWidget {
   const WalletBalanceCard({
     super.key,
     required this.balance,
-    required this.onSend,
     required this.onBuy,
+    this.onSend,
     this.onWithdraw,
     this.tierName,
   });
 
   final CreditBalance balance;
-  final VoidCallback onSend;
+  final VoidCallback? onSend;
   final VoidCallback onBuy;
   final VoidCallback? onWithdraw;
   final String? tierName;
@@ -118,14 +118,16 @@ class WalletBalanceCard extends StatelessWidget {
           const SizedBox(height: WalletSpacing.lg),
           Row(
             children: [
-              Expanded(
-                child: _GhostAction(
-                  icon: Icons.send_rounded,
-                  label: 'Send',
-                  onTap: onSend,
+              if (onSend != null) ...[
+                Expanded(
+                  child: _GhostAction(
+                    icon: Icons.send_rounded,
+                    label: 'Send',
+                    onTap: onSend!,
+                  ),
                 ),
-              ),
-              const SizedBox(width: WalletSpacing.sm),
+                const SizedBox(width: WalletSpacing.sm),
+              ],
               Expanded(
                 child: _GhostAction(
                   icon: Icons.credit_card_rounded,
