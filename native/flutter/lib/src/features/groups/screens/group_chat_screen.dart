@@ -237,8 +237,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             conversationId: widget.conversationId,
             name: name,
           );
-          if (!mounted || created == null) return;
-          _openChannel(groupChannelToView(created));
+          if (!mounted || created == null) return null;
+          final channel = groupChannelToView(created);
+          _openChannel(channel);
+          return channel;
         },
       ),
     );
