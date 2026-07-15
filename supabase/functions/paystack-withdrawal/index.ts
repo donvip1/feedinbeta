@@ -11,6 +11,7 @@ const CREDITS_PER_USD = 100;
 const PLATFORM_FEE_PERCENT = 30;
 const MIN_WITHDRAWAL_CREDITS = 1000;
 const COOLDOWN_MINUTES = 5; // Rate limit: one withdrawal per 5 minutes
+const DIRECT_PAYOUTS_ENABLED = false;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -80,6 +81,20 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  if (!DIRECT_PAYOUTS_ENABLED) {
+    return new Response(JSON.stringify({
+      error:
+        'Direct withdrawals are temporarily unavailable. Sell credits through P2P or request a Feedin finance buyback.',
+      code: 'PAYOUTS_DISABLED',
+    }), {
+      status: 409,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
     });
   }
 

@@ -78,10 +78,6 @@ const P2PMarketplace = () => {
       } else { toast.error('Please complete your P2P setup first'); }
       return;
     }
-    if (creditsAmount < eligibility.minTradeAmount) {
-      toast.error(`Minimum trade amount is ${eligibility.minTradeAmount} credits`);
-      return;
-    }
     setProcessingId(listingId);
     try {
       const { data, error } = await (supabase as any).rpc(

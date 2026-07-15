@@ -140,10 +140,10 @@ const Wallet = () => {
       const { data, error } = await supabase
         .from('finance_credit_buyback_requests' as any)
         .select(
-          'id, credits_amount, usd_amount_cents, status, submitted_at, settled_at',
+          'id, credits_amount, usd_amount_cents, status, requested_at, completed_at, rejected_at, canceled_at',
         )
         .eq('user_id', user?.id)
-        .order('submitted_at', { ascending: false })
+        .order('requested_at', { ascending: false })
         .limit(10);
       if (error) throw error;
       return (data ?? []) as any[];

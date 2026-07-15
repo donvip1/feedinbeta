@@ -465,6 +465,13 @@ serve(async (req) => {
     }
 
     const purchaseType = parsePurchaseType(body.type);
+    if (purchaseType !== "credits") {
+      throw new RequestError(
+        "Paystack checkout currently supports Feedin credit purchases only",
+        409,
+        "PURCHASE_TYPE_DISABLED",
+      );
+    }
     const itemId = parseUuid(body.itemId, "item ID");
     const requestedIdempotencyKey = resolveIdempotencyKey(
       body.idempotencyKey,
