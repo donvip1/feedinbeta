@@ -581,6 +581,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         newConversationRequest: _newConversationRequests,
         callController: _callController,
         backController: _messagesBackController,
+        incrementalMessageSyncService: widget.incrementalMessageSyncService,
       ),
       const WalletScreen(),
       ProfileScreen(

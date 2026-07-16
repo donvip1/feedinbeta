@@ -1,5 +1,6 @@
 import '../message_models.dart';
 import '../message_recipient.dart';
+import '../canonical_message.dart';
 import 'chat_view_models.dart';
 
 /// Maps the persistence-layer models (`message_models.dart`,
@@ -22,6 +23,92 @@ DeliveryState mapDeliveryState(MessageDeliveryState state) {
     MessageDeliveryState.read => DeliveryState.read,
     MessageDeliveryState.failed => DeliveryState.failed,
   };
+}
+
+/// Projects a canonical V2 record into the legacy local shape consumed by the
+/// current bubble widgets. This is the dual-read bridge: canonical persistence
+/// remains authoritative while the presentation layer is migrated in smaller
+/// pieces.
+LocalMessage canonicalMessageToLocalMessage(
+  LocalCanonicalMessage record, {
+  required String currentUserId,
+  required String currentUserName,
+  required String otherSenderName,
+}) {
+  final message = record.message;
+  final payload = message.payload;
+  final ephemeral = message.metadata['ephemeral'];
+  final ephemeralMap = ephemeral is Map
+      ? Map<String, Object?>.from(ephemeral)
+      : const <String, Object?>{};
+  final receipts = message.metadata['receipts'];
+  final receiptsMap = receipts is Map
+      ? Map<String, Object?>.from(receipts)
+      : const <String, Object?>{};
+  final readCount = _intValue(receiptsMap['read_count']);
+  final isMine = message.senderId == currentUserId;
+
+  return LocalMessage(
+    id: message.id,
+    conversationId: message.conversationId,
+    senderName: isMine ? currentUserName : otherSenderName,
+    senderId: message.senderId,
+    body: switch (message.contentType) {
+      CanonicalMessageContentType.text => payload['text']?.toString() ?? '',
+      CanonicalMessageContentType.system =>
+        payload['text']?.toString() ?? 'Conversation updated',
+      CanonicalMessageContentType.gift =>
+        payload['name'] == null ? 'Sent a gift' : 'Sent ${payload['name']}',
+      CanonicalMessageContentType.call => _callPreview(payload),
+      CanonicalMessageContentType.sticker => 'Sticker',
+      _ => payload['caption']?.toString() ?? '',
+    },
+    createdAtMillis: message.createdAt.millisecondsSinceEpoch,
+    deliveryState: _canonicalDeliveryState(record),
+    messageType: switch (message.contentType) {
+      CanonicalMessageContentType.voice => 'audio',
+      _ => message.contentType.name,
+    },
+    localMediaPath: record.localAssetPath,
+    readAtMillis: isMine && readCount > 0
+        ? message.updatedAt.millisecondsSinceEpoch
+        : null,
+    readByUserId: isMine && readCount > 0 ? 'conversation-participant' : null,
+    viewOnce: ephemeralMap['view_once'] == true,
+    expiresAtMillis: _dateMillis(ephemeralMap['expires_at']),
+    viewOnceSeenAtMillis: _dateMillis(ephemeralMap['viewed_at']),
+  );
+}
+
+MessageDeliveryState _canonicalDeliveryState(LocalCanonicalMessage record) {
+  if (record.syncState == MessageSyncState.failed) {
+    return MessageDeliveryState.failed;
+  }
+  if (record.syncState != MessageSyncState.synced) {
+    return MessageDeliveryState.pending;
+  }
+  return switch (record.message.status) {
+    CanonicalMessageStatus.sending => MessageDeliveryState.pending,
+    CanonicalMessageStatus.sent => MessageDeliveryState.sent,
+    CanonicalMessageStatus.delivered => MessageDeliveryState.delivered,
+    CanonicalMessageStatus.read => MessageDeliveryState.read,
+  };
+}
+
+String _callPreview(Map<String, Object?> payload) {
+  final kind = payload['call_kind']?.toString() == 'video' ? 'Video' : 'Voice';
+  final state = payload['state']?.toString();
+  return state == 'ended' ? '$kind call ended' : '$kind call';
+}
+
+int _intValue(Object? value) {
+  if (value is int) return value;
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+int? _dateMillis(Object? value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString())?.millisecondsSinceEpoch;
 }
 
 /// Maps a stored conversation summary to an inbox-row view. Until the backend

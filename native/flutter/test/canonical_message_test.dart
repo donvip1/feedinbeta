@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/src/features/messages/canonical_message.dart';
+import 'package:feedin/src/features/messages/chat/chat_mappers.dart';
+import 'package:feedin/src/features/messages/canonical_message.dart';
+import 'package:feedin/src/features/messages/message_models.dart';
 
 void main() {
   test('parses and round-trips the shared text fixture', () async {
@@ -39,5 +41,43 @@ void main() {
       }),
       throwsFormatException,
     );
+  });
+
+  test('projects a pending canonical text record into the chat UI model', () {
+    final timestamp = DateTime.utc(2026, 7, 16, 12);
+    final canonical = CanonicalMessage(
+      id: '11111111-1111-4111-8111-111111111111',
+      conversationId: '22222222-2222-4222-8222-222222222222',
+      senderId: '33333333-3333-4333-8333-333333333333',
+      contentType: CanonicalMessageContentType.text,
+      payload: const {'text': 'Queued while offline'},
+      status: CanonicalMessageStatus.sending,
+      metadata: const {
+        'revision': 1,
+        'receipts': {'read_count': 0},
+        'ephemeral': {
+          'view_once': false,
+          'viewed_at': null,
+          'expires_at': null,
+        },
+      },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    );
+
+    final local = canonicalMessageToLocalMessage(
+      LocalCanonicalMessage(
+        message: canonical,
+        syncState: MessageSyncState.pending,
+      ),
+      currentUserId: canonical.senderId,
+      currentUserName: 'Ada',
+      otherSenderName: 'Tobi',
+    );
+
+    expect(local.body, 'Queued while offline');
+    expect(local.senderName, 'Ada');
+    expect(local.deliveryState, MessageDeliveryState.pending);
+    expect(local.createdAtMillis, timestamp.millisecondsSinceEpoch);
   });
 }

@@ -13,7 +13,9 @@ import 'package:file_picker/file_picker.dart';
 import '../../core/connectivity/connectivity_service.dart';
 import '../../core/connectivity/offline_notice.dart';
 import '../../core/sync/conversation_starter.dart';
+import '../../core/sync/incremental_message_sync_service.dart';
 import '../../core/sync/sync_service.dart';
+import '../../data/local/canonical_message_store.dart';
 import '../../data/local/local_messages_repository_contract.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_models.dart';
@@ -39,6 +41,7 @@ import 'chat/widgets/new_conversation_sheet.dart';
 import 'chat/widgets/report_message_sheet.dart';
 import 'chat/widgets/typing_indicator_bubble.dart';
 import 'chat/widgets/voice_note_bubble.dart';
+import 'canonical_message.dart';
 import 'message_models.dart';
 import 'message_recipient.dart';
 
@@ -73,6 +76,7 @@ class MessagesScreen extends StatefulWidget {
     this.newConversationRequest = 0,
     this.callController,
     this.backController,
+    this.incrementalMessageSyncService,
   });
 
   final LocalMessagesRepositoryContract messagesRepository;
@@ -92,6 +96,7 @@ class MessagesScreen extends StatefulWidget {
   /// Allows the app shell's Android system-back policy to close an in-thread
   /// conversation before it falls back to tab/home navigation.
   final MessagesScreenBackController? backController;
+  final IncrementalMessageSyncService? incrementalMessageSyncService;
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -246,6 +251,7 @@ class _MessagesScreenState extends State<MessagesScreen>
         realtimeVersion: widget.realtimeVersion,
         onBack: _closeConversation,
         callController: widget.callController,
+        incrementalMessageSyncService: widget.incrementalMessageSyncService,
       );
     }
 
@@ -438,6 +444,7 @@ class ConversationScreen extends StatefulWidget {
     required this.onBack,
     this.initialTitle,
     this.callController,
+    this.incrementalMessageSyncService,
   });
 
   final String conversationId;
@@ -452,6 +459,7 @@ class ConversationScreen extends StatefulWidget {
   /// Shared call controller from the shell. When set (and the other user's id
   /// resolves), the header voice/video buttons place a real 1:1 call.
   final CallController? callController;
+  final IncrementalMessageSyncService? incrementalMessageSyncService;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -464,7 +472,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final _genericFilePicker = GenericFileAttachmentPicker();
   late final ChatRealtimeDataSource _chatRealtime;
   late final StreamSubscription<ChatRealtimeEvent> _chatRealtimeSubscription;
+  StreamSubscription<CanonicalMessageStoreChange>?
+  _canonicalMessageSubscription;
   late Future<List<LocalMessage>> _messagesFuture;
+  String? _canonicalConversationId;
   String? _title;
   ReplyPreview? _replyTarget;
   PresenceState _otherPresence = PresenceState.offline;
@@ -530,9 +541,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _handleChatRealtimeEvent,
     );
     _title = widget.initialTitle;
-    _messagesFuture = widget.messagesRepository.loadMessages(
-      widget.conversationId,
-    );
+    _canonicalMessageSubscription = widget
+        .incrementalMessageSyncService
+        ?.changes
+        .listen(_handleCanonicalMessageChange);
+    _messagesFuture = _loadMessages();
     _resolveTitle();
     _markReadLocally();
     _presenceAgeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -552,6 +565,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     final serverConversationId = conversation.serverConversationId;
     setState(() {
+      _canonicalConversationId = serverConversationId?.isNotEmpty == true
+          ? serverConversationId
+          : null;
       _title = (_title != null && _title!.isNotEmpty)
           ? _title
           : conversation.title;
@@ -578,6 +594,66 @@ class _ConversationScreenState extends State<ConversationScreen> {
         setState(() => _starredMessageIds = <String>{});
       }
     }
+  }
+
+  void _handleCanonicalMessageChange(CanonicalMessageStoreChange change) {
+    if (!mounted) return;
+    final canonicalId = _canonicalConversationId;
+    if (canonicalId == null || change.conversationId != canonicalId) return;
+    setState(() => _messagesFuture = _loadMessages(syncRemote: false));
+  }
+
+  Future<String?> _resolveCanonicalConversationId() async {
+    final current = _canonicalConversationId;
+    if (current != null && current.isNotEmpty) return current;
+    final localConversationId = widget.conversationId;
+    final conversation = await widget.messagesRepository.loadConversation(
+      localConversationId,
+    );
+    if (!mounted || widget.conversationId != localConversationId) return null;
+    final resolved = conversation?.serverConversationId;
+    if (resolved == null || resolved.isEmpty) return null;
+    _canonicalConversationId = resolved;
+    return resolved;
+  }
+
+  Future<List<LocalMessage>> _loadMessages({bool syncRemote = true}) async {
+    final legacy = await widget.messagesRepository.loadMessages(
+      widget.conversationId,
+    );
+    final service = widget.incrementalMessageSyncService;
+    final canonicalId = await _resolveCanonicalConversationId();
+    if (service == null || canonicalId == null) return legacy;
+
+    List<LocalCanonicalMessage> canonical;
+    try {
+      canonical = syncRemote
+          ? await service.syncConversationPage(canonicalId)
+          : await service.loadConversation(canonicalId);
+    } catch (_) {
+      canonical = await service.loadConversation(canonicalId);
+    }
+
+    final merged = <String, LocalMessage>{
+      for (final message in legacy) message.id: message,
+    };
+    for (final record in canonical) {
+      // Legacy media rows currently contain signed/downloadable URLs; V2
+      // envelopes intentionally expose private storage paths. Keep media on
+      // the legacy read side until the canonical URL resolver lands.
+      if (record.message.contentType != CanonicalMessageContentType.text) {
+        continue;
+      }
+      merged[record.message.id] = canonicalMessageToLocalMessage(
+        record,
+        currentUserId: widget.profile.userId,
+        currentUserName: widget.profile.displayName,
+        otherSenderName: _title ?? 'Participant',
+      );
+    }
+    final result = merged.values.toList()
+      ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
+    return result;
   }
 
   Future<void> _loadStarredMessageIds({
@@ -652,9 +728,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> _refreshReadReceipts() async {
     final conversationId = widget.conversationId;
     await widget.syncService.syncNow();
+    await widget.incrementalMessageSyncService?.reconcile();
+    await widget.incrementalMessageSyncService?.drainOutbox();
     if (!mounted || widget.conversationId != conversationId) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
+      _messagesFuture = _loadMessages();
     });
   }
 
@@ -668,7 +746,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await _markReadRemotely(conversationId);
     if (!mounted || widget.conversationId != conversationId) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
+      _messagesFuture = _loadMessages(syncRemote: false);
     });
   }
 
@@ -706,14 +784,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _otherUserAvatarUrl = null;
         _disappearingSeconds = 0;
         _starredMessageIds = <String>{};
+        _canonicalConversationId = null;
         _title = widget.initialTitle;
         _replyTarget = null;
         _messageController.clear();
       }
       setState(() {
-        _messagesFuture = widget.messagesRepository.loadMessages(
-          widget.conversationId,
-        );
+        _messagesFuture = _loadMessages();
       });
       _resolveTitle();
       _markReadLocally();
@@ -725,6 +802,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _otherActivityTimer?.cancel();
     _receiptRefreshTimer?.cancel();
     _presenceAgeTimer?.cancel();
+    unawaited(_canonicalMessageSubscription?.cancel());
     unawaited(_disposeRealtime());
     _messageController.dispose();
     super.dispose();
@@ -737,9 +815,88 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-    // Hard-block when offline: leave the composed text in place so the user can
-    // resend once they reconnect. Nothing is queued for later delivery.
+    final body = _messageController.text.trim();
+    if (body.isEmpty) return;
+
+    final localConversationId = widget.conversationId;
+    final canonicalService = widget.incrementalMessageSyncService;
+    final canonicalConversationId = await _resolveCanonicalConversationId();
+    if (!mounted || widget.conversationId != localConversationId) return;
+    if (canonicalService != null &&
+        canonicalConversationId != null &&
+        _disappearingSeconds <= 0) {
+      final now = DateTime.now().toUtc();
+      final expiresAtMillis = _disappearingExpiryMillis();
+      final expiresAt = expiresAtMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              expiresAtMillis,
+              isUtc: true,
+            ).toIso8601String();
+      final message = CanonicalMessage(
+        id: const Uuid().v4(),
+        conversationId: canonicalConversationId,
+        senderId: widget.profile.userId,
+        contentType: CanonicalMessageContentType.text,
+        payload: {'text': body},
+        replyToId: _replyTarget?.messageId,
+        status: CanonicalMessageStatus.sending,
+        metadata: {
+          'schema_version': 1,
+          'revision': 1,
+          'reactions': <Object?>[],
+          'pin': <String, Object?>{
+            'is_pinned': false,
+            'pinned_by': null,
+            'pinned_at': null,
+          },
+          'is_starred_by_me': false,
+          'forwarded': <String, Object?>{
+            'original_message_id': null,
+            'original_sender_id': null,
+            'original_sender_name': null,
+            'original_created_at': null,
+          },
+          'receipts': <String, Object?>{
+            'delivered_count': 0,
+            'read_count': 0,
+            'read_by_me_at': null,
+          },
+          'ephemeral': <String, Object?>{
+            'view_once': false,
+            'viewed_at': null,
+            'expires_at': expiresAt,
+          },
+          'edited_at': null,
+          'deleted_at': null,
+        },
+        createdAt: now,
+        updatedAt: now,
+      );
+      await canonicalService.enqueue(message);
+      final conversation = await widget.messagesRepository.loadConversation(
+        localConversationId,
+      );
+      if (conversation != null) {
+        await widget.messagesRepository.upsertConversation(
+          conversation.copyWith(
+            lastMessagePreview: body,
+            updatedAtMillis: now.millisecondsSinceEpoch,
+          ),
+        );
+      }
+      if (!mounted || widget.conversationId != localConversationId) return;
+      _messageController.clear();
+      setState(() {
+        _replyTarget = null;
+        _messagesFuture = _loadMessages(syncRemote: false);
+      });
+      return;
+    }
+
+    // Local-only conversations do not have a server identity that the V2
+    // outbox can authorize yet. Preserve the draft until connectivity lets the
+    // conversation starter create that identity.
     if (!widget.connectivityService.isOnline) {
       showOfflineSnackBar(context);
       return;
@@ -756,9 +913,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (!mounted) return;
     setState(() {
       _replyTarget = null;
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages(syncRemote: false);
     });
     await _syncMessages();
   }
@@ -766,11 +921,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> _syncMessages() async {
     final conversationId = widget.conversationId;
     await widget.syncService.syncNow();
+    await widget.incrementalMessageSyncService?.drainOutbox();
     if (!mounted || widget.conversationId != conversationId) return;
     await _resolveTitle();
     if (!mounted || widget.conversationId != conversationId) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(conversationId);
+      _messagesFuture = _loadMessages();
     });
   }
 
@@ -867,9 +1023,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     // Pull the thread so the (realtime-materialised) reaction shows.
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages();
     });
     _toast(result ? 'Reacted $emoji' : 'Reaction removed');
   }
@@ -902,9 +1056,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       return;
     }
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages();
     });
     _toast('Message deleted.');
   }
@@ -1056,9 +1208,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
     if (!mounted) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages(syncRemote: false);
     });
     await _syncMessages();
   }
@@ -1089,9 +1239,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
     if (!mounted) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages(syncRemote: false);
     });
     await _syncMessages();
   }
@@ -1228,9 +1376,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     if (!mounted) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages(syncRemote: false);
     });
     await _syncMessages();
   }
@@ -1318,9 +1464,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     if (!mounted) return;
     setState(() {
-      _messagesFuture = widget.messagesRepository.loadMessages(
-        widget.conversationId,
-      );
+      _messagesFuture = _loadMessages();
     });
   }
 
