@@ -35,6 +35,12 @@ import { MuteConversationSheet } from './MuteConversationSheet';
 import { StickerPicker } from './StickerPicker';
 import { EmojiKeyboard } from './EmojiKeyboard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  canonicalMessagePayload,
+  canonicalMessageToChatMessage,
+  ChatMessageProjection,
+} from './canonicalMessageAdapter';
+import { CanonicalMedia, parseCanonicalMessage } from '@/contracts/messaging';
 
 import {
   DropdownMenu,
@@ -46,55 +52,7 @@ import {
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay, differenceInHours } from 'date-fns';
 
-interface Message {
-  id: string;
-  content: string;
-  sender_id: string;
-  created_at: string;
-  media_url?: string | null;
-  media_type?: string | null;
-  reply_to_id?: string | null;
-  reply_to_message?: {
-    content: string;
-    sender: {
-      display_name: string;
-    };
-    media_url?: string | null;
-    media_type?: string | null;
-  } | null;
-  reply_metadata?: {
-    type?: string;
-    story_id?: string;
-    story_media_url?: string;
-    story_media_type?: string;
-  } | null;
-  profiles: {
-    display_name: string | null;
-    avatar_url: string | null;
-  };
-  reactions?: Array<{
-    emoji: string;
-    user_id: string;
-    user: {
-      display_name: string;
-      avatar_url?: string | null;
-    };
-  }>;
-  read_receipts?: Array<{
-    user_id: string;
-    read_at: string;
-  }>;
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
-  is_pinned?: boolean;
-  edited_at?: string | null;
-  forwarded_from?: {
-    original_sender_id: string;
-    original_sender_name: string;
-    original_timestamp: string;
-    source_type: 'dm' | 'group';
-    source_id: string;
-  } | null;
-}
+type Message = ChatMessageProjection;
 
 interface ChatInterfaceProps {
   conversationId: string;
@@ -106,6 +64,113 @@ interface ChatInterfaceProps {
 
 
 const MESSAGES_PER_PAGE = 50;
+
+const resolveCanonicalMediaUrl = (media: CanonicalMedia) =>
+  supabase.storage.from(media.bucket).getPublicUrl(media.path).data.publicUrl;
+
+const projectCanonicalMessages = async (
+  values: unknown[],
+  currentUserId?: string,
+): Promise<Message[]> => {
+  const envelopes = values.map(parseCanonicalMessage);
+  if (envelopes.length === 0) return [];
+
+  const messageIds = envelopes.map((message) => message.id);
+  const senderIds = [...new Set(envelopes.map((message) => message.sender_id))];
+  const [profilesResult, reactionsResult, receiptsResult] = await Promise.all([
+    supabase
+      .from('public_profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', senderIds),
+    supabase
+      .from('message_reactions')
+      .select('message_id, emoji, user_id, user:profiles(display_name, avatar_url)')
+      .in('message_id', messageIds),
+    supabase
+      .from('message_read_receipts')
+      .select('message_id, user_id, read_at')
+      .in('message_id', messageIds),
+  ]);
+
+  const profiles = new Map(
+    (profilesResult.data ?? []).map((profile) => [profile.id, profile]),
+  );
+  const reactionsByMessage = new Map<string, Message['reactions']>();
+  for (const row of reactionsResult.data ?? []) {
+    const rawUser = Array.isArray(row.user) ? row.user[0] : row.user;
+    const reactions = reactionsByMessage.get(row.message_id) ?? [];
+    reactions.push({
+      emoji: row.emoji,
+      user_id: row.user_id,
+      user: {
+        display_name: rawUser?.display_name ?? 'User',
+        avatar_url: rawUser?.avatar_url ?? null,
+      },
+    });
+    reactionsByMessage.set(row.message_id, reactions);
+  }
+
+  const receiptsByMessage = new Map<string, Message['read_receipts']>();
+  for (const row of receiptsResult.data ?? []) {
+    const receipts = receiptsByMessage.get(row.message_id) ?? [];
+    receipts.push({ user_id: row.user_id, read_at: row.read_at });
+    receiptsByMessage.set(row.message_id, receipts);
+  }
+
+  return envelopes.map((envelope) => {
+    const profile = profiles.get(envelope.sender_id);
+    const projected = canonicalMessageToChatMessage(
+      envelope,
+      {
+        display_name:
+          profile?.display_name ??
+          (envelope.sender_id === currentUserId ? 'You' : 'Unknown User'),
+        avatar_url: profile?.avatar_url ?? null,
+      },
+      resolveCanonicalMediaUrl,
+    );
+    const readReceipts = receiptsByMessage.get(envelope.id) ?? [];
+    return {
+      ...projected,
+      reactions: reactionsByMessage.get(envelope.id) ?? [],
+      read_receipts: readReceipts,
+      status:
+        envelope.sender_id === currentUserId &&
+        readReceipts.some((receipt) => receipt.user_id !== currentUserId)
+          ? 'read'
+          : projected.status,
+    };
+  });
+};
+
+const getCanonicalMessagePage = async (
+  conversationId: string,
+  currentUserId?: string,
+  before?: Pick<Message, 'id' | 'created_at'>,
+) => {
+  const { data, error } = await supabase.rpc('get_message_page', {
+    p_conversation_id: conversationId,
+    p_before_created_at: before?.created_at ?? null,
+    p_before_id: before?.id ?? null,
+    p_limit: MESSAGES_PER_PAGE,
+  });
+  if (error) throw error;
+  const values = data ?? [];
+  const messages = await projectCanonicalMessages(values, currentUserId);
+  return {
+    messages: messages.reverse(),
+    hasMore: values.length === MESSAGES_PER_PAGE,
+  };
+};
+
+const getCanonicalMessage = async (messageId: string, currentUserId?: string) => {
+  const { data, error } = await supabase.rpc('get_message_envelope', {
+    p_message_id: messageId,
+  });
+  if (error) throw error;
+  const messages = await projectCanonicalMessages(data ? [data] : [], currentUserId);
+  return messages[0] ?? null;
+};
 
 export const ModernChatInterface = ({ 
   conversationId, 
@@ -249,60 +314,84 @@ export const ModernChatInterface = ({
   // Handle new message from realtime
   const handleRealtimeMessage = useCallback((message: MessagePayload) => {
     console.log('[Realtime] New message from other user:', message.id);
-    
-    setMessages(prev => {
-      // Don't add duplicates
-      if (prev.some(m => m.id === message.id)) return prev;
-      
-      const formattedMsg: Message = {
-        id: message.id,
-        content: message.content,
-        sender_id: message.sender_id,
-        created_at: message.created_at,
-        media_url: message.media_url || null,
-        media_type: message.media_type || null,
-        reply_to_id: message.reply_to_id || null,
-        reply_to_message: null,
-        profiles: {
-          display_name: otherUser?.display_name || 'Unknown',
-          avatar_url: otherUser?.avatar_url || null
-        },
-        reactions: [],
-        read_receipts: [],
-        status: 'sent',
-        is_pinned: false,
-        edited_at: null,
-      };
-      
-      return [...prev, formattedMsg];
-    });
-    
-    // Cache the message
-    appendMessage({
-      id: message.id,
-      content: message.content,
-      sender_id: message.sender_id,
-      created_at: message.created_at,
-      media_url: message.media_url || null,
-      media_type: message.media_type || null,
-      profiles: {
-        display_name: otherUser?.display_name || 'Unknown',
-        avatar_url: otherUser?.avatar_url || null
-      },
-    });
-    
-    // Scroll to bottom if near bottom
-    if (isNearBottomRef.current) {
-      setTimeout(() => scrollToBottom(), 100);
-      markMessagesAsRead([{ id: message.id, sender_id: message.sender_id, read_receipts: [] } as Message]);
-    } else {
-      setShowScrollButton(true);
-      setNewMessagesCount(prev => prev + 1);
-    }
-    
-    // Play receive sound for messages from other users
-    chatSounds.playReceive();
-  }, [otherUser, appendMessage]);
+
+    void (async () => {
+      let formattedMsg: Message;
+      try {
+        const canonicalMessage = await getCanonicalMessage(message.id, user?.id);
+        if (!canonicalMessage) {
+          throw new Error('Canonical message was not visible');
+        }
+        formattedMsg = canonicalMessage;
+      } catch (canonicalError) {
+        console.warn(
+          'Canonical realtime materialization unavailable; using row payload.',
+          canonicalError,
+        );
+        formattedMsg = {
+          id: message.id,
+          content: message.content,
+          sender_id: message.sender_id,
+          created_at: message.created_at,
+          media_url: message.media_url || null,
+          media_type: message.media_type || null,
+          reply_to_id: message.reply_to_id || null,
+          reply_to_message: null,
+          profiles: {
+            display_name: otherUser?.display_name || 'Unknown',
+            avatar_url: otherUser?.avatar_url || null,
+          },
+          reactions: [],
+          read_receipts: [],
+          status: 'sent',
+          is_pinned: false,
+          edited_at: null,
+        };
+      }
+
+      setMessages((previous) =>
+        previous.some((existing) => existing.id === formattedMsg.id)
+          ? previous.map((existing) =>
+              existing.id === formattedMsg.id ? formattedMsg : existing,
+            )
+          : [...previous, formattedMsg],
+      );
+      appendMessage({
+        id: formattedMsg.id,
+        content: formattedMsg.content,
+        sender_id: formattedMsg.sender_id,
+        created_at: formattedMsg.created_at,
+        media_url: formattedMsg.media_url,
+        media_type: formattedMsg.media_type,
+        profiles: formattedMsg.profiles,
+      });
+
+      if (isNearBottomRef.current) {
+        setTimeout(() => scrollToBottom(), 100);
+        markMessagesAsRead([formattedMsg]);
+      } else {
+        setShowScrollButton(true);
+        setNewMessagesCount((previous) => previous + 1);
+      }
+      chatSounds.playReceive();
+    })();
+  }, [appendMessage, otherUser, user?.id]);
+
+  const handleRealtimeUpdate = useCallback((message: MessagePayload) => {
+    void (async () => {
+      try {
+        const updated = await getCanonicalMessage(message.id, user?.id);
+        if (!updated) return;
+        setMessages((previous) =>
+          previous.map((existing) =>
+            existing.id === updated.id ? updated : existing,
+          ),
+        );
+      } catch (error) {
+        console.warn('Unable to materialize canonical message update.', error);
+      }
+    })();
+  }, [user?.id]);
 
   // Handle typing indicator from realtime
   const handleRealtimeTyping = useCallback((typing: TypingPayload) => {
@@ -335,6 +424,7 @@ export const ModernChatInterface = ({
     conversationId,
     otherUserId: otherUser?.id,
     onNewMessage: handleRealtimeMessage,
+    onMessageUpdate: handleRealtimeUpdate,
     onMessageDelete: handleRealtimeDelete,
     onTyping: handleRealtimeTyping,
     onReadReceipt: handleRealtimeReceipt,
@@ -455,9 +545,50 @@ export const ModernChatInterface = ({
 
   const loadMessages = async () => {
     if (!conversationId) return;
+
+    try {
+      const canonicalPage = await getCanonicalMessagePage(
+        conversationId,
+        user?.id,
+      );
+      const formattedMessages = canonicalPage.messages;
+      setHasMoreMessages(canonicalPage.hasMore);
+      setMessages(formattedMessages);
+      setPinnedMessages(formattedMessages.filter((message) => message.is_pinned));
+      setIsLoading(false);
+      saveToCache(formattedMessages.map((message) => ({
+        id: message.id,
+        content: message.content,
+        sender_id: message.sender_id,
+        created_at: message.created_at,
+        media_url: message.media_url,
+        media_type: message.media_type,
+        profiles: message.profiles,
+      })));
+      setTimeout(() => scrollToBottom(), 100);
+
+      const unreadMessages = formattedMessages.filter(
+        (message) =>
+          message.sender_id !== user?.id &&
+          !message.read_receipts?.some((receipt) => receipt.user_id === user?.id),
+      );
+      if (unreadMessages.length > 0 && !hasScrolledToUnread.current) {
+        setFirstUnreadId(unreadMessages[0].id);
+        setTimeout(() => markMessagesAsRead(unreadMessages), 1500);
+      } else {
+        setFirstUnreadId(null);
+      }
+      return;
+    } catch (canonicalError) {
+      console.warn(
+        'Canonical message page unavailable; using the rollout fallback.',
+        canonicalError,
+      );
+    }
     
     try {
-      // Load recent messages with pagination
+      // Compatibility fallback for environments that have not deployed the
+      // canonical message RPCs yet.
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -568,6 +699,31 @@ export const ModernChatInterface = ({
     const oldestMessage = messages[0];
     
     try {
+      try {
+        const canonicalPage = await getCanonicalMessagePage(
+          conversationId,
+          user?.id,
+          oldestMessage,
+        );
+        setHasMoreMessages(canonicalPage.hasMore);
+
+        const scrollContainer = scrollAreaRef.current;
+        const previousScrollHeight = scrollContainer?.scrollHeight || 0;
+        setMessages((previous) => [...canonicalPage.messages, ...previous]);
+        requestAnimationFrame(() => {
+          if (scrollContainer) {
+            scrollContainer.scrollTop =
+              scrollContainer.scrollHeight - previousScrollHeight;
+          }
+        });
+        return;
+      } catch (canonicalError) {
+        console.warn(
+          'Canonical message pagination unavailable; using the rollout fallback.',
+          canonicalError,
+        );
+      }
+
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -777,12 +933,13 @@ export const ModernChatInterface = ({
     
     const messageContent = customContent || newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment');
     
-    const tempId = `temp-${Date.now()}`;
+    const optimisticId = crypto.randomUUID();
+    const optimisticCreatedAt = new Date().toISOString();
     const optimisticMessage: Message = {
-      id: tempId,
+      id: optimisticId,
       content: messageContent,
       sender_id: user.id,
-      created_at: new Date().toISOString(),
+      created_at: optimisticCreatedAt,
       media_url: mediaUrl || null,
       media_type: mediaType || null,
       reply_to_id: replyingTo?.id || null,
@@ -814,30 +971,54 @@ export const ModernChatInterface = ({
     }, 50);
 
     try {
-      const { data: newMsg, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: messageContent,
-          media_url: mediaUrl,
-          media_type: mediaType,
-          reply_to_id: replyingTo?.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      let sentMessage: Message;
+      if (!mediaUrl) {
+        const { data, error } = await supabase.rpc('send_message', {
+          p_message: canonicalMessagePayload({
+            id: optimisticId,
+            conversationId,
+            senderId: user.id,
+            text: messageContent,
+            replyToId: replyingTo?.id,
+            createdAt: optimisticCreatedAt,
+          }),
+        });
+        if (error) throw error;
+        const projected = await projectCanonicalMessages([data], user.id);
+        if (!projected[0]) throw new Error('Message send returned no envelope');
+        sentMessage = {
+          ...projected[0],
+          reply_to_message: optimisticMessage.reply_to_message,
+        };
+      } else {
+        // Media uploads still use the compatibility columns until the crop,
+        // caption, and canonical storage-descriptor flow is completed.
+        const { data, error } = await supabase
+          .from('messages')
+          .insert({
+            id: optimisticId,
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: messageContent,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            reply_to_id: replyingTo?.id,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        sentMessage = {
+          ...optimisticMessage,
+          id: data.id,
+          created_at: data.created_at,
+          status: 'sent',
+        };
+      }
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === tempId
-            ? {
-                ...msg,
-                id: newMsg.id,
-                created_at: newMsg.created_at,
-                status: 'delivered' as Message['status'],
-              }
+          msg.id === optimisticId
+            ? sentMessage
             : msg
         )
       );
@@ -859,7 +1040,7 @@ export const ModernChatInterface = ({
         inputRef.current?.focus();
       }, 50);
     } catch (error: any) {
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
       
       toast({
         title: 'Error sending message',

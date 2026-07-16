@@ -20,6 +20,8 @@ Implemented:
   unless their premium subscription is active;
 - a Flutter Hive projection, durable outbox, incremental message-ID realtime
   materialization, reconciliation cursor, and retry worker;
+- canonical Flutter DM text rendering/offline sending plus canonical React DM
+  page reads, message-ID realtime materialization, and idempotent text sends;
 - premium-gated Flutter and React community creation, paid discovery/group-link
   request flows, join-request review UI, server-priced React chat gifting, and
   canonical LiveKit room authorization;
@@ -29,8 +31,9 @@ Implemented:
 
 Pending rollout work:
 
-- switch the existing Flutter and React thread renderers from legacy message
-  queries to the canonical projection during the dual-read rollout;
+- switch the remaining group, channel, external, and media-send paths from
+  legacy message queries/writes to the canonical projection during the
+  dual-read rollout;
 - add canonical gift/call bubbles and gift controls to every Flutter composer;
 - finish media crop/caption and persistent voice-waveform UX on both clients;
 - remove legacy `message_attachments`, `group_messages`, and `channel_posts`
