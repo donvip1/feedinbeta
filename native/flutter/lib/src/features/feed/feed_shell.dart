@@ -906,7 +906,15 @@ class _FeedScreenState extends State<FeedScreen> {
   bool _isLoadingMore = false;
   bool _hasMorePosts = true;
   final Set<String> _savedPostIds = {};
+  final Set<String> _unsavedPostIds = {};
   final Set<String> _likedPostIds = {};
+  final Set<String> _unlikedPostIds = {};
+  final Set<String> _refeededPostIds = {};
+  final Set<String> _unrefeededPostIds = {};
+  final Map<String, int> _likeDeltas = {};
+  final Map<String, int> _commentDeltas = {};
+  final Map<String, int> _refeedDeltas = {};
+  Timer? _realtimeRefreshDebounce;
   // Posts whose view has been recorded this session, so a post is counted once
   // even if it scrolls in and out of focus.
   final Set<String> _recordedViewIds = {};
@@ -921,6 +929,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void dispose() {
     widget.backController.setActiveBackHandler(null);
+    _realtimeRefreshDebounce?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -933,7 +942,11 @@ class _FeedScreenState extends State<FeedScreen> {
       _syncBackController();
     }
     if (oldWidget.realtimeVersion != widget.realtimeVersion) {
-      _reloadAfterRealtimeEvent();
+      _realtimeRefreshDebounce?.cancel();
+      _realtimeRefreshDebounce = Timer(
+        const Duration(milliseconds: 250),
+        _reloadAfterRealtimeEvent,
+      );
     }
   }
 
@@ -961,8 +974,21 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
+      _clearEngagementOverrides();
       _message = 'New feed activity synced.';
     });
+  }
+
+  void _clearEngagementOverrides() {
+    _savedPostIds.clear();
+    _unsavedPostIds.clear();
+    _likedPostIds.clear();
+    _unlikedPostIds.clear();
+    _refeededPostIds.clear();
+    _unrefeededPostIds.clear();
+    _likeDeltas.clear();
+    _commentDeltas.clear();
+    _refeedDeltas.clear();
   }
 
   Future<List<FeedPost>> _initialLoad() async {
@@ -983,6 +1009,7 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _postsFuture = Future.value(result.posts);
+      _clearEngagementOverrides();
       _message = result.message ?? 'Feed refreshed.';
       _hasMorePosts = result.usedRemote;
     });
@@ -1018,21 +1045,39 @@ class _FeedScreenState extends State<FeedScreen> {
     return false;
   }
 
-  /// Run an online write, then flush immediately so it is sent now (not queued
-  /// for "later"). Blocks with the offline affordance when there's no network.
-  Future<void> _runOnlineAction(Future<void> Function() action) async {
-    if (!_requireOnline()) return;
-    await action();
-    await widget.syncService.syncNow();
-  }
-
   Future<void> _likePost(FeedPost post) async {
     if (!_requireOnline()) return;
-    if (!_likedPostIds.contains(post.id)) {
-      setState(() => _likedPostIds.add(post.id));
+    final currentlyLiked =
+        !_unlikedPostIds.contains(post.id) &&
+        (_likedPostIds.contains(post.id) || post.viewerHasLiked);
+    setState(() {
+      if (currentlyLiked) {
+        _likedPostIds.remove(post.id);
+        _unlikedPostIds.add(post.id);
+      } else {
+        _likedPostIds.add(post.id);
+        _unlikedPostIds.remove(post.id);
+      }
+      _likeDeltas[post.id] =
+          (_likeDeltas[post.id] ?? 0) + (currentlyLiked ? -1 : 1);
+    });
+    try {
+      await widget.feedRepository.toggleLike(post.id, liked: currentlyLiked);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (currentlyLiked) {
+          _likedPostIds.add(post.id);
+          _unlikedPostIds.remove(post.id);
+        } else {
+          _likedPostIds.remove(post.id);
+          _unlikedPostIds.add(post.id);
+        }
+        _likeDeltas[post.id] =
+            (_likeDeltas[post.id] ?? 0) - (currentlyLiked ? -1 : 1);
+      });
+      setState(() => _message = 'Could not update the like.');
     }
-    await widget.feedRepository.queueLike(post.id);
-    await widget.syncService.syncNow();
   }
 
   /// Pull the next page in once the viewer nears the end of the loaded feed.
@@ -1066,13 +1111,34 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _savePost(FeedPost post) async {
     if (!_requireOnline()) return;
-    await widget.feedRepository.queueSave(post.id);
-    await widget.syncService.syncNow();
-    if (!mounted) return;
+    final currentlySaved =
+        !_unsavedPostIds.contains(post.id) &&
+        (_savedPostIds.contains(post.id) || post.viewerHasSaved);
     setState(() {
-      _savedPostIds.add(post.id);
-      _message = 'Post saved.';
+      if (currentlySaved) {
+        _savedPostIds.remove(post.id);
+        _unsavedPostIds.add(post.id);
+      } else {
+        _savedPostIds.add(post.id);
+        _unsavedPostIds.remove(post.id);
+      }
+      _message = currentlySaved ? 'Post removed from saved.' : 'Post saved.';
     });
+    try {
+      await widget.feedRepository.toggleSave(post.id, saved: currentlySaved);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (currentlySaved) {
+          _savedPostIds.add(post.id);
+          _unsavedPostIds.remove(post.id);
+        } else {
+          _savedPostIds.remove(post.id);
+          _unsavedPostIds.add(post.id);
+        }
+        _message = 'Could not update saved posts.';
+      });
+    }
   }
 
   Future<void> _sharePost(FeedPost post) async {
@@ -1092,25 +1158,85 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   String _shareTextForPost(FeedPost post) {
-    final mediaUrl = post.mediaUrl ?? post.mediaUrls.firstOrNull;
+    final sharedPost = post.displayedPost;
+    final mediaUrl = sharedPost.mediaUrl ?? sharedPost.mediaUrls.firstOrNull;
     return [
-      '${post.authorName} on feedIn',
-      if (post.body.trim().isNotEmpty) post.body.trim(),
+      '${sharedPost.authorName} on feedIn',
+      if (sharedPost.body.trim().isNotEmpty) sharedPost.body.trim(),
       if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
     ].join('\n\n');
   }
 
   Future<void> _openComments(FeedPost post) async {
-    final comment = await showModalBottomSheet<String>(
+    List<FeedComment> comments = const [];
+    try {
+      comments = await widget.feedRepository.loadComments(post.id);
+    } catch (_) {
+      // The composer remains usable if an older backend cannot list comments.
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _CommentSheet(post: post),
+      builder: (context) => _CommentSheet(
+        post: post,
+        comments: comments,
+        onSubmit: (body) async {
+          final created = await widget.feedRepository.addComment(post.id, body);
+          if (mounted) {
+            setState(() {
+              _commentDeltas[post.id] = (_commentDeltas[post.id] ?? 0) + 1;
+            });
+          }
+          return created;
+        },
+      ),
     );
-    if (comment == null || comment.trim().isEmpty) return;
-    await _runOnlineAction(
-      () => widget.feedRepository.queueComment(post.id, comment),
-    );
+  }
+
+  Future<void> _refeedPost(FeedPost post) async {
+    if (!_requireOnline()) return;
+    final currentlyRefeeded =
+        !_unrefeededPostIds.contains(post.id) &&
+        (_refeededPostIds.contains(post.id) || post.viewerHasRefeeded);
+    setState(() {
+      if (currentlyRefeeded) {
+        _refeededPostIds.remove(post.id);
+        _unrefeededPostIds.add(post.id);
+      } else {
+        _refeededPostIds.add(post.id);
+        _unrefeededPostIds.remove(post.id);
+      }
+      _refeedDeltas[post.id] =
+          (_refeedDeltas[post.id] ?? 0) + (currentlyRefeeded ? -1 : 1);
+    });
+    try {
+      await widget.feedRepository.toggleRefeed(
+        post.id,
+        refeeded: currentlyRefeeded,
+      );
+      if (!mounted) return;
+      setState(() {
+        _message = currentlyRefeeded
+            ? 'Re-share removed.'
+            : 'Re-shared to your feed.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (currentlyRefeeded) {
+          _refeededPostIds.add(post.id);
+          _unrefeededPostIds.remove(post.id);
+        } else {
+          _refeededPostIds.remove(post.id);
+          _unrefeededPostIds.add(post.id);
+        }
+        _refeedDeltas[post.id] =
+            (_refeedDeltas[post.id] ?? 0) - (currentlyRefeeded ? -1 : 1);
+        _message = 'Could not update this re-share.';
+      });
+    }
   }
 
   @override
@@ -1189,21 +1315,32 @@ class _FeedScreenState extends State<FeedScreen> {
         _maybeLoadMore(index, posts.length);
         // Warm the next few reels so swiping to them starts playback instantly.
         ReelPreloader.instance.preloadAround([
-          for (final p in posts) p.mediaUrl ?? p.mediaUrls.firstOrNull,
+          for (final p in posts)
+            p.displayedPost.mediaUrl ?? p.displayedPost.mediaUrls.firstOrNull,
         ], index);
       },
       itemBuilder: (context, index) {
         final post = posts[index];
+        final renderedPost = post.copyWith(
+          likesCount: post.likesCount + (_likeDeltas[post.id] ?? 0),
+          commentsCount: post.commentsCount + (_commentDeltas[post.id] ?? 0),
+          refeedsCount: post.refeedsCount + (_refeedDeltas[post.id] ?? 0),
+        );
         final card = ImmersivePostCard(
-          post: post,
+          post: renderedPost,
           isActive: index == _activePage,
-          isLiked: _likedPostIds.contains(post.id),
-          isSaved: _savedPostIds.contains(post.id),
+          isLiked:
+              !_unlikedPostIds.contains(post.id) &&
+              (_likedPostIds.contains(post.id) || post.viewerHasLiked),
+          isRefeeded:
+              !_unrefeededPostIds.contains(post.id) &&
+              (_refeededPostIds.contains(post.id) || post.viewerHasRefeeded),
+          isSaved:
+              !_unsavedPostIds.contains(post.id) &&
+              (_savedPostIds.contains(post.id) || post.viewerHasSaved),
           onLike: () => _likePost(post),
           onComment: () => _openComments(post),
-          onRefeed: () => _runOnlineAction(
-            () => widget.feedRepository.queueRefeed(post.id),
-          ),
+          onRefeed: () => _refeedPost(post),
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
         );
@@ -1570,9 +1707,15 @@ class _FeedStatusBanner extends StatelessWidget {
 }
 
 class _CommentSheet extends StatefulWidget {
-  const _CommentSheet({required this.post});
+  const _CommentSheet({
+    required this.post,
+    required this.comments,
+    required this.onSubmit,
+  });
 
   final FeedPost post;
+  final List<FeedComment> comments;
+  final Future<FeedComment> Function(String body) onSubmit;
 
   @override
   State<_CommentSheet> createState() => _CommentSheetState();
@@ -1580,6 +1723,8 @@ class _CommentSheet extends StatefulWidget {
 
 class _CommentSheetState extends State<_CommentSheet> {
   final _controller = TextEditingController();
+  late final List<FeedComment> _comments = [...widget.comments];
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -1595,49 +1740,165 @@ class _CommentSheetState extends State<_CommentSheet> {
         right: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Comments',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.post.body,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 620),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Comments',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            minLines: 2,
-            maxLines: 5,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Add a comment',
-              border: OutlineInputBorder(),
+            const SizedBox(height: 8),
+            Text(
+              widget.post.displayedPost.body,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(_controller.text),
-              icon: const Icon(Icons.send),
-              label: const Text('Comment'),
+            const SizedBox(height: 12),
+            Flexible(
+              child: _comments.isEmpty
+                  ? const Center(child: Text('No comments yet.'))
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _comments.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final comment = _comments[index];
+                        final initial = comment.authorName.trim().isEmpty
+                            ? '?'
+                            : comment.authorName.characters.first;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                radius: 19,
+                                backgroundImage: comment.avatarUrl == null
+                                    ? null
+                                    : NetworkImage(comment.avatarUrl!),
+                                child: comment.avatarUrl == null
+                                    ? Text(initial)
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            comment.authorName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                        if (comment.authorHandle != null) ...[
+                                          const SizedBox(width: 5),
+                                          Flexible(
+                                            child: Text(
+                                              comment.authorHandle!,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _relativeCommentTime(
+                                            comment.createdAtMillis,
+                                          ),
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(comment.content),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              minLines: 2,
+              maxLines: 5,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Add a comment',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _sending ? null : _submit,
+                icon: const Icon(Icons.send),
+                label: Text(_sending ? 'Posting...' : 'Comment'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Future<void> _submit() async {
+    final body = _controller.text.trim();
+    if (body.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      final comment = await widget.onSubmit(body);
+      if (!mounted) return;
+      setState(() {
+        _comments.add(comment);
+        _controller.clear();
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not post comment.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+}
+
+String _relativeCommentTime(int createdAtMillis) {
+  final elapsed = DateTime.now().difference(
+    DateTime.fromMillisecondsSinceEpoch(createdAtMillis),
+  );
+  if (elapsed.inMinutes < 1) return 'now';
+  if (elapsed.inHours < 1) return '${elapsed.inMinutes}m';
+  if (elapsed.inDays < 1) return '${elapsed.inHours}h';
+  if (elapsed.inDays < 7) return '${elapsed.inDays}d';
+  return '${DateTime.fromMillisecondsSinceEpoch(createdAtMillis).day}/'
+      '${DateTime.fromMillisecondsSinceEpoch(createdAtMillis).month}';
 }
 
 class ProfilePanel extends StatelessWidget {

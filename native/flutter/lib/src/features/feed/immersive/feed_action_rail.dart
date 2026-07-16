@@ -18,6 +18,7 @@ class FeedActionRail extends StatelessWidget {
     required this.refeedsCount,
     required this.viewsCount,
     required this.isLiked,
+    required this.isRefeeded,
     required this.isSaved,
     required this.avatarText,
     this.avatarUrl,
@@ -34,6 +35,7 @@ class FeedActionRail extends StatelessWidget {
   final int refeedsCount;
   final int viewsCount;
   final bool isLiked;
+  final bool isRefeeded;
   final bool isSaved;
   final String avatarText;
   final String? avatarUrl;
@@ -73,6 +75,9 @@ class FeedActionRail extends StatelessWidget {
         const SizedBox(height: FeedImmersiveTheme.railGap),
         _RailButton(
           icon: Icons.repeat,
+          color: isRefeeded ? const Color(0xFF22C55E) : Colors.white,
+          chipColor: isRefeeded ? const Color(0x3322C55E) : null,
+          active: isRefeeded,
           label: _compactCount(refeedsCount),
           onTap: onRefeed,
         ),
@@ -292,13 +297,17 @@ class _RailButtonState extends State<_RailButton>
     );
     _popScale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: FeedImmersiveTheme.pressPopScale)
-            .chain(CurveTween(curve: FeedImmersiveTheme.popCurve)),
+        tween: Tween(
+          begin: 1.0,
+          end: FeedImmersiveTheme.pressPopScale,
+        ).chain(CurveTween(curve: FeedImmersiveTheme.popCurve)),
         weight: 45,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: FeedImmersiveTheme.pressPopScale, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        tween: Tween(
+          begin: FeedImmersiveTheme.pressPopScale,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
         weight: 55,
       ),
     ]).animate(_popController);

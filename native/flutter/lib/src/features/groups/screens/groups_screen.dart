@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../data/groups_remote_data_source.dart';
+import '../data/communities_remote_data_source.dart';
+import '../data/community_models.dart';
 import '../groups_theme.dart';
-import '../view_models/group_view_models.dart';
-import '../widgets/create_group_sheet.dart';
-import '../widgets/group_list_tile.dart';
-import 'group_chat_screen.dart';
+import '../widgets/create_community_sheet.dart';
+import 'community_chat_screen.dart';
+import 'community_detail_screen.dart';
 
-/// Public entry point for the groups / message-rooms feature.
-///
-/// Lists the group conversations the current user is in, lets them create a new
-/// group (name + members), and opens the group room. This is the ONE public
-/// screen the host wires into navigation (e.g. a "Groups" entry reachable from
-/// the Messages/Chats surface).
-///
-/// The only required dependency is the current user's id (to compute "isMine"
-/// on messages and exclude self from member lists). The Supabase-backed
-/// [GroupsRemoteDataSource] self-detects configuration via [autoDetect] when
-/// not supplied, so the host can construct this with just an id.
+typedef GroupGoLiveCallback =
+    void Function({required String conversationId, required String groupTitle});
+
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({
     super.key,
@@ -27,23 +19,12 @@ class GroupsScreen extends StatefulWidget {
     this.onGoLive,
   });
 
-  /// The signed-in user's id (matches `messages.sender_id` /
-  /// `conversation_participants.user_id`).
   final String currentUserId;
-
-  /// Optional injected data source; defaults to [GroupsRemoteDataSource.autoDetect].
-  final GroupsRemoteDataSource? dataSource;
-
-  /// Optional back affordance. When null, no back button is shown (the screen
-  /// is assumed to be a tab). When provided, a back button is rendered.
+  final CommunitiesRemoteDataSource? dataSource;
   final VoidCallback? onBack;
 
-  /// Optional "Go Live from group" handler, forwarded to each opened
-  /// [GroupChatScreen]. When provided, group rooms surface a "Go Live" action
-  /// that calls back with the group's conversation id + title so the coordinator
-  /// can start a group-scoped livestream (this module does not depend on
-  /// features/live). When null, the affordance is hidden. Additive — the
-  /// existing public constructor is unchanged.
+  // Kept for compatibility with the existing coordinator. Community live rooms
+  // need a separate authorization contract from conversation-scoped streams.
   final GroupGoLiveCallback? onGoLive;
 
   @override
@@ -51,86 +32,125 @@ class GroupsScreen extends StatefulWidget {
 }
 
 class _GroupsScreenState extends State<GroupsScreen> {
-  late final GroupsRemoteDataSource _dataSource;
-  late Future<List<GroupListItemView>> _groupsFuture;
+  final _searchController = TextEditingController();
+  late final CommunitiesRemoteDataSource _dataSource;
+  late Future<List<CommunitySummary>> _communitiesFuture;
+  int _segment = 0;
 
   @override
   void initState() {
     super.initState();
-    _dataSource = widget.dataSource ?? GroupsRemoteDataSource.autoDetect();
-    _groupsFuture = _loadGroups();
+    _dataSource = widget.dataSource ?? CommunitiesRemoteDataSource.autoDetect();
+    _communitiesFuture = _dataSource.fetchCommunities();
+    _searchController.addListener(_refreshFilter);
   }
 
-  Future<List<GroupListItemView>> _loadGroups() async {
-    final remote = await _dataSource.fetchGroups();
-    return remote.map(groupToListItem).toList();
+  @override
+  void dispose() {
+    _searchController
+      ..removeListener(_refreshFilter)
+      ..dispose();
+    super.dispose();
   }
 
-  void _refresh() {
-    setState(() => _groupsFuture = _loadGroups());
+  void _refreshFilter() => setState(() {});
+
+  Future<void> _refresh() async {
+    setState(() => _communitiesFuture = _dataSource.fetchCommunities());
+    await _communitiesFuture;
   }
 
-  void _openGroup(GroupListItemView group) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => GroupChatScreen(
-          dataSource: _dataSource,
-          conversationId: group.conversationId,
-          currentUserId: widget.currentUserId,
-          initialTitle: group.title,
-          initialMemberCount: group.memberCount,
-          onBack: () => Navigator.of(context).pop(),
-          onGoLive: widget.onGoLive,
-          onLeft: () {
-            Navigator.of(context).pop();
-            _refresh();
-          },
-        ),
-      ),
-    ).then((_) => _refresh());
+  void _openCommunity(CommunitySummary community) {
+    final route = community.isMember
+        ? CommunityChatScreen(
+            community: community,
+            currentUserId: widget.currentUserId,
+            dataSource: _dataSource,
+          )
+        : CommunityDetailScreen(
+            communityId: community.id,
+            currentUserId: widget.currentUserId,
+            dataSource: _dataSource,
+          );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => route))
+        .then((_) => _refresh());
   }
 
-  void _openCreateGroup() {
+  void _openCreate() {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: GroupColors.barrier,
-      builder: (sheetContext) => CreateGroupSheet(
-        dataSource: _dataSource,
+      showDragHandle: true,
+      builder: (sheetContext) => CreateCommunitySheet(
         onCreate: (result) async {
-          Navigator.of(sheetContext).pop();
-          final conversationId = await _dataSource.createGroup(
-            memberIds: result.memberIds,
-            name: result.name,
-          );
-          if (!mounted) return;
-          if (conversationId == null) {
-            _toast('Could not create the group. Try again.');
-            return;
+          try {
+            final community = await _dataSource.createCommunity(
+              name: result.name,
+              description: result.description,
+              isPrivate: result.isPrivate,
+              isPremium: result.isPremium,
+            );
+            if (!sheetContext.mounted) return;
+            Navigator.of(sheetContext).pop();
+            if (!mounted) return;
+            await _refresh();
+            if (!mounted) return;
+            _openCommunity(community);
+          } catch (error) {
+            if (sheetContext.mounted) {
+              ScaffoldMessenger.of(
+                sheetContext,
+              ).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+            }
           }
-          _refresh();
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => GroupChatScreen(
-                dataSource: _dataSource,
-                conversationId: conversationId,
-                currentUserId: widget.currentUserId,
-                initialTitle: result.name,
-                // creator + selected members.
-                initialMemberCount: result.memberIds.length + 1,
-                onBack: () => Navigator.of(context).pop(),
-                onGoLive: widget.onGoLive,
-                onLeft: () {
-                  Navigator.of(context).pop();
-                  _refresh();
-                },
-              ),
-            ),
-          ).then((_) => _refresh());
         },
       ),
     );
+  }
+
+  Future<void> _openInviteJoin() async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join with invite'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Invite code or link',
+            prefixIcon: Icon(Icons.link_rounded),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (code == null || code.trim().isEmpty) return;
+    final normalized = code
+        .trim()
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .last;
+    try {
+      final groupId = await _dataSource.joinViaInvite(normalized);
+      await _refresh();
+      if (!mounted) return;
+      final community = (await _dataSource.fetchCommunity(groupId));
+      if (community != null && mounted) _openCommunity(community);
+    } catch (error) {
+      if (mounted) _toast(_errorMessage(error));
+    }
   }
 
   void _toast(String message) {
@@ -147,39 +167,135 @@ class _GroupsScreenState extends State<GroupsScreen> {
         bottom: false,
         child: Column(
           children: [
-            _Header(onBack: widget.onBack, onCreate: _openCreateGroup),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              child: Row(
+                children: [
+                  if (widget.onBack != null)
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: widget.onBack,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                  const Expanded(
+                    child: Text(
+                      'Communities',
+                      style: TextStyle(
+                        color: GroupColors.foreground,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Join with invite',
+                    onPressed: _openInviteJoin,
+                    icon: const Icon(Icons.link_rounded),
+                  ),
+                  IconButton.filled(
+                    tooltip: 'Create community',
+                    onPressed: _openCreate,
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search communities',
+                  prefixIcon: Icon(Icons.search_rounded),
+                  isDense: true,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 0,
+                      icon: Icon(Icons.forum_outlined),
+                      label: Text('My communities'),
+                    ),
+                    ButtonSegment(
+                      value: 1,
+                      icon: Icon(Icons.explore_outlined),
+                      label: Text('Discover'),
+                    ),
+                  ],
+                  selected: {_segment},
+                  onSelectionChanged: (values) {
+                    setState(() => _segment = values.first);
+                  },
+                ),
+              ),
+            ),
             Expanded(
               child: RefreshIndicator(
-                color: GroupColors.primary,
-                backgroundColor: GroupColors.card,
-                onRefresh: () async => _refresh(),
-                child: FutureBuilder<List<GroupListItemView>>(
-                  future: _groupsFuture,
+                onRefresh: _refresh,
+                child: FutureBuilder<List<CommunitySummary>>(
+                  future: _communitiesFuture,
                   builder: (context, snapshot) {
-                    final groups = snapshot.data;
-                    if (groups == null) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: GroupColors.primary,
-                        ),
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final query = _searchController.text.trim().toLowerCase();
+                    final communities = snapshot.data!
+                        .where(
+                          (community) => (_segment == 0
+                              ? community.isMember
+                              : !community.isMember),
+                        )
+                        .where(
+                          (community) =>
+                              query.isEmpty ||
+                              community.name.toLowerCase().contains(query) ||
+                              community.description.toLowerCase().contains(
+                                query,
+                              ),
+                        )
+                        .toList();
+                    if (communities.isEmpty) {
+                      return ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.18,
+                          ),
+                          Icon(
+                            _segment == 0
+                                ? Icons.groups_2_outlined
+                                : Icons.travel_explore_rounded,
+                            size: 54,
+                            color: GroupColors.mutedForeground,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            _segment == 0
+                                ? 'You have not joined a community yet.'
+                                : 'No communities match this search.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: GroupColors.mutedForeground,
+                            ),
+                          ),
+                        ],
                       );
                     }
-                    if (groups.isEmpty) {
-                      return _EmptyGroupsState(onCreate: _openCreateGroup);
-                    }
-                    return ListView.builder(
-                      padding: const EdgeInsets.only(
-                        top: GroupSpacing.xs,
-                        bottom: GroupSpacing.xl,
+                    return ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                      itemCount: communities.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) => _CommunityTile(
+                        community: communities[index],
+                        onTap: () => _openCommunity(communities[index]),
                       ),
-                      itemCount: groups.length,
-                      itemBuilder: (context, index) {
-                        final group = groups[index];
-                        return GroupListTile(
-                          group: group,
-                          onTap: () => _openGroup(group),
-                        );
-                      },
                     );
                   },
                 ),
@@ -192,185 +308,115 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.onCreate, this.onBack});
+class _CommunityTile extends StatelessWidget {
+  const _CommunityTile({required this.community, required this.onTap});
 
-  final VoidCallback onCreate;
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        GroupSpacing.lg,
-        GroupSpacing.md,
-        GroupSpacing.sm,
-        GroupSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          if (onBack != null)
-            Padding(
-              padding: const EdgeInsets.only(right: GroupSpacing.xs),
-              child: IconButton(
-                onPressed: onBack,
-                tooltip: 'Back',
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: GroupColors.foreground,
-                ),
-              ),
-            ),
-          const Expanded(
-            child: Text(
-              'Groups',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-                color: GroupColors.foreground,
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: GroupGradients.sendAction,
-              shape: BoxShape.circle,
-              boxShadow: GroupShadows.pink,
-            ),
-            child: IconButton(
-              tooltip: 'New group',
-              onPressed: onCreate,
-              icon: const Icon(
-                Icons.group_add_outlined,
-                color: GroupColors.primaryForeground,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyGroupsState extends StatelessWidget {
-  const _EmptyGroupsState({required this.onCreate});
-
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    // Wrapped in a scroll view so RefreshIndicator can pull even when empty.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(GroupSpacing.xl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 84,
-                      height: 84,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: GroupColors.primaryFaint,
-                        boxShadow: GroupShadows.glow,
-                      ),
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: GroupGradients.sendAction,
-                          boxShadow: GroupShadows.pink,
-                        ),
-                        child: const Icon(
-                          Icons.groups_2_rounded,
-                          size: 28,
-                          color: GroupColors.primaryForeground,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: GroupSpacing.lg),
-                    const Text(
-                      'No groups yet',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        color: GroupColors.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: GroupSpacing.sm),
-                    const Text(
-                      'Create a group to chat with several people at once.',
-                      textAlign: TextAlign.center,
-                      style: GroupTextStyles.previewMuted,
-                    ),
-                    const SizedBox(height: GroupSpacing.lg),
-                    _CreateButton(onTap: onCreate),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _CreateButton extends StatelessWidget {
-  const _CreateButton({required this.onTap});
-
+  final CommunitySummary community;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(GroupRadii.md),
+      color: GroupColors.rowCard,
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(GroupRadii.md),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: GroupSpacing.xl,
-            vertical: GroupSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            gradient: GroupGradients.sendAction,
-            borderRadius: BorderRadius.circular(GroupRadii.md),
-            boxShadow: GroupShadows.pink,
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
-              Icon(
-                Icons.group_add_outlined,
-                size: 18,
-                color: GroupColors.primaryForeground,
+              CircleAvatar(
+                radius: 27,
+                backgroundImage: community.avatarUrl?.isNotEmpty == true
+                    ? NetworkImage(community.avatarUrl!)
+                    : null,
+                child: community.avatarUrl?.isNotEmpty == true
+                    ? null
+                    : Text(
+                        community.name.trim().isEmpty
+                            ? 'C'
+                            : community.name.characters.first.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
               ),
-              SizedBox(width: GroupSpacing.sm),
-              Text(
-                'New group',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: GroupColors.primaryForeground,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            community.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: GroupColors.foreground,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          community.isPrivate
+                              ? Icons.lock_outline_rounded
+                              : Icons.public_rounded,
+                          size: 15,
+                          color: GroupColors.mutedForeground,
+                        ),
+                        if (community.isPremium) ...[
+                          const SizedBox(width: 5),
+                          const Icon(
+                            Icons.workspace_premium_outlined,
+                            size: 16,
+                            color: Color(0xFFFFC24A),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (community.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        community.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: GroupColors.mutedForeground,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 7),
+                    Text(
+                      '${community.memberCount} members'
+                      '${community.joinRequestPending ? '  •  Request pending' : ''}',
+                      style: const TextStyle(
+                        color: GroupColors.mutedForeground,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+String _errorMessage(Object error) {
+  final message = error.toString().replaceFirst(
+    'PostgrestException(message: ',
+    '',
+  );
+  if (message.contains('premium subscription')) {
+    return 'An active premium subscription is required to join.';
+  }
+  if (message.contains('invalid')) return 'This invite link is invalid.';
+  return 'Could not complete that community action.';
 }

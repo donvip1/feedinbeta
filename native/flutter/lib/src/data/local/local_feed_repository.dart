@@ -57,7 +57,17 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
         );
       }
 
-      await _box.clear();
+      final cachedPosts = await loadPosts();
+      final refreshedIds = remotePosts.map((post) => post.id).toSet();
+      final oldestRemote = remotePosts
+          .map((post) => post.createdAtMillis)
+          .reduce((a, b) => a < b ? a : b);
+      for (final cached in cachedPosts) {
+        if (cached.createdAtMillis >= oldestRemote &&
+            !refreshedIds.contains(cached.id)) {
+          await _box.delete(cached.id);
+        }
+      }
       for (final post in remotePosts) {
         final cachedPost = await _cacheMediaForPost(post);
         await _box.put(cachedPost.id, cachedPost.toJson());
@@ -147,6 +157,31 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
       type: PendingActionType.likePost,
       payload: {'post_id': postId},
     );
+  }
+
+  @override
+  Future<bool> toggleLike(String postId, {required bool liked}) {
+    return _remoteDataSource.toggleLike(postId, liked: liked);
+  }
+
+  @override
+  Future<bool> toggleSave(String postId, {required bool saved}) {
+    return _remoteDataSource.toggleSave(postId, saved: saved);
+  }
+
+  @override
+  Future<List<FeedComment>> loadComments(String postId) {
+    return _remoteDataSource.fetchComments(postId);
+  }
+
+  @override
+  Future<FeedComment> addComment(String postId, String body) {
+    return _remoteDataSource.addComment(postId, body);
+  }
+
+  @override
+  Future<bool> toggleRefeed(String postId, {required bool refeeded}) {
+    return _remoteDataSource.toggleRefeed(postId, refeeded: refeeded);
   }
 
   @override

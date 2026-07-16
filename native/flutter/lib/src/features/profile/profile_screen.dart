@@ -139,7 +139,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       });
     }
     try {
-      final posts = await widget.feedRepository.loadPostsByUser(_profile.userId);
+      final posts = await widget.feedRepository.loadPostsByUser(
+        _profile.userId,
+      );
       if (!mounted) return;
       setState(() {
         _posts = posts;
@@ -209,9 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         _openConnections(ConnectionsTab.following);
       case ProfileStat.views:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Total views across your posts.'),
-          ),
+          const SnackBar(content: Text('Total views across your posts.')),
         );
     }
   }
@@ -569,6 +569,7 @@ class _ProfilePostPagerState extends State<_ProfilePostPager> {
                 post: post,
                 isActive: index == _activePage,
                 isLiked: _likedPostIds.contains(post.id),
+                isRefeeded: post.viewerHasRefeeded,
                 isSaved: _savedPostIds.contains(post.id),
                 onLike: () => _like(post),
                 onComment: () => unawaited(widget.onComment(context, post)),
@@ -595,10 +596,7 @@ class _ProfilePostPagerState extends State<_ProfilePostPager> {
                       IconButton(
                         tooltip: 'Back',
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                        ),
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
                       ),
                       const SizedBox(width: 4),
                       const Text(

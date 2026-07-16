@@ -543,7 +543,7 @@ class _GoLiveSheetState extends State<_GoLiveSheet> {
   late final TextEditingController _title = TextEditingController(
     text: (widget.groupName?.trim().isNotEmpty ?? false)
         ? '${widget.groupName!.trim()} Live'
-        : 'Group livestream',
+        : 'Live stream',
   );
   bool _starting = false;
 
@@ -558,16 +558,17 @@ class _GoLiveSheetState extends State<_GoLiveSheet> {
 
   Future<void> _start() async {
     final groupId = widget.groupId;
-    if (groupId == null || groupId.isEmpty) return;
     final title = _title.text.trim();
     if (title.isEmpty) return;
 
     setState(() => _starting = true);
     try {
-      final stream = await widget.dataSource.startGroupLiveStream(
-        conversationId: groupId,
-        title: title,
-      );
+      final stream = groupId != null && groupId.isNotEmpty
+          ? await widget.dataSource.startGroupLiveStream(
+              conversationId: groupId,
+              title: title,
+            )
+          : await widget.dataSource.startLiveStream(title: title);
       if (!mounted) return;
       final navigator = Navigator.of(context);
       navigator.pop();
@@ -646,38 +647,28 @@ class _GoLiveSheetState extends State<_GoLiveSheet> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: LiveTheme.chipBorder),
               ),
-              child: _scopedToGroup
-                  ? TextField(
-                      controller: _title,
-                      maxLength: 120,
-                      textInputAction: TextInputAction.go,
-                      onSubmitted: (_) => _start(),
-                      style: const TextStyle(color: LiveTheme.onSurface),
-                      decoration: const InputDecoration(
-                        labelText: 'Livestream title',
-                        labelStyle: TextStyle(color: LiveTheme.onSurfaceMuted),
-                        border: OutlineInputBorder(),
-                      ),
-                    )
-                  : const Text(
-                      'Start a livestream from a group chat to keep it scoped '
-                      'to that group.',
-                      style: TextStyle(
-                        color: LiveTheme.onSurfaceMuted,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
+              child: TextField(
+                controller: _title,
+                maxLength: 120,
+                textInputAction: TextInputAction.go,
+                onSubmitted: (_) => _start(),
+                style: const TextStyle(color: LiveTheme.onSurface),
+                decoration: InputDecoration(
+                  labelText: _scopedToGroup
+                      ? 'Group livestream title'
+                      : 'Livestream title',
+                  labelStyle: const TextStyle(
+                    color: LiveTheme.onSurfaceMuted,
+                  ),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _starting
-                    ? null
-                    : _scopedToGroup
-                    ? _start
-                    : () => Navigator.of(context).maybePop(),
+                onPressed: _starting ? null : _start,
                 style: FilledButton.styleFrom(
                   backgroundColor: LiveTheme.surfaceRaised,
                   foregroundColor: LiveTheme.onSurface,
@@ -686,9 +677,7 @@ class _GoLiveSheetState extends State<_GoLiveSheet> {
                 child: Text(
                   _starting
                       ? 'Starting...'
-                      : _scopedToGroup
-                      ? 'Go Live'
-                      : 'Got it',
+                      : 'Go Live',
                 ),
               ),
             ),

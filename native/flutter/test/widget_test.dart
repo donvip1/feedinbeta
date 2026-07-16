@@ -442,6 +442,37 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<bool> toggleLike(String postId, {required bool liked}) async {
+    return !liked;
+  }
+
+  @override
+  Future<bool> toggleSave(String postId, {required bool saved}) async {
+    return !saved;
+  }
+
+  @override
+  Future<List<FeedComment>> loadComments(String postId) async => const [];
+
+  @override
+  Future<FeedComment> addComment(String postId, String body) async {
+    return FeedComment(
+      id: 'comment-${_pendingActions++}',
+      userId: 'test-user',
+      authorName: 'Tester',
+      authorHandle: '@tester',
+      content: body,
+      createdAtMillis: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  @override
+  Future<bool> toggleRefeed(String postId, {required bool refeeded}) async {
+    _pendingActions++;
+    return !refeeded;
+  }
+
+  @override
   Future<void> queueSave(String postId) async {
     _pendingActions++;
   }

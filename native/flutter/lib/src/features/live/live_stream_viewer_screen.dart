@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/live_models.dart';
 import 'data/live_realtime.dart';
@@ -15,17 +17,15 @@ import 'widgets/live_reaction_bar.dart';
 import 'widgets/live_stream_video.dart';
 import 'widgets/pulse_panel.dart';
 
-/// Full-screen viewer for a live video stream. Plays the HLS `playback_url`
-/// (via [LiveStreamVideo] on the existing `video_player` package, audio ON),
+/// Full-screen viewer for a live video stream. Joins the same LiveKit room as
+/// the native host and falls back to HLS for legacy web-created streams,
 /// overlays live chat (`live_stream_comments`), a reaction bar
 /// (`live_stream_reactions`) with float-up emoji, a gift action
 /// (`live_stream_gifts`) with a center burst, a mute toggle, and a live viewer
 /// count.
 ///
 /// Web mapping: this is the native counterpart of `LiveKitViewer.tsx` for the
-/// consumption path (chat + reactions + gifts + viewer presence). The actual
-/// WebRTC/LiveKit media transport is replaced by direct HLS playback of
-/// `playback_url`.
+/// consumption path (media + chat + reactions + gifts + viewer presence).
 class LiveStreamViewerScreen extends StatefulWidget {
   const LiveStreamViewerScreen({
     super.key,
@@ -56,6 +56,11 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
   bool _muted = false;
   bool _loadingChat = true;
   Timer? _viewerPoll;
+  Room? _room;
+  EventsListener<RoomEvent>? _roomListener;
+  VideoTrack? _videoTrack;
+  bool _mediaConnecting = true;
+  bool _mediaConnected = false;
 
   /// Host-published PULSE spotlight cards, seeded from the summary and refreshed
   /// from `stream_features.host_cards` on bootstrap. The host mutates this list
@@ -85,6 +90,8 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
 
   Future<void> _bootstrap() async {
     await _data.joinStream(widget.stream.id);
+    if (!mounted) return;
+    unawaited(_connectLiveKit());
 
     _realtime.connect();
     _commentSub = _realtime.comments.listen((comment) {
@@ -119,6 +126,88 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     final cards = await _data.fetchHostCards(widget.stream.id);
     if (!mounted || cards.isEmpty && _hostCards.isEmpty) return;
     setState(() => _hostCards = cards);
+  }
+
+  Future<void> _connectLiveKit() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'livekit-token',
+        body: {
+          'roomName': 'stream-${widget.stream.id}',
+          'participantName': 'feedIn viewer',
+        },
+      );
+      if (response.status != 200 || response.data is! Map) {
+        throw StateError('LiveKit token unavailable.');
+      }
+      final payload = Map<String, dynamic>.from(response.data as Map);
+      final token = payload['token']?.toString();
+      final url = payload['url']?.toString();
+      if (token == null || token.isEmpty || url == null || url.isEmpty) {
+        throw StateError('LiveKit credentials are incomplete.');
+      }
+      if (!mounted) return;
+
+      final room = Room(
+        roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
+      );
+      _room = room;
+      final listener = room.createListener();
+      _roomListener = listener;
+      listener
+        ..on<TrackSubscribedEvent>((event) {
+          final track = event.track;
+          if (track is VideoTrack && mounted) {
+            setState(() {
+              _videoTrack = track;
+              _mediaConnecting = false;
+              _mediaConnected = true;
+            });
+          }
+        })
+        ..on<TrackUnsubscribedEvent>((event) {
+          if (identical(event.track, _videoTrack) && mounted) {
+            setState(() => _videoTrack = null);
+          }
+        })
+        ..on<ParticipantConnectedEvent>((_) => _refreshRemoteTracks())
+        ..on<ParticipantDisconnectedEvent>((_) => _refreshRemoteTracks())
+        ..on<RoomDisconnectedEvent>((_) {
+          if (mounted) setState(() => _videoTrack = null);
+        });
+
+      await room.connect(url, token);
+      _refreshRemoteTracks();
+      if (mounted) {
+        setState(() {
+          _mediaConnecting = false;
+          _mediaConnected = true;
+        });
+      }
+    } catch (_) {
+      // Legacy web streams may still expose only HLS. Keep that path alive.
+      if (mounted) setState(() => _mediaConnecting = false);
+    }
+  }
+
+  void _refreshRemoteTracks() {
+    final room = _room;
+    if (room == null) return;
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (track is VideoTrack) {
+          if (mounted) {
+            setState(() {
+              _videoTrack = track;
+              _mediaConnecting = false;
+              _mediaConnected = true;
+            });
+          }
+          return;
+        }
+      }
+    }
   }
 
   Future<void> _openPulse() async {
@@ -187,6 +276,7 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     // Fire-and-forget presence cleanup; realtime teardown is awaited internally.
     unawaited(_data.leaveStream(widget.stream.id));
     unawaited(_realtime.dispose());
+    unawaited(_disposeLiveKit());
     _reactionsController.dispose();
     _giftBurstController.dispose();
     super.dispose();
@@ -240,7 +330,45 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
     }
   }
 
-  void _toggleMute() => setState(() => _muted = !_muted);
+  Future<void> _toggleMute() async {
+    final next = !_muted;
+    final room = _room;
+    if (room != null) {
+      for (final participant in room.remoteParticipants.values) {
+        for (final publication in participant.audioTrackPublications) {
+          final track = publication.track;
+          if (track != null) {
+            if (next) {
+              await track.disable();
+            } else {
+              await track.enable();
+            }
+          }
+        }
+      }
+    }
+    if (mounted) setState(() => _muted = next);
+  }
+
+  Future<void> _disposeLiveKit() async {
+    final listener = _roomListener;
+    _roomListener = null;
+    if (listener != null) {
+      try {
+        await listener.dispose();
+      } catch (_) {}
+    }
+    final room = _room;
+    _room = null;
+    if (room != null) {
+      try {
+        await room.disconnect();
+      } catch (_) {}
+      try {
+        await room.dispose();
+      } catch (_) {}
+    }
+  }
 
   Future<void> _openGiftSheet() async {
     final gift = await showLiveGiftSheet(
@@ -301,10 +429,15 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          LiveStreamVideo(
-            playbackUrl: widget.stream.playbackUrl,
-            muted: _muted,
-          ),
+          if (_videoTrack != null)
+            VideoTrackRenderer(_videoTrack!, fit: VideoViewFit.cover)
+          else
+            LiveStreamVideo(
+              playbackUrl: widget.stream.playbackUrl,
+              muted: _muted,
+            ),
+          if (_mediaConnecting && !_mediaConnected)
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
           const DecoratedBox(
             decoration: BoxDecoration(gradient: LiveTheme.bottomScrim),
           ),
@@ -387,10 +520,10 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
             _PulseButton(cardCount: _hostCards.length, onTap: _openPulse),
             const SizedBox(width: 2),
           ],
-          if (widget.stream.playbackUrl != null &&
-              widget.stream.playbackUrl!.isNotEmpty)
+          if (_mediaConnected ||
+              (widget.stream.playbackUrl?.isNotEmpty ?? false))
             IconButton(
-              onPressed: _toggleMute,
+              onPressed: () => unawaited(_toggleMute()),
               icon: Icon(
                 _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                 color: LiveTheme.onSurface,

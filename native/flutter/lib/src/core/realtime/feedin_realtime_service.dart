@@ -47,6 +47,32 @@ class FeedinRealtimeService {
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
+          table: 'post_likes',
+          callback: (payload) {
+            _eventsController.add(
+              FeedinRealtimeEvent(
+                type: FeedinRealtimeEventType.postChanged,
+                recordId: _postId(payload),
+              ),
+            );
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'post_comments',
+          callback: (payload) {
+            _eventsController.add(
+              FeedinRealtimeEvent(
+                type: FeedinRealtimeEventType.postChanged,
+                recordId: _postId(payload),
+              ),
+            );
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
           table: 'notifications',
           callback: (payload) {
             _eventsController.add(
@@ -66,6 +92,13 @@ class FeedinRealtimeService {
         ? payload.newRecord
         : payload.oldRecord;
     return record['id']?.toString();
+  }
+
+  String? _postId(PostgresChangePayload payload) {
+    final record = payload.newRecord.isNotEmpty
+        ? payload.newRecord
+        : payload.oldRecord;
+    return record['post_id']?.toString();
   }
 
   Future<void> disconnect() async {

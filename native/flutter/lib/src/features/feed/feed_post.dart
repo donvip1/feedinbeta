@@ -19,6 +19,11 @@ class FeedPost {
     this.postType,
     this.avatarUrl,
     this.authorHandle,
+    this.originalPostId,
+    this.originalPost,
+    this.viewerHasLiked = false,
+    this.viewerHasSaved = false,
+    this.viewerHasRefeeded = false,
   });
 
   final String id;
@@ -45,8 +50,24 @@ class FeedPost {
 
   /// Author handle (e.g. `@username`) from the `profiles` join, if available.
   final String? authorHandle;
+  final String? originalPostId;
+  final FeedPost? originalPost;
+  final bool viewerHasLiked;
+  final bool viewerHasSaved;
+  final bool viewerHasRefeeded;
 
-  FeedPost copyWith({String? localMediaPath}) {
+  FeedPost get displayedPost => originalPost ?? this;
+
+  FeedPost copyWith({
+    String? localMediaPath,
+    int? likesCount,
+    int? commentsCount,
+    int? refeedsCount,
+    bool? viewerHasLiked,
+    bool? viewerHasSaved,
+    bool? viewerHasRefeeded,
+    FeedPost? originalPost,
+  }) {
     return FeedPost(
       id: id,
       userId: userId,
@@ -59,14 +80,19 @@ class FeedPost {
       mediaUrls: mediaUrls,
       mediaTypes: mediaTypes,
       localMediaPath: localMediaPath ?? this.localMediaPath,
-      likesCount: likesCount,
-      commentsCount: commentsCount,
+      likesCount: likesCount ?? this.likesCount,
+      commentsCount: commentsCount ?? this.commentsCount,
       viewsCount: viewsCount,
-      refeedsCount: refeedsCount,
+      refeedsCount: refeedsCount ?? this.refeedsCount,
       location: location,
       postType: postType,
       avatarUrl: avatarUrl,
       authorHandle: authorHandle,
+      originalPostId: originalPostId,
+      originalPost: originalPost ?? this.originalPost,
+      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
+      viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
+      viewerHasRefeeded: viewerHasRefeeded ?? this.viewerHasRefeeded,
     );
   }
 
@@ -95,6 +121,15 @@ class FeedPost {
       postType: json['postType'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       authorHandle: json['authorHandle'] as String?,
+      originalPostId: json['originalPostId'] as String?,
+      originalPost: json['originalPost'] is Map
+          ? FeedPost.fromJson(
+              Map<String, Object?>.from(json['originalPost']! as Map),
+            )
+          : null,
+      viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
+      viewerHasSaved: json['viewerHasSaved'] as bool? ?? false,
+      viewerHasRefeeded: json['viewerHasRefeeded'] as bool? ?? false,
     );
   }
 
@@ -119,8 +154,33 @@ class FeedPost {
       'postType': postType,
       'avatarUrl': avatarUrl,
       'authorHandle': authorHandle,
+      'originalPostId': originalPostId,
+      'originalPost': originalPost?.toJson(),
+      'viewerHasLiked': viewerHasLiked,
+      'viewerHasSaved': viewerHasSaved,
+      'viewerHasRefeeded': viewerHasRefeeded,
     };
   }
+}
+
+class FeedComment {
+  const FeedComment({
+    required this.id,
+    required this.userId,
+    required this.authorName,
+    required this.authorHandle,
+    required this.content,
+    required this.createdAtMillis,
+    this.avatarUrl,
+  });
+
+  final String id;
+  final String userId;
+  final String authorName;
+  final String? authorHandle;
+  final String content;
+  final int createdAtMillis;
+  final String? avatarUrl;
 }
 
 class LiveFeedItem {

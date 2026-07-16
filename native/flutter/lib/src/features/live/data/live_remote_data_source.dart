@@ -268,6 +268,47 @@ class LiveRemoteDataSource {
     }
   }
 
+  /// Starts a public livestream, matching the web app's normal Go Live flow.
+  /// Group scoping remains optional through [startGroupLiveStream].
+  Future<LiveStreamSummary> startLiveStream({
+    required String title,
+    String? description,
+  }) async {
+    final client = _client;
+    if (client == null) _throwUnavailable();
+    final userId = currentUserId;
+    if (userId == null) _throwSignIn('start a livestream');
+
+    final normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) {
+      throw const LiveDataException('A livestream title is required.');
+    }
+
+    try {
+      final row = await client
+          .from(_streamsTable)
+          .insert({
+            'user_id': userId,
+            'title': normalizedTitle,
+            'description': description?.trim().isEmpty ?? true
+                ? null
+                : description!.trim(),
+            'status': 'live',
+            'started_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'thumbnail_url, playback_url, started_at, stream_features, '
+            'group_conversation_id, $_streamHostEmbed',
+          )
+          .single();
+      return LiveStreamSummary.fromJson(Map<String, Object?>.from(row));
+    } catch (error) {
+      if (error is LiveDataException) rethrow;
+      throw LiveDataException('Could not start the livestream.', cause: error);
+    }
+  }
+
   /// Marks a host-owned stream as ended before the host leaves LiveKit.
   Future<void> endStream(String streamId) async {
     final client = _client;

@@ -18,6 +18,7 @@ class ImmersivePostCard extends StatefulWidget {
     required this.post,
     required this.isActive,
     required this.isLiked,
+    required this.isRefeeded,
     required this.isSaved,
     required this.onLike,
     required this.onComment,
@@ -34,6 +35,7 @@ class ImmersivePostCard extends StatefulWidget {
   final bool isActive;
 
   final bool isLiked;
+  final bool isRefeeded;
   final bool isSaved;
   final VoidCallback onLike;
   final VoidCallback onComment;
@@ -126,15 +128,17 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
 
   void _handleDoubleTapLike() {
     _burstController.forward(from: 0);
-    widget.onLike();
+    if (!widget.isLiked) widget.onLike();
   }
 
   // ----- Media resolution -------------------------------------------------
 
+  FeedPost get _contentPost => widget.post.displayedPost;
+
   String? get _primaryMediaType {
-    final type = widget.post.mediaType;
+    final type = _contentPost.mediaType;
     if (type != null && type.isNotEmpty) return type;
-    final types = widget.post.mediaTypes;
+    final types = _contentPost.mediaTypes;
     return types.isNotEmpty ? types.first : null;
   }
 
@@ -152,15 +156,15 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
       if (seen.add(trimmed)) urls.add(trimmed);
     }
 
-    add(widget.post.mediaUrl);
-    for (final url in widget.post.mediaUrls) {
+    add(_contentPost.mediaUrl);
+    for (final url in _contentPost.mediaUrls) {
       add(url);
     }
     return urls;
   }
 
   bool get _isVerified =>
-      widget.post.postType?.toLowerCase().contains('verified') ?? false;
+      _contentPost.postType?.toLowerCase().contains('verified') ?? false;
 
   // ----- Build ------------------------------------------------------------
 
@@ -214,9 +218,10 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
               refeedsCount: widget.post.refeedsCount,
               viewsCount: widget.post.viewsCount,
               isLiked: widget.isLiked,
+              isRefeeded: widget.isRefeeded,
               isSaved: widget.isSaved,
-              avatarText: widget.post.authorName,
-              avatarUrl: widget.post.avatarUrl,
+              avatarText: _contentPost.authorName,
+              avatarUrl: _contentPost.avatarUrl,
               onLike: widget.onLike,
               onComment: widget.onComment,
               onRefeed: widget.onRefeed,
@@ -236,13 +241,13 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
   Widget _buildMedia() {
     if (_isVideo) {
       final url =
-          widget.post.mediaUrl ??
-          (widget.post.mediaUrls.isNotEmpty
-              ? widget.post.mediaUrls.first
+          _contentPost.mediaUrl ??
+          (_contentPost.mediaUrls.isNotEmpty
+              ? _contentPost.mediaUrls.first
               : null);
       return ImmersiveVideoPlayer(
         url: url,
-        localPath: widget.post.localMediaPath,
+        localPath: _contentPost.localMediaPath,
         isActive: widget.isActive,
         onDoubleTapLike: _handleDoubleTapLike,
       );
@@ -254,7 +259,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
       // path, so attach it to the first image and pad the rest with nulls.
       final localPaths = <String?>[
         for (var i = 0; i < imageUrls.length; i++)
-          i == 0 ? widget.post.localMediaPath : null,
+          i == 0 ? _contentPost.localMediaPath : null,
       ];
       return PhotoCarousel(
         urls: imageUrls,
@@ -278,7 +283,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
           padding: const EdgeInsets.fromLTRB(28, 0, 88, 0),
           child: Center(
             child: Text(
-              widget.post.body,
+              _contentPost.body,
               textAlign: TextAlign.center,
               maxLines: 8,
               overflow: TextOverflow.ellipsis,
@@ -297,7 +302,8 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
   }
 
   Widget _buildOverlay(BuildContext context) {
-    final post = widget.post;
+    final wrapper = widget.post;
+    final post = _contentPost;
     final handle = post.meta.trim();
     final hasLocation = post.location?.trim().isNotEmpty ?? false;
 
@@ -305,6 +311,28 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (wrapper.originalPost != null) ...[
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.repeat_rounded,
+                size: 14,
+                color: FeedImmersiveTheme.onMediaMuted,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  '${wrapper.authorName} re-shared',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: FeedImmersiveTheme.metaLabel,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         // Author row.
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -396,7 +424,10 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
                 ),
                 Opacity(
                   opacity: _burstOpacity.value.clamp(0.0, 1.0),
-                  child: Transform.scale(scale: _burstScale.value, child: child),
+                  child: Transform.scale(
+                    scale: _burstScale.value,
+                    child: child,
+                  ),
                 ),
               ],
             );
