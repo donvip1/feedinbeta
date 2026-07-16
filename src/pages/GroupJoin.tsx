@@ -4,14 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, CheckCircle, XCircle, Lock } from 'lucide-react';
+import { Loader2, Users, CheckCircle, XCircle } from 'lucide-react';
 
 const GroupJoin = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already_member'>('loading');
+  const [status, setStatus] = useState<'loading' | 'requested' | 'error' | 'already_member'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [groupId, setGroupId] = useState<string | null>(null);
 
@@ -32,33 +32,41 @@ const GroupJoin = () => {
     if (!inviteCode || !user) return;
 
     try {
-      const { data, error } = await supabase.rpc('join_group_via_invite', {
-        p_invite_code: inviteCode,
-      });
+      const { data: linkedGroup, error: linkError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('invite_code', inviteCode.toLowerCase().trim())
+        .maybeSingle();
+      if (linkError) throw linkError;
+      if (!linkedGroup?.id) throw new Error('GROUP_LINK_INVALID');
 
-      if (error) throw error;
+      setGroupId(linkedGroup.id);
+      const { data: membership } = await supabase
+        .from('conversation_participants')
+        .select('user_id')
+        .eq('conversation_id', linkedGroup.id)
+        .eq('user_id', user.id)
+        .eq('state', 'active')
+        .maybeSingle();
 
-      const result = data as { success: boolean; group_id?: string; already_member?: boolean; error?: string };
-
-      if (!result.success) {
-        setStatus('error');
-        setErrorMessage(result.error || 'Failed to join group');
-        return;
-      }
-
-      if (result.already_member) {
+      if (membership) {
         setStatus('already_member');
-        setGroupId(result.group_id || null);
         toast({
           title: 'Already a member',
           description: 'You are already a member of this group',
         });
       } else {
-        setStatus('success');
-        setGroupId(result.group_id || null);
+        const { error } = await supabase.rpc('request_group_join' as any, {
+          p_conversation_id: linkedGroup.id,
+          p_source: 'public_link',
+        } as any);
+        if (error) throw error;
+
+        setStatus('requested');
         toast({
-          title: 'Welcome!',
-          description: 'You have successfully joined the group',
+          title: 'Request sent',
+          description:
+            'An owner or administrator must approve your request before you can join.',
         });
       }
     } catch (error: any) {
@@ -73,7 +81,7 @@ const GroupJoin = () => {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-slate-400">Joining group...</p>
+          <p className="text-slate-400">Checking group link...</p>
         </div>
       </div>
     );
@@ -82,31 +90,19 @@ const GroupJoin = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-slate-900 rounded-2xl p-8 text-center space-y-6">
-        {status === 'success' && (
+        {status === 'requested' && (
           <>
             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Welcome to the Group!</h1>
+            <h1 className="text-2xl font-bold text-white">Request Sent</h1>
             <p className="text-slate-400">
-              You have successfully joined the group. Start chatting with other members now!
+              An owner or administrator must approve your request. If approved,
+              50 credits will be charged unless your premium subscription is active.
             </p>
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => navigate(`/groups/${groupId}`)}
-              >
-                View Group
-              </Button>
-              <Button 
-                className="flex-1"
-                onClick={() => navigate(`/groups/${groupId}/chat`)}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Start Chatting
-              </Button>
-            </div>
+            <Button className="w-full" onClick={() => navigate('/messages')}>
+              Back to Messages
+            </Button>
           </>
         )}
 
@@ -143,9 +139,9 @@ const GroupJoin = () => {
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto">
               <XCircle className="w-8 h-8 text-red-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Invite Link Invalid</h1>
+            <h1 className="text-2xl font-bold text-white">Group Link Invalid</h1>
             <p className="text-slate-400">
-              {errorMessage || 'This invite link is invalid, expired, or has been revoked.'}
+              {errorMessage || 'This group link is invalid or has been revoked.'}
             </p>
             <Button onClick={() => navigate('/messages')} className="w-full">
               Go to Messages

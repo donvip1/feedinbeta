@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedin.app/contracts/messaging/conversation.schema.json",
+  "title": "FEEDIN Canonical Conversation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "type",
+    "owner_id",
+    "title",
+    "description",
+    "avatar",
+    "settings",
+    "external_context",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "type": { "enum": ["dm", "group", "channel", "external"] },
+    "owner_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "title": { "type": ["string", "null"], "maxLength": 160 },
+    "description": { "type": ["string", "null"], "maxLength": 4000 },
+    "avatar": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["bucket", "path"],
+      "properties": {
+        "bucket": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "members_can_send",
+        "members_can_start_calls",
+        "disappearing_seconds",
+        "is_private"
+      ],
+      "properties": {
+        "members_can_send": { "type": "boolean" },
+        "members_can_start_calls": { "type": "boolean" },
+        "disappearing_seconds": { "type": "integer", "minimum": 0 },
+        "is_private": { "type": "boolean" }
+      }
+    },
+    "external_context": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "type": { "type": ["string", "null"] },
+        "id": { "type": ["string", "null"], "format": "uuid" }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

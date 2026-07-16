@@ -425,6 +425,136 @@ export type Database = {
           },
         ]
       }
+      chat_gifts: {
+        Row: {
+          asset_key: string
+          catalog_item_id: string
+          conversation_id: string
+          converted_at: string | null
+          created_at: string
+          credit_cost: number
+          gift_key: string
+          gift_name: string
+          id: string
+          idempotency_key: string
+          message_id: string
+          platform_fee_credits: number
+          recipient_credit_value: number
+          recipient_id: string
+          recipient_transaction_id: string | null
+          refunded_at: string | null
+          sender_id: string
+          sender_transaction_id: string | null
+          state: string
+        }
+        Insert: {
+          asset_key: string
+          catalog_item_id: string
+          conversation_id: string
+          converted_at?: string | null
+          created_at?: string
+          credit_cost: number
+          gift_key: string
+          gift_name: string
+          id?: string
+          idempotency_key: string
+          message_id: string
+          platform_fee_credits: number
+          recipient_credit_value: number
+          recipient_id: string
+          recipient_transaction_id?: string | null
+          refunded_at?: string | null
+          sender_id: string
+          sender_transaction_id?: string | null
+          state?: string
+        }
+        Update: {
+          asset_key?: string
+          catalog_item_id?: string
+          conversation_id?: string
+          converted_at?: string | null
+          created_at?: string
+          credit_cost?: number
+          gift_key?: string
+          gift_name?: string
+          id?: string
+          idempotency_key?: string
+          message_id?: string
+          platform_fee_credits?: number
+          recipient_credit_value?: number
+          recipient_id?: string
+          recipient_transaction_id?: string | null
+          refunded_at?: string | null
+          sender_id?: string
+          sender_transaction_id?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_gifts_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "gift_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_recipient_transaction_id_fkey"
+            columns: ["recipient_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "credit_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_gifts_sender_transaction_id_fkey"
+            columns: ["sender_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "credit_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_reports: {
         Row: {
           content_id: string
@@ -470,26 +600,403 @@ export type Database = {
         }
         Relationships: []
       }
-      conversation_participants: {
+      conversation_calls: {
+        Row: {
+          call_kind: string
+          conversation_id: string
+          created_at: string
+          ended_at: string | null
+          host_id: string
+          id: string
+          message_id: string
+          room_name: string
+          started_at: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          call_kind: string
+          conversation_id: string
+          created_at?: string
+          ended_at?: string | null
+          host_id: string
+          id?: string
+          message_id: string
+          room_name: string
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          call_kind?: string
+          conversation_id?: string
+          created_at?: string
+          ended_at?: string | null
+          host_id?: string
+          id?: string
+          message_id?: string
+          room_name?: string
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_calls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_calls_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_calls_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_calls_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_invitations: {
         Row: {
           conversation_id: string
           created_at: string
-          last_read_at: string | null
-          user_id: string
+          expires_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          responded_at: string | null
+          role: string
+          status: string
+          token: string
         }
         Insert: {
           conversation_id: string
           created_at?: string
-          last_read_at?: string | null
-          user_id: string
+          expires_at?: string
+          id?: string
+          invitee_id: string
+          inviter_id: string
+          responded_at?: string | null
+          role?: string
+          status?: string
+          token?: string
         }
         Update: {
           conversation_id?: string
           created_at?: string
+          expires_at?: string
+          id?: string
+          invitee_id?: string
+          inviter_id?: string
+          responded_at?: string | null
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_invitations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_invitations_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_invitations_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_invitations_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_invitations_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_join_requests: {
+        Row: {
+          charge_idempotency_key: string
+          conversation_id: string
+          created_at: string
+          estimated_cost: number
+          id: string
+          requester_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          charge_idempotency_key?: string
+          conversation_id: string
+          created_at?: string
+          estimated_cost?: number
+          id?: string
+          requester_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          charge_idempotency_key?: string
+          conversation_id?: string
+          created_at?: string
+          estimated_cost?: number
+          id?: string
+          requester_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_join_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_member_charges: {
+        Row: {
+          actor_id: string
+          balance_after: number | null
+          balance_before: number | null
+          base_cost: number
+          charged_credits: number
+          conversation_id: string
+          created_at: string
+          credit_transaction_id: string | null
+          id: string
+          idempotency_key: string
+          member_id: string
+          payer_id: string
+          reason: string
+          subscription_id: string | null
+          waiver_reason: string | null
+        }
+        Insert: {
+          actor_id: string
+          balance_after?: number | null
+          balance_before?: number | null
+          base_cost: number
+          charged_credits: number
+          conversation_id: string
+          created_at?: string
+          credit_transaction_id?: string | null
+          id?: string
+          idempotency_key: string
+          member_id: string
+          payer_id: string
+          reason: string
+          subscription_id?: string | null
+          waiver_reason?: string | null
+        }
+        Update: {
+          actor_id?: string
+          balance_after?: number | null
+          balance_before?: number | null
+          base_cost?: number
+          charged_credits?: number
+          conversation_id?: string
+          created_at?: string
+          credit_transaction_id?: string | null
+          id?: string
+          idempotency_key?: string
+          member_id?: string
+          payer_id?: string
+          reason?: string
+          subscription_id?: string | null
+          waiver_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_member_charges_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_credit_transaction_id_fkey"
+            columns: ["credit_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "credit_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_payer_id_fkey"
+            columns: ["payer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_payer_id_fkey"
+            columns: ["payer_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_member_charges_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_participants: {
+        Row: {
+          added_by: string | null
+          conversation_id: string
+          created_at: string
+          joined_at: string
+          last_read_at: string | null
+          left_at: string | null
+          muted_until: string | null
+          permissions: Json
+          role: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          conversation_id: string
+          created_at?: string
+          joined_at?: string
           last_read_at?: string | null
+          left_at?: string | null
+          muted_until?: string | null
+          permissions?: Json
+          role?: string
+          state?: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string | null
+          conversation_id?: string
+          created_at?: string
+          joined_at?: string
+          last_read_at?: string | null
+          left_at?: string | null
+          muted_until?: string | null
+          permissions?: Json
+          role?: string
+          state?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_participants_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_participants_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -515,24 +1022,69 @@ export type Database = {
       }
       conversations: {
         Row: {
+          avatar_bucket: string | null
+          avatar_path: string | null
           created_at: string
+          description: string | null
           disappearing_seconds: number
+          external_context: Json
           id: string
+          legacy_source_id: string | null
+          legacy_source_type: string | null
+          owner_id: string | null
+          settings: Json
+          title: string | null
+          type: string
           updated_at: string
         }
         Insert: {
+          avatar_bucket?: string | null
+          avatar_path?: string | null
           created_at?: string
+          description?: string | null
           disappearing_seconds?: number
+          external_context?: Json
           id?: string
+          legacy_source_id?: string | null
+          legacy_source_type?: string | null
+          owner_id?: string | null
+          settings?: Json
+          title?: string | null
+          type?: string
           updated_at?: string
         }
         Update: {
+          avatar_bucket?: string | null
+          avatar_path?: string | null
           created_at?: string
+          description?: string | null
           disappearing_seconds?: number
+          external_context?: Json
           id?: string
+          legacy_source_id?: string | null
+          legacy_source_type?: string | null
+          owner_id?: string | null
+          settings?: Json
+          title?: string | null
+          type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       creator_incentive_tiers: {
         Row: {
@@ -1345,6 +1897,45 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+        }
+        Relationships: []
+      }
+      gift_catalog: {
+        Row: {
+          asset_key: string
+          created_at: string
+          credit_cost: number
+          display_order: number
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          recipient_percent: number
+          updated_at: string
+        }
+        Insert: {
+          asset_key: string
+          created_at?: string
+          credit_cost: number
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          recipient_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          asset_key?: string
+          created_at?: string
+          credit_cost?: number
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          recipient_percent?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2690,6 +3281,56 @@ export type Database = {
           },
         ]
       }
+      message_pins: {
+        Row: {
+          conversation_id: string
+          message_id: string
+          pinned_at: string
+          pinned_by: string
+        }
+        Insert: {
+          conversation_id: string
+          message_id: string
+          pinned_at?: string
+          pinned_by: string
+        }
+        Update: {
+          conversation_id?: string
+          message_id?: string
+          pinned_at?: string
+          pinned_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_pins_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_pins_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_pins_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_pins_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           conversation_id: string
@@ -2849,6 +3490,7 @@ export type Database = {
       messages: {
         Row: {
           content: string
+          content_type: string
           conversation_id: string
           created_at: string
           deleted_at: string | null
@@ -2858,7 +3500,10 @@ export type Database = {
           is_read: boolean
           message_type: string
           metadata: Json
+          payload: Json
           read_at: string | null
+          reply_to_id: string | null
+          revision: number
           sender_id: string
           status: string
           updated_at: string
@@ -2867,6 +3512,7 @@ export type Database = {
         }
         Insert: {
           content: string
+          content_type?: string
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
@@ -2876,7 +3522,10 @@ export type Database = {
           is_read?: boolean
           message_type?: string
           metadata?: Json
+          payload?: Json
           read_at?: string | null
+          reply_to_id?: string | null
+          revision?: number
           sender_id: string
           status?: string
           updated_at?: string
@@ -2885,6 +3534,7 @@ export type Database = {
         }
         Update: {
           content?: string
+          content_type?: string
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -2894,7 +3544,10 @@ export type Database = {
           is_read?: boolean
           message_type?: string
           metadata?: Json
+          payload?: Json
           read_at?: string | null
+          reply_to_id?: string | null
+          revision?: number
           sender_id?: string
           status?: string
           updated_at?: string
@@ -2907,6 +3560,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -2924,6 +3584,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      monetization_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
       }
       notification_preferences: {
         Row: {
@@ -4959,6 +5640,13 @@ export type Database = {
           },
         ]
       }
+      messaging_v2_backfill_gaps: {
+        Row: {
+          source_id: string | null
+          source_type: string | null
+        }
+        Relationships: []
+      }
       public_profiles: {
         Row: {
           avatar_url: string | null
@@ -5024,6 +5712,23 @@ export type Database = {
       }
     }
     Functions: {
+      accept_conversation_invitation: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      active_premium_subscription_id: {
+        Args: { p_at?: string; p_user_id: string }
+        Returns: string
+      }
+      add_conversation_member: {
+        Args: {
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_member_id: string
+          p_role?: string
+        }
+        Returns: Json
+      }
       add_credits_from_purchase:
         | {
             Args: {
@@ -5112,6 +5817,14 @@ export type Database = {
         }
       }
       are_friends: { Args: { p_a: string; p_b: string }; Returns: boolean }
+      can_send_conversation_message: {
+        Args: { p_conversation_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      can_start_conversation_call: {
+        Args: { p_conversation_id: string; p_user_id?: string }
+        Returns: boolean
+      }
       can_view_admin_wallet: { Args: never; Returns: boolean }
       can_view_profile_field: {
         Args: { p_field: string; p_owner: string; p_viewer: string }
@@ -5149,7 +5862,45 @@ export type Database = {
         }
       }
       change_username: { Args: { p_username: string }; Returns: Json }
+      charge_group_member_addition: {
+        Args: {
+          p_actor_id: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_member_id: string
+          p_payer_id: string
+          p_reason: string
+        }
+        Returns: {
+          actor_id: string
+          balance_after: number | null
+          balance_before: number | null
+          base_cost: number
+          charged_credits: number
+          conversation_id: string
+          created_at: string
+          credit_transaction_id: string | null
+          id: string
+          idempotency_key: string
+          member_id: string
+          payer_id: string
+          reason: string
+          subscription_id: string | null
+          waiver_reason: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_member_charges"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       clear_post_view_history: { Args: never; Returns: undefined }
+      conversation_role: {
+        Args: { p_conversation_id: string; p_user_id?: string }
+        Returns: string
+      }
+      convert_chat_gift: { Args: { p_gift_id: string }; Returns: Json }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       create_group_channel: {
         Args: {
@@ -5177,8 +5928,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_group_conversation: {
+        Args: {
+          p_avatar_bucket?: string
+          p_avatar_path?: string
+          p_description?: string
+          p_is_private?: boolean
+          p_title: string
+        }
+        Returns: Json
+      }
       delete_expired_stories: { Args: never; Returns: undefined }
       delete_message: { Args: { p_message_id: string }; Returns: undefined }
+      end_conversation_call: { Args: { p_call_id: string }; Returns: Json }
+      get_changed_message_envelopes: {
+        Args: {
+          p_after_id?: string
+          p_after_updated_at?: string
+          p_limit?: number
+        }
+        Returns: Json[]
+      }
       get_conversations_with_details: {
         Args: { p_user_id: string }
         Returns: {
@@ -5195,6 +5965,16 @@ export type Database = {
           unread_count: number
           updated_at: string
         }[]
+      }
+      get_message_envelope: { Args: { p_message_id: string }; Returns: Json }
+      get_message_page: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: Json[]
       }
       get_starred_message_ids: {
         Args: { p_conversation_id: string }
@@ -5214,6 +5994,18 @@ export type Database = {
           post_id: string
           viewed_at: string
         }[]
+      }
+      has_active_premium: {
+        Args: { p_at?: string; p_user_id: string }
+        Returns: boolean
+      }
+      invite_conversation_member: {
+        Args: {
+          p_conversation_id: string
+          p_invitee_id: string
+          p_role?: string
+        }
+        Returns: Json
       }
       is_conversation_participant: {
         Args: { p_conversation_id: string }
@@ -5467,6 +6259,10 @@ export type Database = {
         }
         Returns: string
       }
+      remove_conversation_member: {
+        Args: { p_conversation_id: string; p_member_id: string }
+        Returns: undefined
+      }
       report_message: {
         Args: { p_description?: string; p_message_id: string; p_reason: string }
         Returns: string
@@ -5508,6 +6304,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      request_group_join: {
+        Args: { p_conversation_id: string; p_source?: string }
+        Returns: Json
+      }
+      review_group_join_request: {
+        Args: { p_approve: boolean; p_request_id: string }
+        Returns: Json
+      }
+      send_chat_gift: {
+        Args: {
+          p_catalog_key: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_message_id: string
+          p_recipient_id?: string
+        }
+        Returns: Json
+      }
+      send_message: { Args: { p_message: Json }; Returns: Json }
+      set_conversation_member_role: {
+        Args: { p_conversation_id: string; p_member_id: string; p_role: string }
+        Returns: Json
+      }
       set_disappearing_timer: {
         Args: { p_conversation_id: string; p_seconds: number }
         Returns: undefined
@@ -5516,6 +6335,14 @@ export type Database = {
       set_typing_indicator: {
         Args: { p_activity?: string; p_conversation_id: string }
         Returns: undefined
+      }
+      start_conversation_call: {
+        Args: {
+          p_call_kind: string
+          p_conversation_id: string
+          p_message_id?: string
+        }
+        Returns: Json
       }
       start_group_live_stream: {
         Args: {
@@ -5555,6 +6382,10 @@ export type Database = {
         Returns: boolean
       }
       toggle_message_star: { Args: { p_message_id: string }; Returns: boolean }
+      update_conversation_settings: {
+        Args: { p_conversation_id: string; p_settings: Json }
+        Returns: Json
+      }
       update_presence: { Args: { p_status?: string }; Returns: undefined }
       username_change_status: { Args: never; Returns: Json }
       wallet_claim_checkout_initialization: {

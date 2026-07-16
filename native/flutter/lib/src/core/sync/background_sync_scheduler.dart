@@ -1,5 +1,9 @@
 import 'package:workmanager/workmanager.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/feedin_services.dart';
+import '../bootstrap/feedin_bootstrap.dart';
+import '../bootstrap/local_storage_bootstrap.dart';
 import '../config/feedin_config.dart';
 
 const feedinBackgroundSyncTask = 'feedin.backgroundSync';
@@ -8,7 +12,28 @@ const _feedinBackgroundSyncUniqueName = 'feedin-background-sync';
 @pragma('vm:entry-point')
 void feedinBackgroundDispatcher() {
   Workmanager().executeTask((task, inputData) async {
-    return task == feedinBackgroundSyncTask;
+    if (task != feedinBackgroundSyncTask) return true;
+    try {
+      const config = FeedinConfig.fromEnvironment;
+      if (!config.hasSupabaseConfig) return true;
+
+      await LocalStorageBootstrap().initialize();
+      await FeedinBootstrap(config: config).initialize();
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return true;
+
+      final services = FeedinServices.create(config);
+      final sync = services.incrementalMessageSyncService;
+      if (sync == null) return true;
+      await sync.start(userId);
+      await sync.reconcile();
+      await sync.drainOutbox();
+      await sync.stop();
+      return true;
+    } catch (_) {
+      // Returning false asks Workmanager to retry according to OS policy.
+      return false;
+    }
   });
 }
 

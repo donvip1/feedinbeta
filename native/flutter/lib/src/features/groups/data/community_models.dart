@@ -82,6 +82,26 @@ class CommunityMessage {
   final String? fileName;
 }
 
+class CommunityJoinRequest {
+  const CommunityJoinRequest({
+    required this.id,
+    required this.requesterId,
+    required this.displayName,
+    required this.estimatedCost,
+    required this.createdAtMillis,
+    this.username,
+    this.avatarUrl,
+  });
+
+  final String id;
+  final String requesterId;
+  final String displayName;
+  final String? username;
+  final String? avatarUrl;
+  final int estimatedCost;
+  final int createdAtMillis;
+}
+
 enum CommunityJoinResult { joined, requested }
 
 int communityMillis(Object? value) {

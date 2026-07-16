@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedin.app/contracts/messaging/message.schema.json",
+  "title": "FEEDIN Canonical Message",
+  "description": "The versioned message envelope shared by Flutter, React Web, Supabase RPCs, and local persistence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "conversation_id",
+    "sender_id",
+    "content_type",
+    "payload",
+    "reply_to_id",
+    "status",
+    "metadata",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "conversation_id": { "$ref": "#/$defs/uuid" },
+    "sender_id": { "$ref": "#/$defs/uuid" },
+    "content_type": {
+      "enum": [
+        "text",
+        "image",
+        "video",
+        "voice",
+        "file",
+        "sticker",
+        "gift",
+        "call",
+        "system"
+      ]
+    },
+    "payload": {
+      "oneOf": [
+        { "$ref": "#/$defs/textPayload" },
+        { "$ref": "#/$defs/imagePayload" },
+        { "$ref": "#/$defs/videoPayload" },
+        { "$ref": "#/$defs/voicePayload" },
+        { "$ref": "#/$defs/filePayload" },
+        { "$ref": "#/$defs/stickerPayload" },
+        { "$ref": "#/$defs/giftPayload" },
+        { "$ref": "#/$defs/callPayload" },
+        { "$ref": "#/$defs/systemPayload" }
+      ]
+    },
+    "reply_to_id": {
+      "oneOf": [
+        { "$ref": "#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "status": {
+      "enum": ["sending", "sent", "delivered", "read"]
+    },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        { "$ref": "#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    },
+    "nullableUuid": {
+      "oneOf": [
+        { "$ref": "#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket", "path", "mime_type", "size_bytes"],
+      "properties": {
+        "bucket": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "mime_type": { "type": "string", "minLength": 1 },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "width": { "type": ["integer", "null"], "minimum": 1 },
+        "height": { "type": ["integer", "null"], "minimum": 1 },
+        "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "thumbnail_path": { "type": ["string", "null"] },
+        "blur_hash": { "type": ["string", "null"] },
+        "file_name": { "type": ["string", "null"] }
+      }
+    },
+    "textPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 10000 }
+      }
+    },
+    "imagePayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["media"],
+      "properties": {
+        "caption": { "type": ["string", "null"], "maxLength": 2000 },
+        "media": { "$ref": "#/$defs/media" }
+      }
+    },
+    "videoPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["media"],
+      "properties": {
+        "caption": { "type": ["string", "null"], "maxLength": 2000 },
+        "media": { "$ref": "#/$defs/media" }
+      }
+    },
+    "voicePayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["media", "waveform"],
+      "properties": {
+        "media": { "$ref": "#/$defs/media" },
+        "waveform": {
+          "type": "array",
+          "maxItems": 256,
+          "items": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "filePayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["media"],
+      "properties": {
+        "caption": { "type": ["string", "null"], "maxLength": 2000 },
+        "media": { "$ref": "#/$defs/media" }
+      }
+    },
+    "stickerPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset_key"],
+      "properties": {
+        "asset_key": { "type": "string", "minLength": 1 },
+        "media": {
+          "oneOf": [
+            { "$ref": "#/$defs/media" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "giftPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gift_id",
+        "catalog_item_id",
+        "name",
+        "asset_key",
+        "credit_cost",
+        "recipient_credit_value",
+        "platform_fee_credits",
+        "recipient_id",
+        "state"
+      ],
+      "properties": {
+        "gift_id": { "$ref": "#/$defs/uuid" },
+        "catalog_item_id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "asset_key": { "type": "string", "minLength": 1 },
+        "credit_cost": { "type": "integer", "minimum": 1 },
+        "recipient_credit_value": { "type": "integer", "minimum": 0 },
+        "platform_fee_credits": { "type": "integer", "minimum": 0 },
+        "recipient_id": { "$ref": "#/$defs/uuid" },
+        "state": { "enum": ["sent", "converted", "refunded"] }
+      }
+    },
+    "callPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "call_id",
+        "call_kind",
+        "room_name",
+        "state",
+        "host_id",
+        "started_at",
+        "ended_at",
+        "participant_count",
+        "joinable"
+      ],
+      "properties": {
+        "call_id": { "$ref": "#/$defs/uuid" },
+        "call_kind": { "enum": ["audio", "video"] },
+        "room_name": { "type": "string", "minLength": 1 },
+        "state": {
+          "enum": ["scheduled", "ringing", "active", "ended", "cancelled"]
+        },
+        "host_id": { "$ref": "#/$defs/uuid" },
+        "started_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "ended_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "participant_count": { "type": "integer", "minimum": 0 },
+        "joinable": { "type": "boolean" }
+      }
+    },
+    "systemPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["event", "text"],
+      "properties": {
+        "event": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["emoji", "count", "reacted_by_me"],
+      "properties": {
+        "emoji": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "count": { "type": "integer", "minimum": 1 },
+        "reacted_by_me": { "type": "boolean" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version",
+        "revision",
+        "reactions",
+        "pin",
+        "is_starred_by_me",
+        "forwarded",
+        "receipts",
+        "ephemeral",
+        "edited_at",
+        "deleted_at"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "revision": { "type": "integer", "minimum": 1 },
+        "reactions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reaction" }
+        },
+        "pin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["is_pinned", "pinned_by", "pinned_at"],
+          "properties": {
+            "is_pinned": { "type": "boolean" },
+            "pinned_by": { "$ref": "#/$defs/nullableUuid" },
+            "pinned_at": { "$ref": "#/$defs/nullableTimestamp" }
+          }
+        },
+        "is_starred_by_me": { "type": "boolean" },
+        "forwarded": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "original_message_id",
+            "original_sender_id",
+            "original_sender_name",
+            "original_created_at"
+          ],
+          "properties": {
+            "original_message_id": { "$ref": "#/$defs/nullableUuid" },
+            "original_sender_id": { "$ref": "#/$defs/nullableUuid" },
+            "original_sender_name": { "type": ["string", "null"] },
+            "original_created_at": { "$ref": "#/$defs/nullableTimestamp" }
+          }
+        },
+        "receipts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["delivered_count", "read_count", "read_by_me_at"],
+          "properties": {
+            "delivered_count": { "type": "integer", "minimum": 0 },
+            "read_count": { "type": "integer", "minimum": 0 },
+            "read_by_me_at": { "$ref": "#/$defs/nullableTimestamp" }
+          }
+        },
+        "ephemeral": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["view_once", "viewed_at", "expires_at"],
+          "properties": {
+            "view_once": { "type": "boolean" },
+            "viewed_at": { "$ref": "#/$defs/nullableTimestamp" },
+            "expires_at": { "$ref": "#/$defs/nullableTimestamp" }
+          }
+        },
+        "edited_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "deleted_at": { "$ref": "#/$defs/nullableTimestamp" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "content_type": { "const": "text" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/textPayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "image" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/imagePayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "video" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/videoPayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "voice" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/voicePayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "file" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/filePayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "sticker" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/stickerPayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "gift" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/giftPayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "call" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/callPayload" } } }
+    },
+    {
+      "if": { "properties": { "content_type": { "const": "system" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/systemPayload" } } }
+    }
+  ]
+}

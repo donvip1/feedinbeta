@@ -44,9 +44,9 @@ class CommunitiesRemoteDataSource {
           .select('group_id, role')
           .eq('user_id', userId),
       client
-          .from('group_join_requests')
-          .select('group_id')
-          .eq('user_id', userId)
+          .from('conversation_join_requests')
+          .select('conversation_id')
+          .eq('requester_id', userId)
           .eq('status', 'pending'),
     ]);
     final roles = <String, String>{
@@ -54,7 +54,7 @@ class CommunitiesRemoteDataSource {
         row['group_id'].toString(): row['role']?.toString() ?? 'member',
     };
     final pending = <String>{
-      for (final row in results[2]) row['group_id'].toString(),
+      for (final row in results[2]) row['conversation_id'].toString(),
     };
     return results[0]
         .map(
@@ -84,10 +84,10 @@ class CommunitiesRemoteDataSource {
         .eq('user_id', userId)
         .maybeSingle();
     final request = await client
-        .from('group_join_requests')
+        .from('conversation_join_requests')
         .select('id')
-        .eq('group_id', groupId)
-        .eq('user_id', userId)
+        .eq('conversation_id', groupId)
+        .eq('requester_id', userId)
         .eq('status', 'pending')
         .maybeSingle();
     return _mapCommunity(
@@ -108,41 +108,55 @@ class CommunitiesRemoteDataSource {
     if (client == null || userId == null) {
       throw const AuthException('Sign in to create a community.');
     }
-    final row = await client
-        .from('groups')
-        .insert({
-          'name': name.trim(),
-          'description': description.trim(),
-          'created_by': userId,
-          'is_private': isPrivate,
-          'is_premium': isPremium,
-          'requires_subscription': isPremium,
-        })
-        .select(_groupFields)
-        .single();
-    return _mapCommunity(Map<String, dynamic>.from(row), viewerRole: 'owner');
+    final created = await client.rpc<dynamic>(
+      'create_group_conversation',
+      params: {
+        'p_title': name.trim(),
+        'p_description': description.trim(),
+        'p_is_private': isPrivate,
+      },
+    );
+    if (created is! Map || created['id'] == null) {
+      throw const FormatException('Invalid group creation response.');
+    }
+    final community = await fetchCommunity(created['id'].toString());
+    if (community == null) {
+      throw StateError('Created community could not be loaded.');
+    }
+    return community;
   }
 
   Future<CommunityJoinResult> joinCommunity(String groupId) async {
     final client = _client;
     if (client == null) throw StateError('Communities are unavailable.');
-    final response = await client.rpc(
-      'join_group',
-      params: {'p_group_id': groupId},
+    await client.rpc<dynamic>(
+      'request_group_join',
+      params: {
+        'p_conversation_id': groupId,
+        'p_source': 'discovery',
+      },
     );
-    return response?.toString() == 'requested'
-        ? CommunityJoinResult.requested
-        : CommunityJoinResult.joined;
+    return CommunityJoinResult.requested;
   }
 
   Future<String> joinViaInvite(String inviteCode) async {
     final client = _client;
     if (client == null) throw StateError('Communities are unavailable.');
-    final response = await client.rpc(
-      'join_group_via_invite',
-      params: {'p_invite_code': inviteCode.trim().toLowerCase()},
+    final group = await client
+        .from('groups')
+        .select('id')
+        .eq('invite_code', inviteCode.trim().toLowerCase())
+        .maybeSingle();
+    if (group == null) throw StateError('INVITE_LINK_INVALID');
+    final groupId = group['id'].toString();
+    await client.rpc<dynamic>(
+      'request_group_join',
+      params: {
+        'p_conversation_id': groupId,
+        'p_source': 'public_link',
+      },
     );
-    return response.toString();
+    return groupId;
   }
 
   Future<void> leaveCommunity(String groupId) async {
@@ -187,6 +201,61 @@ class CommunitiesRemoteDataSource {
         avatarUrl: profile?['avatar_url']?.toString(),
       );
     }).toList();
+  }
+
+  Future<List<CommunityJoinRequest>> fetchPendingJoinRequests(
+    String groupId,
+  ) async {
+    final client = _client;
+    if (client == null) return const [];
+    final rows = await client
+        .from('conversation_join_requests')
+        .select('id, requester_id, estimated_cost, created_at')
+        .eq('conversation_id', groupId)
+        .eq('status', 'pending')
+        .order('created_at');
+    final requesterIds = rows
+        .map((row) => row['requester_id'].toString())
+        .toSet()
+        .toList();
+    final profiles = requesterIds.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : await client
+              .from('profiles')
+              .select('id, display_name, username, avatar_url')
+              .inFilter('id', requesterIds);
+    final byId = {for (final row in profiles) row['id'].toString(): row};
+    return rows.map((row) {
+      final requesterId = row['requester_id'].toString();
+      final profile = byId[requesterId];
+      final displayName = profile?['display_name']?.toString().trim();
+      final username = profile?['username']?.toString().trim();
+      return CommunityJoinRequest(
+        id: row['id'].toString(),
+        requesterId: requesterId,
+        displayName: displayName?.isNotEmpty == true
+            ? displayName!
+            : username?.isNotEmpty == true
+            ? username!
+            : 'feedIn user',
+        username: username?.isNotEmpty == true ? username : null,
+        avatarUrl: profile?['avatar_url']?.toString(),
+        estimatedCost: communityInt(row['estimated_cost']),
+        createdAtMillis: communityMillis(row['created_at']),
+      );
+    }).toList();
+  }
+
+  Future<void> reviewJoinRequest({
+    required String requestId,
+    required bool approve,
+  }) async {
+    final client = _client;
+    if (client == null) throw StateError('Communities are unavailable.');
+    await client.rpc<dynamic>(
+      'review_group_join_request',
+      params: {'p_request_id': requestId, 'p_approve': approve},
+    );
   }
 
   Future<List<CommunityMessage>> fetchMessages(String groupId) async {

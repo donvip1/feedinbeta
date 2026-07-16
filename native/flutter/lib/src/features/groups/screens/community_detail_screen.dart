@@ -55,7 +55,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       if (result == CommunityJoinResult.joined && _community != null) {
         _openChat(_community!);
       } else {
-        _toast('Join request sent to the community admins.');
+        _toast(
+          'Request sent. If approved, 50 credits will be charged unless your premium subscription is active.',
+        );
       }
     } catch (error) {
       if (mounted) _toast(_messageFor(error, 'Could not join this community.'));
@@ -76,10 +78,14 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     );
   }
 
-  Future<void> _copyInvite(CommunitySummary community) async {
+  Future<void> _copyGroupLink(CommunitySummary community) async {
     final link = 'https://feedin.app/groups/join/${community.inviteCode}';
     await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) _toast('Invite link copied.');
+    if (mounted) {
+      _toast(
+        'Group link copied. Joining requires approval and may cost 50 credits.',
+      );
+    }
   }
 
   void _toast(String message) {
@@ -105,8 +111,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         actions: [
           if (community.isMember)
             IconButton(
-              tooltip: 'Copy invite link',
-              onPressed: () => _copyInvite(community),
+              tooltip: 'Copy group link',
+              onPressed: () => _copyGroupLink(community),
               icon: const Icon(Icons.link_rounded),
             ),
         ],
@@ -161,6 +167,39 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
             ),
           ],
           const SizedBox(height: 28),
+          if (!community.isMember) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: GroupColors.rowCard,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: GroupColors.rowCardBorder),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 18,
+                    color: GroupColors.primary,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Admin approval required. Joining costs 50 credits; active premium members receive a fee waiver.',
+                      style: TextStyle(
+                        color: GroupColors.mutedForeground,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (community.isMember)
             FilledButton.icon(
               onPressed: () => _openChat(community),
@@ -185,9 +224,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               label: Text(
                 community.joinRequestPending
                     ? 'Request pending'
-                    : community.isPrivate
-                    ? 'Request to join'
-                    : 'Join community',
+                    : 'Request to join',
               ),
             ),
         ],

@@ -9,6 +9,9 @@ class LocalStorageBootstrap {
   static const pendingActionsBoxName = 'feedin.pending_actions';
   static const conversationsBoxName = 'feedin.conversations';
   static const messagesBoxName = 'feedin.messages';
+  static const canonicalMessagesBoxName = 'feedin.messages_v2';
+  static const messageOutboxBoxName = 'feedin.message_outbox_v2';
+  static const messageSyncCursorsBoxName = 'feedin.message_sync_cursors_v2';
   static const postDraftsBoxName = 'feedin.post_drafts';
   static const uploadQueueBoxName = 'feedin.upload_queue';
   static const notificationsBoxName = 'feedin.notifications';
@@ -32,6 +35,9 @@ class LocalStorageBootstrap {
       Hive.openBox<Map>(pendingActionsBoxName),
       Hive.openBox<Map>(conversationsBoxName),
       Hive.openBox<Map>(messagesBoxName),
+      Hive.openBox<Map>(canonicalMessagesBoxName),
+      Hive.openBox<Map>(messageOutboxBoxName),
+      Hive.openBox<Map>(messageSyncCursorsBoxName),
       Hive.openBox<Map>(postDraftsBoxName),
       Hive.openBox<Map>(uploadQueueBoxName),
       Hive.openBox<Map>(notificationsBoxName),

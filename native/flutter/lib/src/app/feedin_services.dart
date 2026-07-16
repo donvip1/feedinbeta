@@ -14,12 +14,14 @@ import '../core/storage/storage_diagnostics_service.dart';
 import '../core/sync/conversation_starter.dart';
 import '../core/sync/foreground_sync_coordinator.dart';
 import '../core/sync/message_materializer.dart';
+import '../core/sync/incremental_message_sync_service.dart';
 import '../core/sync/sync_service.dart';
 import '../core/sync/upload_queue_service.dart';
 import '../data/local/local_feed_repository.dart';
 import '../data/local/local_feed_repository_contract.dart';
 import '../data/local/local_messages_repository.dart';
 import '../data/local/local_messages_repository_contract.dart';
+import '../data/local/canonical_message_store.dart';
 import '../data/local/notification_repository.dart';
 import '../data/local/notification_repository_contract.dart';
 import '../data/local/pending_action_repository.dart';
@@ -32,6 +34,7 @@ import '../data/local/upload_queue_repository.dart';
 import '../data/remote/feed_remote_data_source.dart';
 import '../data/remote/message_recipient_remote_data_source.dart';
 import '../data/remote/messages_remote_data_source.dart';
+import '../data/remote/canonical_messages_remote_data_source.dart';
 import '../data/remote/notifications_remote_data_source.dart';
 import '../data/remote/profile_remote_data_source.dart';
 import '../features/auth/data/auth_repository.dart';
@@ -59,6 +62,7 @@ class FeedinServices {
     required this.pushNotificationService,
     required this.localNotificationsService,
     required this.callKitService,
+    this.incrementalMessageSyncService,
   });
 
   final FeedinConfig config;
@@ -81,6 +85,7 @@ class FeedinServices {
   final PushNotificationService pushNotificationService;
   final LocalNotificationsService localNotificationsService;
   final CallKitService callKitService;
+  final IncrementalMessageSyncService? incrementalMessageSyncService;
 
   factory FeedinServices.create(FeedinConfig config) {
     final profileBox = Hive.box<Map>(LocalStorageBootstrap.profileBoxName);
@@ -92,6 +97,15 @@ class FeedinServices {
       LocalStorageBootstrap.conversationsBoxName,
     );
     final messagesBox = Hive.box<Map>(LocalStorageBootstrap.messagesBoxName);
+    final canonicalMessagesBox = Hive.box<Map>(
+      LocalStorageBootstrap.canonicalMessagesBoxName,
+    );
+    final messageOutboxBox = Hive.box<Map>(
+      LocalStorageBootstrap.messageOutboxBoxName,
+    );
+    final messageSyncCursorsBox = Hive.box<Map>(
+      LocalStorageBootstrap.messageSyncCursorsBoxName,
+    );
     final postDraftsBox = Hive.box<Map>(
       LocalStorageBootstrap.postDraftsBoxName,
     );
@@ -144,6 +158,18 @@ class FeedinServices {
       messagesRepository: messagesRepository,
       messageMaterializer: messageMaterializer,
     );
+    final connectivityService = ConnectivityService();
+    final incrementalMessageSyncService = IncrementalMessageSyncService(
+      store: CanonicalMessageStore(
+        messagesBox: canonicalMessagesBox,
+        outboxBox: messageOutboxBox,
+        cursorsBox: messageSyncCursorsBox,
+      ),
+      remote: CanonicalMessagesRemoteDataSource(
+        isConfigured: config.hasSupabaseConfig,
+      ),
+      connectivity: connectivityService,
+    );
     final uploadQueueService = UploadQueueService(
       isConfigured: config.hasSupabaseConfig,
       draftRepository: postDraftRepository,
@@ -189,7 +215,7 @@ class FeedinServices {
       realtimeService: FeedinRealtimeService(
         isConfigured: config.hasSupabaseConfig,
       ),
-      connectivityService: ConnectivityService(),
+      connectivityService: connectivityService,
       storageMaintenance: LocalStorageMaintenance(
         profileBox: profileBox,
         feedBox: feedBox,
@@ -202,9 +228,8 @@ class FeedinServices {
       localNotificationsService: LocalNotificationsService(
         isConfigured: config.hasSupabaseConfig,
       ),
-      callKitService: CallKitService(
-        isConfigured: config.hasSupabaseConfig,
-      ),
+      callKitService: CallKitService(isConfigured: config.hasSupabaseConfig),
+      incrementalMessageSyncService: incrementalMessageSyncService,
       pushNotificationService: PushNotificationService(
         isConfigured: config.hasSupabaseConfig,
         notificationRepository: notificationRepository,

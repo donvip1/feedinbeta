@@ -14,6 +14,7 @@ import '../../core/storage/local_storage_maintenance.dart';
 import '../../core/storage/storage_diagnostics_service.dart';
 import '../../core/sync/conversation_starter.dart';
 import '../../core/sync/foreground_sync_coordinator.dart';
+import '../../core/sync/incremental_message_sync_service.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/sync/upload_queue_service.dart';
 import '../../data/local/local_feed_repository_contract.dart';
@@ -69,6 +70,7 @@ class FeedShell extends StatefulWidget {
     required this.callKitService,
     required this.connectivityService,
     required this.onSignOut,
+    this.incrementalMessageSyncService,
   });
 
   final String displayName;
@@ -92,6 +94,7 @@ class FeedShell extends StatefulWidget {
   final CallKitService callKitService;
   final ConnectivityService connectivityService;
   final VoidCallback onSignOut;
+  final IncrementalMessageSyncService? incrementalMessageSyncService;
 
   @override
   State<FeedShell> createState() => _FeedShellState();
@@ -128,6 +131,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _profile = widget.profile;
+    unawaited(widget.incrementalMessageSyncService?.start(_profile.userId));
     WidgetsBinding.instance.addObserver(this);
     _notificationUnreadCountFuture = widget.notificationRepository
         .unreadCount();
@@ -135,9 +139,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
       _handleRealtimeEvent,
     );
     _connectRealtime();
-    // No periodic auto-replay: online actions flush immediately and offline
-    // actions are hard-blocked (never queued), so there is no backlog to drain.
-    // Live message refresh still arrives via [realtimeService] below.
+    // The V2 service subscribes before cursor catch-up and drains its durable
+    // outbox whenever connectivity returns. Legacy sync remains active during
+    // the dual-read rollout.
     unawaited(_initPush());
     _initLocalNotificationsAndCalls();
     // Real 1:1 call media over LiveKit (SFU + managed TURN), matching the web
@@ -159,6 +163,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     _replySub?.cancel();
     _callKitSub?.cancel();
     widget.realtimeService.disconnect();
+    unawaited(widget.incrementalMessageSyncService?.stop());
     _callController.removeListener(_handleCallControllerChange);
     _callController.dispose();
     super.dispose();
@@ -170,6 +175,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     // killed are parked in [PendingReplyStore]; flush them the moment we're back.
     if (state == AppLifecycleState.resumed) {
       unawaited(_drainPendingReplies());
+      unawaited(widget.incrementalMessageSyncService?.start(_profile.userId));
     }
   }
 

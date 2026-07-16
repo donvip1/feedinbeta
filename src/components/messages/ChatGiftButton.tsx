@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Gift, Coins, Heart, Rocket, Diamond, Sparkles } from 'lucide-react';
+import { Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,12 +18,26 @@ interface ChatGiftButtonProps {
   onGiftSent?: () => void;
 }
 
-const QUICK_GIFTS = [
-  { type: 'heart', emoji: '❤️', credits: 5, label: 'Heart', icon: Heart, gradient: 'from-pink-500 to-red-500' },
-  { type: 'rocket', emoji: '🚀', credits: 20, label: 'Rocket', icon: Rocket, gradient: 'from-blue-500 to-purple-500' },
-  { type: 'diamond', emoji: '💎', credits: 50, label: 'Diamond', icon: Diamond, gradient: 'from-cyan-400 to-blue-500' },
-  { type: 'sparkle', emoji: '✨', credits: 100, label: 'Sparkle', icon: Sparkles, gradient: 'from-yellow-400 to-orange-500' },
-];
+interface GiftCatalogItem {
+  id: string;
+  key: string;
+  name: string;
+  asset_key: string;
+  credit_cost: number;
+}
+
+const GIFT_EMOJI: Record<string, string> = {
+  heart: '❤️',
+  star: '⭐',
+  fire: '🔥',
+  clap: '👏',
+  rose: '🌹',
+  rocket: '🚀',
+  gift: '🎁',
+  diamond: '💎',
+  crown: '👑',
+  money: '💰',
+};
 
 export const ChatGiftButton = ({
   recipientId,
@@ -37,14 +50,14 @@ export const ChatGiftButton = ({
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [customAmount, setCustomAmount] = useState('');
-  const [sentGift, setSentGift] = useState<typeof QUICK_GIFTS[0] | null>(null);
+  const [catalog, setCatalog] = useState<GiftCatalogItem[]>([]);
+  const [sentGift, setSentGift] = useState<GiftCatalogItem | null>(null);
   const [userCredits, setUserCredits] = useState<number>(0);
 
   // Fetch user credits when modal opens
   React.useEffect(() => {
     if (isOpen && user) {
-      fetchCredits();
+      void Promise.all([fetchCredits(), fetchCatalog()]);
     }
   }, [isOpen, user]);
 
@@ -64,7 +77,16 @@ export const ChatGiftButton = ({
     }
   };
 
-  const sendGift = async (giftType: string, credits: number) => {
+  const fetchCatalog = async () => {
+    const { data, error } = await supabase
+      .from('gift_catalog' as any)
+      .select('id, key, name, asset_key, credit_cost')
+      .eq('is_active', true)
+      .order('display_order');
+    if (!error) setCatalog((data || []) as unknown as GiftCatalogItem[]);
+  };
+
+  const sendGift = async (gift: GiftCatalogItem) => {
     if (!user) {
       toast({
         title: 'Sign in required',
@@ -74,10 +96,10 @@ export const ChatGiftButton = ({
       return;
     }
 
-    if (userCredits < credits) {
+    if (userCredits < gift.credit_cost) {
       toast({
         title: 'Insufficient credits',
-        description: `You need ${credits} credits. Current balance: ${userCredits}`,
+        description: `You need ${gift.credit_cost} credits. Current balance: ${userCredits}`,
         variant: 'destructive',
       });
       return;
@@ -86,18 +108,18 @@ export const ChatGiftButton = ({
     setIsSending(true);
 
     try {
-      // Use the secure RPC function for direct gifts
-      const { data, error } = await supabase.rpc('send_direct_gift', {
-        p_credit_value: credits,
-        p_gift_type: giftType,
-        p_recipient_identifier: recipientId,
-      });
+      const { error } = await supabase.rpc('send_chat_gift' as any, {
+        p_conversation_id: conversationId,
+        p_catalog_key: gift.key,
+        p_message_id: crypto.randomUUID(),
+        p_idempotency_key: crypto.randomUUID(),
+        p_recipient_id: recipientId,
+      } as any);
 
       if (error) throw error;
 
       // Show success animation
-      const gift = QUICK_GIFTS.find(g => g.type === giftType);
-      setSentGift(gift || null);
+      setSentGift(gift);
       playGiftSound();
 
       setTimeout(() => {
@@ -108,7 +130,7 @@ export const ChatGiftButton = ({
 
       toast({
         title: 'Gift sent! 🎁',
-        description: `You sent ${credits} credits to ${recipientName}`,
+        description: `You sent ${gift.name} to ${recipientName}`,
       });
 
       fetchCredits(); // Refresh balance
@@ -122,19 +144,6 @@ export const ChatGiftButton = ({
     } finally {
       setIsSending(false);
     }
-  };
-
-  const handleCustomSend = () => {
-    const amount = parseInt(customAmount);
-    if (isNaN(amount) || amount < 1) {
-      toast({
-        title: 'Invalid amount',
-        description: 'Please enter a valid number of credits',
-        variant: 'destructive',
-      });
-      return;
-    }
-    sendGift('custom', amount);
   };
 
   return (
@@ -173,48 +182,26 @@ export const ChatGiftButton = ({
           </div>
 
           {/* Quick Gifts */}
-          <div className="grid grid-cols-2 gap-3 py-4">
-            {QUICK_GIFTS.map((gift) => (
+          <div className="grid grid-cols-2 gap-3 py-4 max-h-72 overflow-y-auto">
+            {catalog.map((gift) => (
               <button
-                key={gift.type}
-                onClick={() => sendGift(gift.type, gift.credits)}
-                disabled={isSending || userCredits < gift.credits}
+                key={gift.id}
+                onClick={() => sendGift(gift)}
+                disabled={isSending || userCredits < gift.credit_cost}
                 className={cn(
                   "p-4 rounded-xl border transition-all duration-200",
                   "flex flex-col items-center gap-2",
-                  userCredits >= gift.credits
+                  userCredits >= gift.credit_cost
                     ? "border-border hover:border-primary hover:scale-105"
                     : 'border-border/50 opacity-50 cursor-not-allowed',
                   "bg-card hover:bg-accent"
                 )}
               >
-                <span className="text-3xl">{gift.emoji}</span>
-                <span className="font-semibold">{gift.label}</span>
-                <span className="text-xs text-muted-foreground">{gift.credits} credits</span>
+                <span className="text-3xl">{GIFT_EMOJI[gift.asset_key] || '🎁'}</span>
+                <span className="font-semibold">{gift.name}</span>
+                <span className="text-xs text-muted-foreground">{gift.credit_cost} credits</span>
               </button>
             ))}
-          </div>
-
-          {/* Custom Amount */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-500" />
-              <Input
-                type="number"
-                placeholder="Custom amount"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                className="pl-10"
-                min="1"
-              />
-            </div>
-            <Button
-              onClick={handleCustomSend}
-              disabled={isSending || !customAmount}
-              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
-            >
-              Send
-            </Button>
           </div>
 
           {/* Success Animation */}
@@ -232,7 +219,7 @@ export const ChatGiftButton = ({
                     transition={{ duration: 0.5, repeat: 2 }}
                     className="text-7xl mb-4"
                   >
-                    {sentGift.emoji}
+                    {GIFT_EMOJI[sentGift.asset_key] || '🎁'}
                   </motion.div>
                   <p className="text-xl font-bold">Gift Sent!</p>
                 </div>

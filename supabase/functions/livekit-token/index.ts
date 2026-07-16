@@ -184,8 +184,43 @@ serve(async (req) => {
       isHost = stream?.user_id === userId;
       canPublish = isHost;
     } else {
+      const conversationCallMatch = roomName.match(new RegExp(`^conversation-call-${uuid}$`, "i"));
+      if (conversationCallMatch) {
+        const callId = conversationCallMatch[1];
+        const { data: conversationCall } = await supabase
+          .from('conversation_calls')
+          .select('id, conversation_id, host_id, state')
+          .eq('id', callId)
+          .maybeSingle();
+
+        if (conversationCall) {
+          const { data: participant } = await supabase
+            .from('conversation_participants')
+            .select('role, state')
+            .eq('conversation_id', conversationCall.conversation_id)
+            .eq('user_id', userId)
+            .maybeSingle();
+          const { data: conversation } = await supabase
+            .from('conversations')
+            .select('type, settings')
+            .eq('id', conversationCall.conversation_id)
+            .maybeSingle();
+
+          authorized = Boolean(
+            participant?.state === 'active' &&
+            ['scheduled', 'ringing', 'active'].includes(conversationCall.state),
+          );
+          isHost = conversationCall.host_id === userId;
+          // Group participants can speak once admitted. Channel subscribers
+          // can join and listen, while owner/admin retain publish permission.
+          canPublish = authorized && (
+            conversation?.type !== 'channel' ||
+            ['owner', 'admin'].includes(participant?.role ?? '')
+          );
+        }
+      }
       const callMatch = roomName.match(new RegExp(`^call-${uuid}$`, "i"));
-      if (callMatch) {
+      if (!conversationCallMatch && callMatch) {
         const callId = callMatch[1];
         const { data: callLog } = await supabase
           .from('call_logs')

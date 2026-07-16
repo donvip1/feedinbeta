@@ -112,8 +112,9 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _adoptSignedInSession() async {
     final user = await widget.services.authRepository.restoreSession();
     if (user == null || !mounted) return;
-    final profile =
-        await widget.services.profileRepository.loadProfileForUser(user.id);
+    final profile = await widget.services.profileRepository.loadProfileForUser(
+      user.id,
+    );
     if (!mounted) return;
     setState(() {
       _user = user;
@@ -382,6 +383,8 @@ class _AuthGateState extends State<AuthGate> {
         localNotificationsService: widget.services.localNotificationsService,
         callKitService: widget.services.callKitService,
         connectivityService: widget.services.connectivityService,
+        incrementalMessageSyncService:
+            widget.services.incrementalMessageSyncService,
         onSignOut: _signOut,
       );
     }
@@ -430,10 +433,7 @@ class _AuthGateState extends State<AuthGate> {
       switchOutCurve: Curves.easeInCubic,
       layoutBuilder: (currentChild, previousChildren) => Stack(
         alignment: Alignment.topCenter,
-        children: [
-          ...previousChildren,
-          if (currentChild != null) currentChild,
-        ],
+        children: [...previousChildren, if (currentChild != null) currentChild],
       ),
       transitionBuilder: (child, animation) {
         return FadeTransition(
@@ -469,9 +469,7 @@ class _AuthGateState extends State<AuthGate> {
                     vertical: 20,
                   ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isWide ? 940 : 440,
-                    ),
+                    constraints: BoxConstraints(maxWidth: isWide ? 940 : 440),
                     child: isWide
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -619,7 +617,10 @@ class _OfflineEntry extends StatelessWidget {
                         color: AuthColors.onBrand,
                       ),
                       SizedBox(width: AuthSpacing.sm),
-                      Text('Open local mode', style: AuthTextStyles.glassButton),
+                      Text(
+                        'Open local mode',
+                        style: AuthTextStyles.glassButton,
+                      ),
                     ],
                   ),
                 ),

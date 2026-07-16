@@ -30,6 +30,7 @@ const GroupDetail = () => {
   const [group, setGroup] = useState<Group | null>(null);
   const [isMember, setIsMember] = useState(false);
   const [actualMemberCount, setActualMemberCount] = useState(0);
+  const [requestPending, setRequestPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -69,6 +70,15 @@ const GroupDetail = () => {
         .single();
 
       setIsMember(!!memberData);
+
+      const { data: pendingRequest } = await supabase
+        .from('conversation_join_requests' as any)
+        .select('id')
+        .eq('conversation_id', groupId)
+        .eq('requester_id', user?.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      setRequestPending(!!pendingRequest);
       
       // If already a member, redirect to chat
       if (memberData) {
@@ -90,63 +100,18 @@ const GroupDetail = () => {
   const handleJoinGroup = async () => {
     setActionLoading(true);
     try {
-      // Check if group is premium and user has premium subscription
-      if (group?.is_premium || group?.requires_subscription) {
-        const { data: subscription } = await supabase
-          .from('user_subscriptions')
-          .select('status, subscription_tiers(name)')
-          .eq('user_id', user?.id)
-          .eq('status', 'active')
-          .single();
+      const { error } = await supabase.rpc('request_group_join' as any, {
+        p_conversation_id: groupId,
+        p_source: 'discovery',
+      } as any);
+      if (error) throw error;
 
-        const tier = Array.isArray(subscription?.subscription_tiers)
-          ? subscription.subscription_tiers[0]
-          : subscription?.subscription_tiers;
-
-        const isPremium = subscription && (tier?.name === 'Pro' || tier?.name === 'Premium');
-
-        if (!isPremium) {
-          toast({
-            title: 'Premium Required',
-            description: 'This group requires a premium subscription. Upgrade to join!',
-            variant: 'destructive',
-          });
-          setActionLoading(false);
-          return;
-        }
-      }
-
-      if (group?.is_private) {
-        // Create join request
-        const { error } = await supabase.from('group_join_requests').insert({
-          group_id: groupId,
-          user_id: user?.id,
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: 'Request Sent',
-          description: 'Your join request has been sent to group admins',
-        });
-      } else {
-        // Join directly
-        const { error } = await supabase.from('group_members').insert({
-          group_id: groupId,
-          user_id: user?.id,
-          role: 'member',
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: 'Joined!',
-          description: 'Welcome to the group',
-        });
-        
-        // Navigate to chat after joining
-        navigate(`/groups/${groupId}/chat`, { replace: true });
-      }
+      setRequestPending(true);
+      toast({
+        title: 'Request sent',
+        description:
+          'An owner or administrator must approve you. Approval costs 50 credits unless your premium subscription is active.',
+      });
     } catch (error: any) {
       console.error('Error joining group:', error);
       toast({
@@ -225,16 +190,14 @@ const GroupDetail = () => {
         <div className="max-w-md mx-auto space-y-4">
           <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
             <p className="text-sm text-slate-400 text-center">
-              {group.is_private 
-                ? 'This is a private group. Your request will be reviewed by admins.'
-                : 'This is a public group. You can join and start chatting immediately!'
-              }
+              An owner or administrator must approve your request. If approved,
+              50 credits will be charged unless your premium subscription is active.
             </p>
           </div>
 
           <Button
             onClick={handleJoinGroup}
-            disabled={actionLoading}
+            disabled={actionLoading || requestPending}
             className="w-full h-12"
             size="lg"
           >
@@ -243,7 +206,7 @@ const GroupDetail = () => {
             ) : (
               <UserPlus className="w-4 h-4 mr-2" />
             )}
-            {group.is_private ? 'Request to Join' : 'Join Group'}
+            {requestPending ? 'Request Pending' : 'Request to Join'}
           </Button>
         </div>
       </div>

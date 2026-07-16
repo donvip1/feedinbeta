@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -14,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Lock, Globe, Sparkles } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -24,12 +23,10 @@ interface CreateGroupModalProps {
 
 export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupModalProps) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -44,17 +41,14 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
 
     setLoading(true);
     try {
-      // Insert group - the database trigger will:
-      // 1. Add creator as owner in group_members
-      // 2. Create default permanent invite link
-      // 3. Set member_count to 1
-      const { data: newGroup, error } = await supabase.from('groups').insert({
-        name: name.trim(),
-        description: description.trim(),
-        is_private: isPrivate,
-        is_premium: isPremium,
-        created_by: user?.id,
-      }).select().single();
+      const { data: newGroup, error } = await supabase.rpc(
+        'create_group_conversation' as any,
+        {
+          p_title: name.trim(),
+          p_description: description.trim(),
+          p_is_private: isPrivate,
+        } as any,
+      );
 
       if (error) throw error;
 
@@ -66,22 +60,26 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
       setName('');
       setDescription('');
       setIsPrivate(false);
-      setIsPremium(false);
       onOpenChange(false);
       
       // Navigate to the new group chat
-      if (newGroup?.id) {
-        navigate(`/groups/${newGroup.id}/chat`);
+      const created = newGroup as unknown as { id?: string } | null;
+      if (created?.id) {
+        navigate(`/groups/${created.id}/chat`);
       }
       
       onSuccess();
     } catch (error: any) {
       console.error('Error creating group:', error);
+      const premiumRequired = error?.message?.includes('PREMIUM_REQUIRED');
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create group',
+        title: premiumRequired ? 'Premium required' : 'Error',
+        description: premiumRequired
+          ? 'An active premium subscription is required to create a group.'
+          : error.message || 'Failed to create group',
         variant: 'destructive',
       });
+      if (premiumRequired) navigate('/wallet/credits');
     } finally {
       setLoading(false);
     }
@@ -125,19 +123,6 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
             <Switch
               checked={isPrivate}
               onCheckedChange={setIsPrivate}
-              disabled={loading}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Premium Group</Label>
-              <p className="text-sm text-muted-foreground">
-                Only premium users can join
-              </p>
-            </div>
-            <Switch
-              checked={isPremium}
-              onCheckedChange={setIsPremium}
               disabled={loading}
             />
           </div>

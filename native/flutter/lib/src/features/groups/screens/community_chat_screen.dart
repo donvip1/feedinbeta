@@ -121,7 +121,94 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     final link =
         'https://feedin.app/groups/join/${widget.community.inviteCode}';
     await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) _toast('Invite link copied.');
+    if (mounted) {
+      _toast('Group link copied. Link joins require approval and cost 50 credits.');
+    }
+  }
+
+  Future<void> _showJoinRequests() async {
+    final requests = await widget.dataSource.fetchPendingJoinRequests(
+      widget.community.id,
+    );
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: requests.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(28),
+                child: Center(child: Text('No pending join requests.')),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: requests.length,
+                itemBuilder: (context, index) {
+                  final request = requests[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: request.avatarUrl?.isNotEmpty == true
+                          ? NetworkImage(request.avatarUrl!)
+                          : null,
+                      child: request.avatarUrl?.isNotEmpty == true
+                          ? null
+                          : Text(request.displayName.characters.first),
+                    ),
+                    title: Text(request.displayName),
+                    subtitle: Text(
+                      '${request.estimatedCost} credits charged to applicant on approval',
+                    ),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        IconButton(
+                          tooltip: 'Reject',
+                          onPressed: () {
+                            Navigator.of(sheetContext).pop();
+                            _reviewJoinRequest(request, false);
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                        IconButton.filled(
+                          tooltip: 'Approve',
+                          onPressed: () {
+                            Navigator.of(sheetContext).pop();
+                            _reviewJoinRequest(request, true);
+                          },
+                          icon: const Icon(Icons.check_rounded),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  Future<void> _reviewJoinRequest(
+    CommunityJoinRequest request,
+    bool approve,
+  ) async {
+    try {
+      await widget.dataSource.reviewJoinRequest(
+        requestId: request.id,
+        approve: approve,
+      );
+      if (!mounted) return;
+      _toast(approve ? '${request.displayName} joined.' : 'Request rejected.');
+      await _loadMembers();
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString();
+      _toast(
+        message.contains('INSUFFICIENT_CREDITS')
+            ? '${request.displayName} does not have enough credits yet.'
+            : 'Could not review this request.',
+      );
+    }
   }
 
   Future<void> _leave() async {
@@ -238,18 +325,28 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Invite members',
+            tooltip: 'Copy group link',
             onPressed: _copyInvite,
-            icon: const Icon(Icons.person_add_alt_1_rounded),
+            icon: const Icon(Icons.link_rounded),
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'members') _showMembers();
+              if (value == 'requests') _showJoinRequests();
               if (value == 'leave') _leave();
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'members', child: Text('Members')),
-              PopupMenuItem(value: 'leave', child: Text('Leave community')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'members', child: Text('Members')),
+              if (widget.community.viewerRole == 'owner' ||
+                  widget.community.viewerRole == 'admin')
+                const PopupMenuItem(
+                  value: 'requests',
+                  child: Text('Join requests'),
+                ),
+              const PopupMenuItem(
+                value: 'leave',
+                child: Text('Leave community'),
+              ),
             ],
           ),
         ],

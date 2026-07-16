@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import 'group_models.dart';
 
@@ -292,27 +293,24 @@ class GroupsRemoteDataSource {
     final others = memberIds.toSet()..remove(me);
     if (others.length < 2) return null;
 
-    final inserted = await client
-        .from('conversations')
-        .insert(<String, Object?>{})
-        .select('id')
-        .single();
-    final conversationId = inserted['id']?.toString();
+    final inserted = await client.rpc<dynamic>(
+      'create_group_conversation',
+      params: {
+        'p_title': name?.trim().isNotEmpty == true ? name!.trim() : 'New group',
+      },
+    );
+    final conversationId = inserted is Map ? inserted['id']?.toString() : null;
     if (conversationId == null) return null;
 
-    final participantRows = <Map<String, Object?>>[
-      {'conversation_id': conversationId, 'user_id': me},
-      for (final id in others)
-        {'conversation_id': conversationId, 'user_id': id},
-    ];
-    await client.from('conversation_participants').insert(participantRows);
-
-    final trimmedName = name?.trim();
-    if (trimmedName != null && trimmedName.isNotEmpty) {
-      // Persist the chosen name as the opening message (no name column exists).
-      await sendMessage(
-        conversationId: conversationId,
-        body: '$trimmedName group created',
+    for (final id in others) {
+      await client.rpc<dynamic>(
+        'add_conversation_member',
+        params: {
+          'p_conversation_id': conversationId,
+          'p_member_id': id,
+          'p_idempotency_key': const Uuid().v4(),
+          'p_role': 'member',
+        },
       );
     }
 
@@ -328,17 +326,17 @@ class GroupsRemoteDataSource {
     final client = _client;
     if (client == null || memberIds.isEmpty) return;
 
-    final rows = [
-      for (final id in memberIds.toSet())
-        {'conversation_id': conversationId, 'user_id': id},
-    ];
-    await client
-        .from('conversation_participants')
-        .upsert(
-          rows,
-          onConflict: 'conversation_id,user_id',
-          ignoreDuplicates: true,
-        );
+    for (final id in memberIds.toSet()) {
+      await client.rpc<dynamic>(
+        'add_conversation_member',
+        params: {
+          'p_conversation_id': conversationId,
+          'p_member_id': id,
+          'p_idempotency_key': const Uuid().v4(),
+          'p_role': 'member',
+        },
+      );
+    }
   }
 
   /// Leaves a group by deleting the current user's participant row.

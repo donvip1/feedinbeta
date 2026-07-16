@@ -109,17 +109,17 @@ class _GroupsScreenState extends State<GroupsScreen> {
     );
   }
 
-  Future<void> _openInviteJoin() async {
+  Future<void> _openGroupLinkJoin() async {
     final controller = TextEditingController();
     final code = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Join with invite'),
+        title: const Text('Join with group link'),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: const InputDecoration(
-            labelText: 'Invite code or link',
+            labelText: 'Group code or link',
             prefixIcon: Icon(Icons.link_rounded),
           ),
         ),
@@ -188,8 +188,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Join with invite',
-                    onPressed: _openInviteJoin,
+                    tooltip: 'Join with group link',
+                    onPressed: _openGroupLinkJoin,
                     icon: const Icon(Icons.link_rounded),
                   ),
                   IconButton.filled(
@@ -414,9 +414,12 @@ String _errorMessage(Object error) {
     'PostgrestException(message: ',
     '',
   );
-  if (message.contains('premium subscription')) {
-    return 'An active premium subscription is required to join.';
+  if (message.contains('PREMIUM_REQUIRED') ||
+      message.contains('premium subscription')) {
+    return 'Premium is required to create a community. Subscribe from Wallet and try again.';
   }
-  if (message.contains('invalid')) return 'This invite link is invalid.';
+  if (message.contains('INVALID') || message.contains('invalid')) {
+    return 'This group link is invalid.';
+  }
   return 'Could not complete that community action.';
 }
