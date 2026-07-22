@@ -97,6 +97,7 @@ void main() {
             deliveryStateName: 'read',
             readAtMillis: 20,
             readByUserId: 'other-user',
+            replyToId: 'parent-message',
           ),
         ],
       ),
@@ -110,6 +111,7 @@ void main() {
     expect(saved?.deliveryState, MessageDeliveryState.read);
     expect(saved?.readAtMillis, 20);
     expect(saved?.readByUserId, 'other-user');
+    expect(saved?.replyToId, 'parent-message');
   });
 }
 
@@ -236,6 +238,8 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String senderName,
     required String localPath,
     required String mediaType,
+    String? senderId,
+    String? senderAvatarUrl,
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
@@ -251,6 +255,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    String? replyToId,
     int? expiresAtMillis,
   }) async {}
 

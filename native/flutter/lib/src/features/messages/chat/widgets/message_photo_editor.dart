@@ -9,7 +9,6 @@ import 'package:path_provider/path_provider.dart';
 
 enum MessageCropRatio { free, square, story }
 
-/// The edited asset returned to the message composer for upload/persistence.
 class MessagePhotoEditResult {
   const MessagePhotoEditResult({
     required this.file,
@@ -19,7 +18,6 @@ class MessagePhotoEditResult {
     required this.grayscale,
     required this.stamp,
   });
-
   final File file;
   final String caption;
   final MessageCropRatio ratio;
@@ -28,17 +26,138 @@ class MessagePhotoEditResult {
   final String? stamp;
 }
 
-/// Full-screen native photo editing route used by the messaging composer.
-///
-/// Use [MessagePhotoEditor.edit] to push the editor and await a result. The
-/// returned file is a cache JPEG; the caller remains responsible for upload.
+enum _PhotoFilter { normal, vivid, warm, cool, mono, sepia }
+
+extension on _PhotoFilter {
+  String get label => switch (this) {
+    _PhotoFilter.normal => 'Normal',
+    _PhotoFilter.vivid => 'Vivid',
+    _PhotoFilter.warm => 'Warm',
+    _PhotoFilter.cool => 'Cool',
+    _PhotoFilter.mono => 'B&W',
+    _PhotoFilter.sepia => 'Sepia',
+  };
+  ui.ColorFilter? get colorFilter => switch (this) {
+    _PhotoFilter.normal => null,
+    _PhotoFilter.vivid => const ui.ColorFilter.matrix(<double>[
+      1.15,
+      0,
+      0,
+      0,
+      -12,
+      0,
+      1.15,
+      0,
+      0,
+      -12,
+      0,
+      0,
+      1.15,
+      0,
+      -12,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+    _PhotoFilter.warm => const ui.ColorFilter.matrix(<double>[
+      1.08,
+      0,
+      0,
+      0,
+      8,
+      0,
+      1,
+      0,
+      0,
+      2,
+      0,
+      0,
+      .9,
+      0,
+      -4,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+    _PhotoFilter.cool => const ui.ColorFilter.matrix(<double>[
+      .92,
+      0,
+      0,
+      0,
+      -2,
+      0,
+      1,
+      0,
+      0,
+      2,
+      0,
+      0,
+      1.12,
+      0,
+      8,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+    _PhotoFilter.mono => const ui.ColorFilter.matrix(<double>[
+      .213,
+      .715,
+      .072,
+      0,
+      0,
+      .213,
+      .715,
+      .072,
+      0,
+      0,
+      .213,
+      .715,
+      .072,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+    _PhotoFilter.sepia => const ui.ColorFilter.matrix(<double>[
+      .393,
+      .769,
+      .189,
+      0,
+      0,
+      .349,
+      .686,
+      .168,
+      0,
+      0,
+      .272,
+      .534,
+      .131,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+  };
+}
+
 class MessagePhotoEditor extends StatefulWidget {
   const MessagePhotoEditor({
     super.key,
     required this.imageFile,
     this.initialCaption = '',
   });
-
   final File imageFile;
   final String initialCaption;
 
@@ -46,18 +165,15 @@ class MessagePhotoEditor extends StatefulWidget {
     BuildContext context, {
     required File imageFile,
     String initialCaption = '',
-  }) {
-    return Navigator.of(context).push<MessagePhotoEditResult>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => MessagePhotoEditor(
-          imageFile: imageFile,
-          initialCaption: initialCaption,
-        ),
+  }) => Navigator.of(context).push<MessagePhotoEditResult>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => MessagePhotoEditor(
+        imageFile: imageFile,
+        initialCaption: initialCaption,
       ),
-    );
-  }
-
+    ),
+  );
   @override
   State<MessagePhotoEditor> createState() => _MessagePhotoEditorState();
 }
@@ -66,8 +182,17 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
   ui.Image? _image;
   MessageCropRatio _ratio = MessageCropRatio.free;
   int _rotation = 0;
-  bool _grayscale = false;
+  _PhotoFilter _filter = _PhotoFilter.normal;
   String? _stamp;
+  Offset _stampPosition = const Offset(.5, .5);
+  double _stampScale = 1;
+  double _stampAngle = 0;
+  Rect _crop = const Rect.fromLTWH(0, 0, 1, 1);
+  String? _cropHandle;
+  Offset? _lastCropPoint;
+  double _stampStartScale = 1;
+  double _stampStartAngle = 0;
+  bool _stampGesture = false;
   late final TextEditingController _captionController = TextEditingController(
     text: widget.initialCaption,
   );
@@ -93,9 +218,34 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
     super.dispose();
   }
 
+  Size _orientedSize() {
+    final i = _image!;
+    return _rotation % 180 == 0
+        ? Size(i.width.toDouble(), i.height.toDouble())
+        : Size(i.height.toDouble(), i.width.toDouble());
+  }
+
+  Rect _initialCrop(MessageCropRatio ratio) {
+    final s = _orientedSize();
+    final target = switch (ratio) {
+      MessageCropRatio.free => null,
+      MessageCropRatio.square => 1.0,
+      MessageCropRatio.story => 16 / 9,
+    };
+    if (target == null) return const Rect.fromLTWH(0, 0, 1, 1);
+    final a = s.width / s.height;
+    var w = 1.0, h = 1.0;
+    if (a > target) {
+      w = target / a;
+    } else {
+      h = a / target;
+    }
+    return Rect.fromLTWH((1 - w) / 2, (1 - h) / 2, w, h);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: const Color(0xff080b13),
       appBar: AppBar(
@@ -110,7 +260,7 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text('Send', style: TextStyle(color: color.primary)),
+                : Text('Send', style: TextStyle(color: scheme.primary)),
           ),
         ],
       ),
@@ -123,19 +273,53 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
                   : _Preview(
                       image: _image!,
                       rotation: _rotation,
-                      grayscale: _grayscale,
+                      filter: _filter,
+                      crop: _crop,
+                      cropEditable: _ratio == MessageCropRatio.free,
                       stamp: _stamp,
-                      ratio: _ratio,
+                      stampPosition: _stampPosition,
+                      stampScale: _stampScale,
+                      stampAngle: _stampAngle,
+                      onScaleStart: _onScaleStart,
+                      onScaleUpdate: _onScaleUpdate,
+                      onScaleEnd: (_) {
+                        _cropHandle = null;
+                        _lastCropPoint = null;
+                      },
                     ),
             ),
           ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: _ratio == MessageCropRatio.free
+                ? const Padding(
+                    key: ValueKey('free-crop-hint'),
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Drag an edge or corner to crop',
+                      style: TextStyle(color: Colors.white60, fontSize: 12),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
           _Toolbar(
             ratio: _ratio,
-            grayscale: _grayscale,
-            onRatioChanged: (ratio) => setState(() => _ratio = ratio),
-            onRotate: () => setState(() => _rotation = (_rotation + 90) % 360),
-            onGrayscale: () => setState(() => _grayscale = !_grayscale),
-            onStamp: (stamp) => setState(() => _stamp = stamp),
+            filter: _filter,
+            onRatioChanged: (ratio) => setState(() {
+              _ratio = ratio;
+              _crop = _initialCrop(ratio);
+            }),
+            onRotate: () => setState(() {
+              _rotation = (_rotation + 90) % 360;
+              _crop = _initialCrop(_ratio);
+            }),
+            onFilter: (filter) => setState(() => _filter = filter),
+            onStamp: (stamp) => setState(() {
+              _stamp = stamp;
+              _stampPosition = const Offset(.5, .5);
+              _stampScale = 1;
+              _stampAngle = 0;
+            }),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
@@ -147,12 +331,12 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
               decoration: InputDecoration(
                 hintText: 'Add a caption…',
                 hintStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: .08),
                 prefixIcon: const Icon(
                   Icons.edit_outlined,
                   color: Colors.white54,
                 ),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: .08),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -165,20 +349,109 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
     );
   }
 
+  void _onScaleStart(ScaleStartDetails details, Rect imageRect) {
+    final local = details.localFocalPoint;
+    final point = Offset(
+      (local.dx - imageRect.left) / imageRect.width,
+      (local.dy - imageRect.top) / imageRect.height,
+    );
+    final stampHit =
+        _stamp != null && (point - _stampPosition).distance < .18 * _stampScale;
+    _stampGesture = stampHit;
+    if (stampHit) {
+      _stampStartScale = _stampScale;
+      _stampStartAngle = _stampAngle;
+    } else if (_ratio == MessageCropRatio.free) {
+      _cropHandle = _nearestHandle(point);
+      _lastCropPoint = point;
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details, Rect imageRect) {
+    final local = details.localFocalPoint;
+    final point = Offset(
+      (local.dx - imageRect.left) / imageRect.width,
+      (local.dy - imageRect.top) / imageRect.height,
+    );
+    if (_stampGesture && _stamp != null) {
+      setState(() {
+        _stampPosition = Offset(
+          point.dx.clamp(0.05, .95),
+          point.dy.clamp(0.05, .95),
+        );
+        _stampScale = (_stampStartScale * details.scale).clamp(.35, 3.5);
+        _stampAngle = _stampStartAngle + details.rotation;
+      });
+      return;
+    }
+    if (_cropHandle == null || _lastCropPoint == null) return;
+    final delta = point - _lastCropPoint!;
+    var crop = _crop;
+    const minSize = .08;
+    if (_cropHandle!.contains('l')) {
+      crop = Rect.fromLTRB(
+        (crop.left + delta.dx).clamp(0, crop.right - minSize),
+        crop.top,
+        crop.right,
+        crop.bottom,
+      );
+    }
+    if (_cropHandle!.contains('r')) {
+      crop = Rect.fromLTRB(
+        crop.left,
+        crop.top,
+        (crop.right + delta.dx).clamp(crop.left + minSize, 1),
+        crop.bottom,
+      );
+    }
+    if (_cropHandle!.contains('t')) {
+      crop = Rect.fromLTRB(
+        crop.left,
+        (crop.top + delta.dy).clamp(0, crop.bottom - minSize),
+        crop.right,
+        crop.bottom,
+      );
+    }
+    if (_cropHandle!.contains('b')) {
+      crop = Rect.fromLTRB(
+        crop.left,
+        crop.top,
+        crop.right,
+        (crop.bottom + delta.dy).clamp(crop.top + minSize, 1),
+      );
+    }
+    setState(() => _crop = crop);
+    _lastCropPoint = point;
+  }
+
+  String _nearestHandle(Offset p) {
+    final d = <String, double>{
+      'tl': (p - _crop.topLeft).distance,
+      'tr': (p - _crop.topRight).distance,
+      'bl': (p - _crop.bottomLeft).distance,
+      'br': (p - _crop.bottomRight).distance,
+      'l': (p - Offset(_crop.left, _crop.center.dy)).distance,
+      'r': (p - Offset(_crop.right, _crop.center.dy)).distance,
+      't': (p - Offset(_crop.center.dx, _crop.top)).distance,
+      'b': (p - Offset(_crop.center.dx, _crop.bottom)).distance,
+    };
+    return d.entries.reduce((a, b) => a.value < b.value ? a : b).key;
+  }
+
   Future<void> _save() async {
     final image = _image;
     if (image == null || _saving) return;
     setState(() => _saving = true);
     try {
-      final pngBytes = await _renderEditedImage(image);
+      final png = await _renderEditedImage(image);
       final jpeg = await FlutterImageCompress.compressWithList(
-        pngBytes,
+        png,
         format: CompressFormat.jpeg,
         quality: 90,
       );
-      final directory = await getTemporaryDirectory();
+      final dir = await getTemporaryDirectory();
       final file = File(
-        '${directory.path}/feedin-chat-${DateTime.now().microsecondsSinceEpoch}.jpg',
+        '${dir.path}/feedin-chat-${DateTime.now().microsecondsSinceEpoch}.jpg',
       );
       await file.writeAsBytes(jpeg, flush: true);
       if (!mounted) return;
@@ -188,114 +461,108 @@ class _MessagePhotoEditorState extends State<MessagePhotoEditor> {
           caption: _captionController.text.trim(),
           ratio: _ratio,
           rotation: _rotation,
-          grayscale: _grayscale,
+          grayscale: _filter == _PhotoFilter.mono,
           stamp: _stamp,
         ),
       );
-    } catch (error) {
+    } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not prepare photo: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not prepare photo: $e')));
       }
     }
   }
 
   Future<Uint8List> _renderEditedImage(ui.Image source) async {
-    final quarterTurn = _rotation == 90 || _rotation == 270;
-    final width = quarterTurn ? source.height : source.width;
-    final height = quarterTurn ? source.width : source.height;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.save();
-    if (_rotation == 90) {
-      canvas.translate(width.toDouble(), 0);
-      canvas.rotate(math.pi / 2);
-    } else if (_rotation == 180) {
-      canvas.translate(width.toDouble(), height.toDouble());
-      canvas.rotate(math.pi);
-    } else if (_rotation == 270) {
-      canvas.translate(0, height.toDouble());
-      canvas.rotate(-math.pi / 2);
-    }
+    final sw = source.width.toDouble(), sh = source.height.toDouble();
+    final ow = _rotation % 180 == 0 ? sw : sh,
+        oh = _rotation % 180 == 0 ? sh : sw;
+    final crop = Rect.fromLTRB(
+      _crop.left * ow,
+      _crop.top * oh,
+      _crop.right * ow,
+      _crop.bottom * oh,
+    );
+    final outW = crop.width.clamp(1, 1600).round(),
+        outH = (outW * crop.height / crop.width).round();
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec);
     final paint = Paint()
       ..filterQuality = FilterQuality.high
-      ..colorFilter = _grayscale
-          ? const ui.ColorFilter.matrix(<double>[
-              .213,
-              .715,
-              .072,
-              0,
-              0,
-              .213,
-              .715,
-              .072,
-              0,
-              0,
-              .213,
-              .715,
-              .072,
-              0,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-            ])
-          : null;
-    canvas.drawImage(source, Offset.zero, paint);
-    canvas.restore();
-    final oriented = await recorder.endRecording().toImage(width, height);
-
-    final crop = _cropRect(width.toDouble(), height.toDouble());
-    final outputWidth = crop.width.clamp(1, 1600).round();
-    final outputHeight = (outputWidth * crop.height / crop.width).round();
-    final cropRecorder = ui.PictureRecorder();
-    final cropCanvas = Canvas(cropRecorder);
-    cropCanvas.drawImageRect(
-      oriented,
-      crop,
-      Rect.fromLTWH(0, 0, outputWidth.toDouble(), outputHeight.toDouble()),
-      Paint()..filterQuality = FilterQuality.high,
-    );
+      ..colorFilter = _filter.colorFilter;
+    Rect src;
+    if (_rotation == 0) {
+      src = crop;
+    } else if (_rotation == 180) {
+      src = Rect.fromLTRB(
+        sw - crop.right,
+        sh - crop.bottom,
+        sw - crop.left,
+        sh - crop.top,
+      );
+    } else if (_rotation == 90) {
+      src = Rect.fromLTRB(
+        crop.top,
+        sh - crop.right,
+        crop.bottom,
+        sh - crop.left,
+      );
+    } else {
+      src = Rect.fromLTRB(
+        sw - crop.bottom,
+        crop.left,
+        sw - crop.top,
+        crop.right,
+      );
+    }
+    if (_rotation == 90 || _rotation == 270) {
+      canvas.save();
+      if (_rotation == 90) {
+        canvas.translate(outW.toDouble(), 0);
+        canvas.rotate(math.pi / 2);
+      } else {
+        canvas.translate(0, outH.toDouble());
+        canvas.rotate(-math.pi / 2);
+      }
+      canvas.drawImageRect(
+        source,
+        src,
+        Rect.fromLTWH(0, 0, outH.toDouble(), outW.toDouble()),
+        paint,
+      );
+      canvas.restore();
+    } else {
+      canvas.drawImageRect(
+        source,
+        src,
+        Rect.fromLTWH(0, 0, outW.toDouble(), outH.toDouble()),
+        paint,
+      );
+    }
     if (_stamp != null) {
-      final textPainter = TextPainter(
-        text: TextSpan(text: _stamp, style: const TextStyle(fontSize: 92)),
+      final x = ((_stampPosition.dx - _crop.left) / _crop.width) * outW;
+      final y = ((_stampPosition.dy - _crop.top) / _crop.height) * outH;
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(_stampAngle);
+      final orientedStampSize = math.min(ow, oh) * .18 * _stampScale;
+      final exportedStampSize = orientedStampSize * outW / crop.width;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: _stamp,
+          style: TextStyle(fontSize: exportedStampSize),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(cropCanvas, const Offset(26, 26));
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
     }
-    final result = await cropRecorder.endRecording().toImage(
-      outputWidth,
-      outputHeight,
-    );
+    final result = await rec.endRecording().toImage(outW, outH);
     final data = await result.toByteData(format: ui.ImageByteFormat.png);
-    oriented.dispose();
     result.dispose();
     return data!.buffer.asUint8List();
-  }
-
-  Rect _cropRect(double width, double height) {
-    final ratio = switch (_ratio) {
-      MessageCropRatio.free => null,
-      MessageCropRatio.square => 1.0,
-      MessageCropRatio.story => 16 / 9,
-    };
-    if (ratio == null) return Rect.fromLTWH(0, 0, width, height);
-    var cropWidth = width;
-    var cropHeight = cropWidth / ratio;
-    if (cropHeight > height) {
-      cropHeight = height;
-      cropWidth = cropHeight * ratio;
-    }
-    return Rect.fromLTWH(
-      (width - cropWidth) / 2,
-      (height - cropHeight) / 2,
-      cropWidth,
-      cropHeight,
-    );
   }
 }
 
@@ -303,94 +570,248 @@ class _Preview extends StatelessWidget {
   const _Preview({
     required this.image,
     required this.rotation,
-    required this.grayscale,
+    required this.filter,
+    required this.crop,
+    required this.cropEditable,
     required this.stamp,
-    required this.ratio,
+    required this.stampPosition,
+    required this.stampScale,
+    required this.stampAngle,
+    required this.onScaleStart,
+    required this.onScaleUpdate,
+    required this.onScaleEnd,
   });
-
   final ui.Image image;
   final int rotation;
-  final bool grayscale;
+  final _PhotoFilter filter;
+  final Rect crop;
+  final bool cropEditable;
   final String? stamp;
-  final MessageCropRatio ratio;
-
+  final Offset stampPosition;
+  final double stampScale;
+  final double stampAngle;
+  final void Function(ScaleStartDetails, Rect) onScaleStart;
+  final void Function(ScaleUpdateDetails, Rect) onScaleUpdate;
+  final ValueChanged<ScaleEndDetails> onScaleEnd;
   @override
-  Widget build(BuildContext context) {
-    Widget child = Stack(
-      alignment: Alignment.topLeft,
-      children: [
-        RawImage(image: image, fit: BoxFit.contain),
-        if (stamp != null)
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Text(stamp!, style: const TextStyle(fontSize: 72)),
-          ),
-      ],
-    );
-    if (grayscale) {
-      child = ColorFiltered(
-        colorFilter: const ColorFilter.matrix(<double>[
-          .213,
-          .715,
-          .072,
-          0,
-          0,
-          .213,
-          .715,
-          .072,
-          0,
-          0,
-          .213,
-          .715,
-          .072,
-          0,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-        ]),
-        child: child,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (_, c) {
+      final size = Size(
+        c.maxWidth.clamp(280, 420),
+        c.maxHeight.clamp(260, 520),
       );
-    }
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 390, maxHeight: 450),
-      child: AspectRatio(
-        aspectRatio: ratio == MessageCropRatio.square
-            ? 1
-            : ratio == MessageCropRatio.story
-            ? 16 / 9
-            : image.width / image.height,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: ColoredBox(
-            color: Colors.black,
-            child: RotatedBox(quarterTurns: rotation ~/ 90, child: child),
+      final aspect = rotation % 180 == 0
+          ? image.width / image.height
+          : image.height / image.width;
+      final imageRect = _fitRect(size, aspect);
+      return GestureDetector(
+        onScaleStart: (d) => onScaleStart(d, imageRect),
+        onScaleUpdate: (d) => onScaleUpdate(d, imageRect),
+        onScaleEnd: onScaleEnd,
+        child: CustomPaint(
+          size: size,
+          painter: _PreviewPainter(
+            image: image,
+            rotation: rotation,
+            filter: filter,
+            crop: crop,
+            cropEditable: cropEditable,
+            stamp: stamp,
+            stampPosition: stampPosition,
+            stampScale: stampScale,
+            stampAngle: stampAngle,
+            imageRect: imageRect,
           ),
         ),
-      ),
-    );
+      );
+    },
+  );
+  static Rect _fitRect(Size s, double a) {
+    var w = s.width, h = w / a;
+    if (h > s.height) {
+      h = s.height;
+      w = h * a;
+    }
+    return Rect.fromLTWH((s.width - w) / 2, (s.height - h) / 2, w, h);
   }
+}
+
+class _PreviewPainter extends CustomPainter {
+  _PreviewPainter({
+    required this.image,
+    required this.rotation,
+    required this.filter,
+    required this.crop,
+    required this.cropEditable,
+    required this.stamp,
+    required this.stampPosition,
+    required this.stampScale,
+    required this.stampAngle,
+    required this.imageRect,
+  });
+  final ui.Image image;
+  final int rotation;
+  final _PhotoFilter filter;
+  final Rect crop;
+  final bool cropEditable;
+  final String? stamp;
+  final Offset stampPosition;
+  final double stampScale;
+  final double stampAngle;
+  final Rect imageRect;
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.black);
+    final paint = Paint()
+      ..filterQuality = FilterQuality.high
+      ..colorFilter = filter.colorFilter;
+    final dst = imageRect;
+    final sourceRect = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+    if (rotation == 0) {
+      canvas.drawImageRect(image, sourceRect, dst, paint);
+    } else {
+      canvas.save();
+      if (rotation == 90) {
+        canvas.translate(dst.right, dst.top);
+        canvas.rotate(math.pi / 2);
+        canvas.drawImageRect(
+          image,
+          sourceRect,
+          Rect.fromLTWH(0, 0, dst.height, dst.width),
+          paint,
+        );
+      } else if (rotation == 180) {
+        canvas.translate(dst.right, dst.bottom);
+        canvas.rotate(math.pi);
+        canvas.drawImageRect(
+          image,
+          sourceRect,
+          Rect.fromLTWH(0, 0, dst.width, dst.height),
+          paint,
+        );
+      } else {
+        canvas.translate(dst.left, dst.bottom);
+        canvas.rotate(-math.pi / 2);
+        canvas.drawImageRect(
+          image,
+          sourceRect,
+          Rect.fromLTWH(0, 0, dst.height, dst.width),
+          paint,
+        );
+      }
+      canvas.restore();
+    }
+    final cropRect = Rect.fromLTRB(
+      imageRect.left + crop.left * imageRect.width,
+      imageRect.top + crop.top * imageRect.height,
+      imageRect.left + crop.right * imageRect.width,
+      imageRect.top + crop.bottom * imageRect.height,
+    );
+    final shade = Paint()..color = Colors.black.withValues(alpha: .48);
+    canvas.drawRect(
+      Rect.fromLTRB(
+        imageRect.left,
+        imageRect.top,
+        imageRect.right,
+        cropRect.top,
+      ),
+      shade,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        imageRect.left,
+        cropRect.bottom,
+        imageRect.right,
+        imageRect.bottom,
+      ),
+      shade,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        imageRect.left,
+        cropRect.top,
+        cropRect.left,
+        cropRect.bottom,
+      ),
+      shade,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        cropRect.right,
+        cropRect.top,
+        imageRect.right,
+        cropRect.bottom,
+      ),
+      shade,
+    );
+    final border = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = Colors.white;
+    canvas.drawRect(cropRect, border);
+    final handlePaint = Paint()..color = Colors.white;
+    if (cropEditable) {
+      final handles = <Offset>[
+        cropRect.topLeft,
+        cropRect.topCenter,
+        cropRect.topRight,
+        cropRect.centerRight,
+        cropRect.bottomRight,
+        cropRect.bottomCenter,
+        cropRect.bottomLeft,
+        cropRect.centerLeft,
+      ];
+      for (final handle in handles) {
+        canvas.drawCircle(handle, 7, handlePaint);
+      }
+    }
+    if (stamp != null) {
+      final point = Offset(
+        imageRect.left + stampPosition.dx * imageRect.width,
+        imageRect.top + stampPosition.dy * imageRect.height,
+      );
+      canvas.save();
+      canvas.translate(point.dx, point.dy);
+      canvas.rotate(stampAngle);
+      final text = TextPainter(
+        text: TextSpan(
+          text: stamp,
+          style: TextStyle(
+            fontSize:
+                math.min(imageRect.width, imageRect.height) * .18 * stampScale,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      text.paint(canvas, Offset(-text.width / 2, -text.height / 2));
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PreviewPainter old) => true;
 }
 
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.ratio,
-    required this.grayscale,
+    required this.filter,
     required this.onRatioChanged,
     required this.onRotate,
-    required this.onGrayscale,
+    required this.onFilter,
     required this.onStamp,
   });
-
   final MessageCropRatio ratio;
-  final bool grayscale;
+  final _PhotoFilter filter;
   final ValueChanged<MessageCropRatio> onRatioChanged;
   final VoidCallback onRotate;
-  final VoidCallback onGrayscale;
+  final ValueChanged<_PhotoFilter> onFilter;
   final ValueChanged<String?> onStamp;
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -399,7 +820,7 @@ class _Toolbar extends StatelessWidget {
       child: Row(
         children: [
           _ToolChoice(
-            label: 'Free',
+            label: 'Free crop',
             selected: ratio == MessageCropRatio.free,
             onTap: () => onRatioChanged(MessageCropRatio.free),
           ),
@@ -418,19 +839,25 @@ class _Toolbar extends StatelessWidget {
             onPressed: onRotate,
             icon: const Icon(Icons.rotate_right),
           ),
-          IconButton.filledTonal(
-            onPressed: onGrayscale,
-            isSelected: grayscale,
-            icon: const Icon(Icons.filter_b_and_w_outlined),
+          PopupMenuButton<_PhotoFilter>(
+            tooltip: 'Filters',
+            icon: const Icon(Icons.tune),
+            onSelected: onFilter,
+            itemBuilder: (_) => _PhotoFilter.values
+                .map((f) => PopupMenuItem(value: f, child: Text(f.label)))
+                .toList(),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Stamp emoji',
+            tooltip: 'Stickers and emoji',
             icon: const Icon(Icons.emoji_emotions_outlined),
             onSelected: (value) => onStamp(value.isEmpty ? null : value),
             itemBuilder: (_) => const [
-              PopupMenuItem(value: '⭐', child: Text('⭐ Star')),
-              PopupMenuItem(value: '🔥', child: Text('🔥 Fire')),
+              PopupMenuItem(value: '🚀', child: Text('🚀 Rocket sticker')),
+              PopupMenuItem(value: '🔥', child: Text('🔥 Fire sticker')),
+              PopupMenuItem(value: '🎉', child: Text('🎉 Party sticker')),
               PopupMenuItem(value: '😎', child: Text('😎 Cool')),
+              PopupMenuItem(value: '❤️', child: Text('❤️ Heart')),
+              PopupMenuItem(value: '✨', child: Text('✨ Sparkles')),
               PopupMenuItem(value: '', child: Text('Remove stamp')),
             ],
           ),
@@ -449,7 +876,6 @@ class _ToolChoice extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(right: 6),

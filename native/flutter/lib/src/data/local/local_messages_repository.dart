@@ -118,22 +118,30 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
 
   @override
   Future<void> upsertMessage(LocalMessage message) async {
-    await _messagesBox.put(message.id, message.toJson());
+    final currentRaw = _messagesBox.get(message.id);
+    final current = currentRaw == null
+        ? null
+        : decodeLocalRecord(currentRaw, LocalMessage.fromJson);
+    final merged =
+        message.localMediaPath == null && current?.localMediaPath != null
+        ? message.copyWith(localMediaPath: current!.localMediaPath)
+        : message;
+    await _messagesBox.put(merged.id, merged.toJson());
 
-    final raw = _conversationsBox.get(message.conversationId);
+    final raw = _conversationsBox.get(merged.conversationId);
     if (raw == null) return;
 
     final conversation = ConversationSummary.fromJson(
       Map<String, Object?>.from(raw),
     );
-    if (message.createdAtMillis < conversation.updatedAtMillis) return;
+    if (merged.createdAtMillis < conversation.updatedAtMillis) return;
 
     await _conversationsBox.put(
       conversation.id,
       conversation
           .copyWith(
-            lastMessagePreview: message.body,
-            updatedAtMillis: message.createdAtMillis,
+            lastMessagePreview: merged.body,
+            updatedAtMillis: merged.createdAtMillis,
           )
           .toJson(),
     );
@@ -146,6 +154,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    String? replyToId,
     int? expiresAtMillis,
   }) async {
     final trimmed = body.trim();
@@ -158,6 +167,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       senderName: senderName,
       senderId: senderId,
       senderAvatarUrl: senderAvatarUrl,
+      replyToId: replyToId,
       body: trimmed,
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.pending,
@@ -191,6 +201,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     required String senderName,
     required String localPath,
     required String mediaType,
+    String? senderId,
+    String? senderAvatarUrl,
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
@@ -207,6 +219,8 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
       id: const Uuid().v4(),
       conversationId: conversationId,
       senderName: senderName,
+      senderId: senderId,
+      senderAvatarUrl: senderAvatarUrl,
       body: trimmedCaption != null && trimmedCaption.isNotEmpty
           ? trimmedCaption
           : (viewOnce ? 'Photo · View once' : _attachmentPreview(kind)),

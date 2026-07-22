@@ -83,6 +83,37 @@ void main() {
     expect(find.text('Photos'), findsOneWidget);
     expect(find.text('Live'), findsOneWidget);
     expect(find.text('Wallet'), findsOneWidget);
+
+    await tester.tap(find.text('Chats'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    // Messaging is a focused full-screen destination: the app-wide navigation
+    // stays hidden on both the inbox and thread surfaces.
+    expect(find.text('Feed'), findsNothing);
+    expect(find.text('Chats'), findsNothing);
+    expect(find.text('Wallet'), findsNothing);
+    expect(find.text('Profile'), findsNothing);
+    expect(find.text('feedIn Support'), findsOneWidget);
+
+    await tester.tap(find.text('feedIn Support'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    expect(find.text('Feed'), findsNothing);
+    expect(find.text('Wallet'), findsNothing);
+    expect(find.text('Local messages ready'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    expect(find.text('feedIn Support'), findsOneWidget);
+    expect(find.text('Feed'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Videos'), findsOneWidget);
+    expect(find.text('Feed'), findsOneWidget);
+    expect(find.text('Chats'), findsOneWidget);
   });
 }
 
@@ -592,6 +623,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    String? replyToId,
     int? expiresAtMillis,
   }) async {}
 
@@ -601,6 +633,8 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     required String senderName,
     required String localPath,
     required String mediaType,
+    String? senderId,
+    String? senderAvatarUrl,
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,

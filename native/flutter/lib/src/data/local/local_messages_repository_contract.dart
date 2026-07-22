@@ -17,6 +17,7 @@ abstract interface class LocalMessagesRepositoryContract {
     required String body,
     String? senderId,
     String? senderAvatarUrl,
+    String? replyToId,
     int? expiresAtMillis,
   });
   Future<void> queueAttachment({
@@ -24,6 +25,8 @@ abstract interface class LocalMessagesRepositoryContract {
     required String senderName,
     required String localPath,
     required String mediaType,
+    String? senderId,
+    String? senderAvatarUrl,
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,

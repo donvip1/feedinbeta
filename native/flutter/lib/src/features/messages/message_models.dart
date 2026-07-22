@@ -98,6 +98,7 @@ class LocalMessage {
     required this.deliveryState,
     this.senderId,
     this.senderAvatarUrl,
+    this.replyToId,
     this.messageType = 'text',
     this.readAtMillis,
     this.readByUserId,
@@ -119,6 +120,7 @@ class LocalMessage {
   final String senderName;
   final String? senderId;
   final String? senderAvatarUrl;
+  final String? replyToId;
   final String body;
   final int createdAtMillis;
   final MessageDeliveryState deliveryState;
@@ -157,6 +159,7 @@ class LocalMessage {
     int? durationMs,
     String? musicTitle,
     String? mediaUrl,
+    String? localMediaPath,
     bool? viewOnce,
     int? expiresAtMillis,
     int? viewOnceSeenAtMillis,
@@ -167,6 +170,7 @@ class LocalMessage {
       senderName: senderName,
       senderId: senderId,
       senderAvatarUrl: senderAvatarUrl,
+      replyToId: replyToId,
       body: body,
       createdAtMillis: createdAtMillis,
       deliveryState: deliveryState ?? this.deliveryState,
@@ -174,7 +178,7 @@ class LocalMessage {
       readAtMillis: readAtMillis,
       readByUserId: readByUserId,
       mediaUrl: mediaUrl ?? this.mediaUrl,
-      localMediaPath: localMediaPath,
+      localMediaPath: localMediaPath ?? this.localMediaPath,
       thumbnailUrl: thumbnailUrl,
       mimeType: mimeType,
       fileName: fileName,
@@ -194,6 +198,7 @@ class LocalMessage {
       senderName: json['senderName'] as String,
       senderId: json['senderId'] as String?,
       senderAvatarUrl: json['senderAvatarUrl'] as String?,
+      replyToId: json['replyToId'] as String?,
       body: json['body'] as String,
       createdAtMillis: json['createdAtMillis'] as int,
       deliveryState: MessageDeliveryState.values.byName(
@@ -223,6 +228,7 @@ class LocalMessage {
       'senderName': senderName,
       'senderId': senderId,
       'senderAvatarUrl': senderAvatarUrl,
+      'replyToId': replyToId,
       'body': body,
       'createdAtMillis': createdAtMillis,
       'deliveryState': deliveryState.name,

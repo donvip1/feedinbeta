@@ -108,6 +108,7 @@ void main() {
           'sender_id': 'current-user',
           'content': 'Hello',
           'status': 'delivered',
+          'reply_to_id': 'parent-message',
           'created_at': '2026-07-14T10:00:00Z',
         },
         viewerId: 'current-user',
@@ -135,6 +136,7 @@ void main() {
       expect(outgoing.deliveryStateName, 'read');
       expect(outgoing.readByUserId, 'other-user');
       expect(outgoing.readAtMillis, isNotNull);
+      expect(outgoing.replyToId, 'parent-message');
       expect(incoming.deliveryStateName, 'delivered');
       expect(incoming.readByUserId, isNull);
       expect(incoming.readAtMillis, isNull);
@@ -170,6 +172,63 @@ void main() {
       expect(views.first.readReceipts.single.userId, 'other-user');
       expect(views.first.readReceipts.single.readAtMillis, readAt);
       expect(views.last.readReceipts, isEmpty);
+    });
+
+    test(
+      'keeps local sender content on the right using profile name fallback',
+      () {
+        final views = localMessagesToViews(
+          const [
+            LocalMessage(
+              id: 'local-photo',
+              conversationId: 'conversation-1',
+              senderName: 'Alex Morgan',
+              body: 'Photo',
+              messageType: 'image',
+              localMediaPath: '/tmp/photo.jpg',
+              createdAtMillis: 1,
+              deliveryState: MessageDeliveryState.pending,
+            ),
+          ],
+          currentUserKey: 'current-user-id',
+          currentUserName: 'Alex Morgan',
+        );
+
+        expect(views.single.isMine, isTrue);
+        expect(views.single.mediaKind, ChatMediaKind.image);
+      },
+    );
+
+    test('projects reply metadata into the quoted bubble preview', () {
+      final views = localMessagesToViews(
+        const [
+          LocalMessage(
+            id: 'parent',
+            conversationId: 'conversation-1',
+            senderName: 'Sarah',
+            senderId: 'other-user',
+            body: 'Original message',
+            createdAtMillis: 1,
+            deliveryState: MessageDeliveryState.delivered,
+          ),
+          LocalMessage(
+            id: 'reply',
+            conversationId: 'conversation-1',
+            senderName: 'Alex',
+            senderId: 'current-user',
+            replyToId: 'parent',
+            body: 'My reply',
+            createdAtMillis: 2,
+            deliveryState: MessageDeliveryState.sent,
+          ),
+        ],
+        currentUserKey: 'current-user',
+        currentUserName: 'Alex',
+      );
+
+      expect(views.last.replyPreview?.messageId, 'parent');
+      expect(views.last.replyPreview?.senderName, 'Sarah');
+      expect(views.last.replyPreview?.content, 'Original message');
     });
 
     testWidgets('renders double-blue status and read footer', (tester) async {

@@ -152,6 +152,7 @@ class SyncService implements SyncServiceContract {
           'sender_id': userId,
           'content': hasAttachment ? _attachmentCaption(message) : message.body,
           'message_type': hasAttachment ? message.messageType : 'text',
+          if (message.replyToId != null) 'reply_to_id': message.replyToId,
           'status': 'sent',
           'created_at': DateTime.fromMillisecondsSinceEpoch(
             message.createdAtMillis,

@@ -32,6 +32,7 @@ class MessageMaterializer {
             senderName: remoteMessage.senderName,
             senderId: remoteMessage.senderId,
             senderAvatarUrl: remoteMessage.senderAvatarUrl,
+            replyToId: remoteMessage.replyToId,
             body: remoteMessage.body,
             createdAtMillis: remoteMessage.createdAtMillis,
             deliveryState: _deliveryState(remoteMessage.deliveryStateName),

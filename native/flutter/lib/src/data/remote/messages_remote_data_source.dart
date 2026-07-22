@@ -46,7 +46,7 @@ class MessagesRemoteDataSource {
         .from('messages')
         .select(
           'id, conversation_id, sender_id, content, message_type, status, '
-          'created_at, view_once, expires_at, view_once_seen_at, '
+          'created_at, reply_to_id, view_once, expires_at, view_once_seen_at, '
           'profiles!messages_sender_id_fkey(display_name, username, avatar_url)',
         )
         .eq('conversation_id', serverConversationId)
@@ -235,6 +235,7 @@ class RemoteMessage {
     required this.createdAtMillis,
     required this.deliveryStateName,
     this.senderAvatarUrl,
+    this.replyToId,
     this.messageType = 'text',
     this.readAtMillis,
     this.readByUserId,
@@ -257,6 +258,7 @@ class RemoteMessage {
   final int createdAtMillis;
   final String deliveryStateName;
   final String? senderAvatarUrl;
+  final String? replyToId;
   final String messageType;
   final int? readAtMillis;
   final String? readByUserId;
@@ -318,6 +320,7 @@ class RemoteMessage {
           ? '@$username'
           : 'feedIn user',
       senderAvatarUrl: profileMap?['avatar_url']?.toString(),
+      replyToId: json['reply_to_id']?.toString(),
       body: json['content']?.toString() ?? '',
       createdAtMillis: createdAtMillis,
       deliveryStateName: deliveryStateName,

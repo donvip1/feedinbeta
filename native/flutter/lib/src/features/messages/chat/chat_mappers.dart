@@ -53,6 +53,7 @@ LocalMessage canonicalMessageToLocalMessage(
     conversationId: message.conversationId,
     senderName: isMine ? currentUserName : otherSenderName,
     senderId: message.senderId,
+    replyToId: message.replyToId,
     body: switch (message.contentType) {
       CanonicalMessageContentType.text => payload['text']?.toString() ?? '',
       CanonicalMessageContentType.system =>
@@ -158,9 +159,13 @@ RecipientView recipientToView(MessageRecipient recipient) {
 List<ChatMessageView> localMessagesToViews(
   List<LocalMessage> messages, {
   required String currentUserKey,
+  String? currentUserName,
   Set<String> starredMessageIds = const <String>{},
 }) {
   final views = <ChatMessageView>[];
+  final messagesById = <String, LocalMessage>{
+    for (final message in messages) message.id: message,
+  };
   for (var i = 0; i < messages.length; i++) {
     final message = messages[i];
     final previous = i > 0 ? messages[i - 1] : null;
@@ -177,7 +182,9 @@ List<ChatMessageView> localMessagesToViews(
         (next.createdAtMillis - message.createdAtMillis) > _groupWindowMillis;
     final senderId = message.senderId ?? message.senderName;
     final isMine =
-        senderId == currentUserKey || message.senderName == currentUserKey;
+        senderId == currentUserKey ||
+        message.senderName == currentUserKey ||
+        (currentUserName != null && message.senderName == currentUserName);
     final readByUserId = message.readByUserId;
     final readAtMillis = message.readAtMillis;
 
@@ -193,6 +200,7 @@ List<ChatMessageView> localMessagesToViews(
         deliveryState: mapDeliveryState(message.deliveryState),
         body: message.body,
         media: _messageMedia(message),
+        replyPreview: _replyPreview(message, messagesById),
         readReceipts: [
           if (isMine && readByUserId != null && readAtMillis != null)
             ReadReceiptView(userId: readByUserId, readAtMillis: readAtMillis),
@@ -207,6 +215,41 @@ List<ChatMessageView> localMessagesToViews(
     );
   }
   return views;
+}
+
+ReplyPreview? _replyPreview(
+  LocalMessage message,
+  Map<String, LocalMessage> messagesById,
+) {
+  final replyToId = message.replyToId;
+  if (replyToId == null || replyToId.isEmpty) return null;
+  final parent = messagesById[replyToId];
+  if (parent == null) {
+    return ReplyPreview(
+      messageId: replyToId,
+      senderName: 'Original message',
+      content: 'Message unavailable',
+    );
+  }
+  final media = _messageMedia(parent);
+  final content = parent.body.trim().isNotEmpty
+      ? parent.body.trim()
+      : switch (media?.kind ?? ChatMediaKind.none) {
+          ChatMediaKind.image => 'Photo',
+          ChatMediaKind.video => 'Video',
+          ChatMediaKind.audio => 'Voice message',
+          ChatMediaKind.music => 'Music',
+          ChatMediaKind.file => 'File',
+          ChatMediaKind.callLog => 'Call',
+          ChatMediaKind.none => 'Message',
+        };
+  return ReplyPreview(
+    messageId: replyToId,
+    senderName: parent.senderName,
+    content: content,
+    mediaKind: media?.kind ?? ChatMediaKind.none,
+    mediaThumbUrl: media?.thumbnailUrl ?? media?.remoteUrl,
+  );
 }
 
 MessageMedia? _messageMedia(LocalMessage message) {

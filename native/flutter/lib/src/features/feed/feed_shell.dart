@@ -503,6 +503,18 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     });
   }
 
+  /// Messaging is presented as a focused, full-screen destination. Once its
+  /// own back controller has closed an open thread, leaving the inbox always
+  /// returns to Feed/Reels instead of exposing an arbitrary tab from history.
+  void _returnFromMessagesToFeed() {
+    setState(() {
+      _showNotifications = false;
+      _index = 0;
+      _tabHistory.clear();
+      _resetHomeBackTaps();
+    });
+  }
+
   Future<void> _handleAndroidBack() async {
     if (_showNotifications) {
       setState(() {
@@ -514,6 +526,11 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
 
     if (_index == 1 && _messagesBackController.navigateBack()) {
       _resetHomeBackTaps();
+      return;
+    }
+
+    if (_index == 1) {
+      _returnFromMessagesToFeed();
       return;
     }
 
@@ -669,11 +686,15 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
                 onChanged: _refreshNotificationBadge,
               )
             : pages[_index],
-        bottomNavigationBar: _FeedBottomNavigation(
-          selectedIndex: _index,
-          onSelected: _selectTab,
-          onCreate: _openCreate,
-        ),
+        // Chats own the whole viewport. Navigation returns only after the
+        // inbox/thread back flow lands on Feed/Reels again.
+        bottomNavigationBar: _index == 1
+            ? null
+            : _FeedBottomNavigation(
+                selectedIndex: _index,
+                onSelected: _selectTab,
+                onCreate: _openCreate,
+              ),
       ),
     );
   }

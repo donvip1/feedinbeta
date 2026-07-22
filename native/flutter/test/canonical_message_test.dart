@@ -51,6 +51,7 @@ void main() {
       senderId: '33333333-3333-4333-8333-333333333333',
       contentType: CanonicalMessageContentType.text,
       payload: const {'text': 'Queued while offline'},
+      replyToId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       status: CanonicalMessageStatus.sending,
       metadata: const {
         'revision': 1,
@@ -79,6 +80,7 @@ void main() {
     expect(local.senderName, 'Ada');
     expect(local.deliveryState, MessageDeliveryState.pending);
     expect(local.createdAtMillis, timestamp.millisecondsSinceEpoch);
+    expect(local.replyToId, canonical.replyToId);
   });
 
   test('projects a canonical sticker emoji into the native bubble model', () {
