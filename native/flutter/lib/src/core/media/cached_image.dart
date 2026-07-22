@@ -36,6 +36,7 @@ class CachedImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.placeholderColor,
+    this.placeholder,
     this.errorWidget,
   });
 
@@ -55,6 +56,11 @@ class CachedImage extends StatelessWidget {
 
   /// Fill colour for the loading placeholder box. Falls back to a faint neutral.
   final Color? placeholderColor;
+
+  /// Custom widget shown while the image loads. When supplied it replaces the
+  /// flat [placeholderColor] box (e.g. a shimmer). Purely additive: existing
+  /// call sites that omit it keep the neutral box.
+  final Widget? placeholder;
 
   /// Rendered when the URL is null/empty or the fetch fails. Falls back to a
   /// broken-image glyph on a neutral box.
@@ -82,8 +88,10 @@ class CachedImage extends StatelessWidget {
     return child;
   }
 
-  /// A faint, shimmer-free neutral box shown while the image loads.
+  /// The loading placeholder: the caller's [placeholder] widget when supplied,
+  /// otherwise a faint neutral box.
   Widget _placeholder() {
+    if (placeholder != null) return placeholder!;
     return Container(
       width: width,
       height: height,

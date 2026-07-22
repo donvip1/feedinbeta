@@ -595,6 +595,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Timer? _receiptRefreshTimer;
   Timer? _presenceAgeTimer;
   Set<String> _starredMessageIds = <String>{};
+  final Set<String> _downloadingMediaIds = <String>{};
   bool _isThreadSearchOpen = false;
   String _threadSearchQuery = '';
 
@@ -790,7 +791,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
       // Legacy media rows currently contain signed/downloadable URLs; V2
       // envelopes intentionally expose private storage paths. Keep media on
       // the legacy read side until the canonical URL resolver lands.
-      if (record.message.contentType != CanonicalMessageContentType.text) {
+      if (record.message.contentType != CanonicalMessageContentType.text &&
+          record.message.contentType != CanonicalMessageContentType.sticker) {
         continue;
       }
       merged[record.message.id] = canonicalMessageToLocalMessage(
@@ -1139,6 +1141,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       senderName: widget.profile.displayName,
       senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
       senderAvatarUrl: widget.profile.avatarUrl,
+      replyToId: _replyTarget?.messageId,
       body: _messageController.text,
       expiresAtMillis: _disappearingExpiryMillis(),
     );
@@ -1557,6 +1560,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await widget.messagesRepository.queueAttachment(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
+      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+      senderAvatarUrl: widget.profile.avatarUrl,
       localPath: localPath,
       mediaType: mediaType,
       mimeType: staged.mimeType,
@@ -1590,6 +1595,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await widget.messagesRepository.queueAttachment(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
+      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+      senderAvatarUrl: widget.profile.avatarUrl,
       localPath: file.localPath,
       mediaType: StagedGenericFileAttachment.mediaType,
       mimeType: file.mimeType,
@@ -1702,6 +1709,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await widget.messagesRepository.queueAttachment(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
+      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+      senderAvatarUrl: widget.profile.avatarUrl,
       localPath: staged.localPath,
       mediaType: staged.messageType, // 'music' | 'audio'
       mimeType: staged.mimeType,
@@ -1800,11 +1809,148 @@ class _ConversationScreenState extends State<ConversationScreen> {
       case ChatMediaKind.callLog:
         return MediaMessageContent(
           message: view,
+          onOpenViewer: () => _openMediaViewer(view),
+          onDownload: () => _downloadMedia(view),
+          onRetryDownload: () => _downloadMedia(view),
           onOpenViewOnce: view.viewOnce && !view.isMine && !view.viewOnceSeen
               ? () => _openViewOnce(view)
               : null,
         );
     }
+  }
+
+  Future<void> _downloadMedia(ChatMessageView view) async {
+    if (_downloadingMediaIds.contains(view.id)) return;
+    final remoteUrl = view.media?.remoteUrl;
+    if (remoteUrl == null || remoteUrl.isEmpty) {
+      _toast('This attachment is not available for download yet.');
+      return;
+    }
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
+
+    _downloadingMediaIds.add(view.id);
+    _toast('Downloading attachment…');
+    try {
+      final uri = Uri.parse(remoteUrl);
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(uri);
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw HttpException(
+            'Download failed with status ${response.statusCode}',
+            uri: uri,
+          );
+        }
+        final directory = await getApplicationCacheDirectory();
+        final mediaDirectory = Directory(
+          '${directory.path}/feedin_message_downloads',
+        );
+        if (!mediaDirectory.existsSync()) {
+          mediaDirectory.createSync(recursive: true);
+        }
+        final extension = _downloadExtension(view, uri);
+        final file = File('${mediaDirectory.path}/${view.id}.$extension');
+        await response.pipe(file.openWrite());
+
+        final messages = await widget.messagesRepository.loadMessages(
+          widget.conversationId,
+        );
+        LocalMessage? local;
+        for (final candidate in messages) {
+          if (candidate.id == view.id) {
+            local = candidate;
+            break;
+          }
+        }
+        if (local == null) {
+          throw StateError('Downloaded message is no longer available.');
+        }
+        await widget.messagesRepository.upsertMessage(
+          local.copyWith(localMediaPath: file.path),
+        );
+      } finally {
+        client.close(force: true);
+      }
+      if (!mounted) return;
+      setState(() => _messagesFuture = _loadMessages(syncRemote: false));
+      _toast('Attachment downloaded.');
+    } catch (_) {
+      if (mounted) _toast('Could not download this attachment. Try again.');
+    } finally {
+      _downloadingMediaIds.remove(view.id);
+    }
+  }
+
+  String _downloadExtension(ChatMessageView view, Uri uri) {
+    final fileName = view.media?.fileName;
+    final candidate = fileName?.contains('.') == true
+        ? fileName!.split('.').last
+        : (uri.pathSegments.isNotEmpty && uri.pathSegments.last.contains('.')
+              ? uri.pathSegments.last.split('.').last
+              : null);
+    if (candidate != null &&
+        RegExp(r'^[a-zA-Z0-9]{1,6}$').hasMatch(candidate)) {
+      return candidate.toLowerCase();
+    }
+    return switch (view.mediaKind) {
+      ChatMediaKind.image => 'jpg',
+      ChatMediaKind.video => 'mp4',
+      ChatMediaKind.audio => 'm4a',
+      _ => 'bin',
+    };
+  }
+
+  Future<void> _openMediaViewer(ChatMessageView view) async {
+    final media = view.media;
+    if (media == null) return;
+    if (view.mediaKind != ChatMediaKind.image) {
+      _toast('Tap download to save this attachment.');
+      return;
+    }
+    final localPath = media.localPath;
+    final remoteUrl = media.remoteUrl;
+    if ((localPath == null || localPath.isEmpty) &&
+        (remoteUrl == null || remoteUrl.isEmpty)) {
+      _toast('This photo is not available yet.');
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5,
+                child: Center(
+                  child: localPath != null && localPath.isNotEmpty
+                      ? Image.file(File(localPath), fit: BoxFit.contain)
+                      : Image.network(remoteUrl!, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: SafeArea(
+                child: IconButton.filledTonal(
+                  tooltip: 'Close photo',
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Reveal an incoming view-once photo, then burn it: tell the server via
@@ -2079,6 +2225,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     final allViews = localMessagesToViews(
                       live,
                       currentUserKey: _currentUserKey,
+                      currentUserName: widget.profile.displayName,
                       starredMessageIds: _starredMessageIds,
                     );
                     final query = _threadSearchQuery.trim().toLowerCase();
@@ -2117,6 +2264,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           child: ChatMessageBubble(
                             message: view,
                             mediaSlot: _mediaSlotFor(view),
+                            mediaBleeds: MediaMessageContent.wantsFullBleed(view),
                             onLongPress: () => _openMessageActions(view),
                             onSwipeReply: () => _setReply(view),
                           ),

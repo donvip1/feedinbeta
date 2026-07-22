@@ -39,6 +39,7 @@ class ChatMessageBubble extends StatefulWidget {
     this.onReactionTap,
     this.mediaSlot,
     this.linkPreviewSlot,
+    this.mediaBleeds = false,
   });
 
   final ChatMessageView message;
@@ -63,6 +64,12 @@ class ChatMessageBubble extends StatefulWidget {
 
   /// Inline link-preview card, injected by the parent. Rendered under the text.
   final Widget? linkPreviewSlot;
+
+  /// When true, [mediaSlot] renders edge-to-edge: the bubble drops its inner
+  /// padding around the media (clipping it to the bubble's rounded corners) and
+  /// pads the remaining sections individually. Set by the parent only for
+  /// photo/video thumbnails via `MediaMessageContent.wantsFullBleed`.
+  final bool mediaBleeds;
 
   @override
   State<ChatMessageBubble> createState() => _ChatMessageBubbleState();
@@ -95,6 +102,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
             ? constraints.maxWidth
             : MediaQuery.of(context).size.width;
         final maxBubbleWidth = available * ChatSpacing.bubbleMaxWidthFraction;
+        final readReceiptFooter = _buildReadReceiptFooter();
 
         final row = Row(
           mainAxisAlignment: _isMine
@@ -114,7 +122,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                   children: [
                     _buildBubble(),
                     if (_message.reactions.isNotEmpty) _buildReactions(),
-                    ?_buildReadReceiptFooter(),
+                    if (readReceiptFooter != null) readReceiptFooter,
                   ],
                 ),
               ),
@@ -276,18 +284,31 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
     // The body foreground colour drives text + meta tints.
     final fg = _isMine ? ChatColors.primaryForeground : ChatColors.foreground;
 
+    // Full-bleed media path: the media reaches the (clipped) bubble edges and
+    // every other section pads itself. Only engaged when the parent flags a
+    // photo/video thumbnail and the message is not a deleted tombstone.
+    final bleed =
+        widget.mediaBleeds &&
+        widget.mediaSlot != null &&
+        !_message.isDeletedForEveryone;
+
     final bubble = Container(
       decoration: decoration,
-      padding: const EdgeInsets.symmetric(
-        horizontal: ChatSpacing.md - 2, // ~10px (web px-2.5)
-        vertical: ChatSpacing.xs + 2, // ~6px (web py-1.5)
-      ),
+      clipBehavior: bleed ? Clip.antiAlias : Clip.none,
+      padding: bleed
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(
+              horizontal: ChatSpacing.md - 2, // ~10px (web px-2.5)
+              vertical: ChatSpacing.xs + 2, // ~6px (web py-1.5)
+            ),
       child: Column(
         crossAxisAlignment: _isMine
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-        children: _buildBubbleChildren(fg),
+        children: bleed
+            ? _buildBleedBubbleChildren(fg)
+            : _buildBubbleChildren(fg),
       ),
     );
 
@@ -376,6 +397,57 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
 
     // (5) Meta row (time, edited, status).
     children.add(_buildMetaRow(fg));
+
+    return children;
+  }
+
+  /// Children for the full-bleed media path: [mediaSlot] is inserted raw so it
+  /// reaches the clipped bubble edges; every other section re-adds the
+  /// horizontal padding (and the appropriate vertical gaps) the outer container
+  /// no longer supplies. A caption-less message omits the meta row entirely —
+  /// the media renders its own time/status overlay.
+  List<Widget> _buildBleedBubbleChildren(Color fg) {
+    const double hPad = ChatSpacing.md - 2; // 10
+    const double vPad = ChatSpacing.xs + 2; // 6
+
+    Widget padH(Widget child, {double top = 0, double bottom = 0}) => Padding(
+      padding: EdgeInsets.only(left: hPad, right: hPad, top: top, bottom: bottom),
+      child: child,
+    );
+
+    final children = <Widget>[];
+    var placedTop = false;
+
+    // (1) Forwarded label (carries its own bottom gap).
+    if (_message.forwardedFrom != null) {
+      children.add(padH(_buildForwardedLabel(), top: vPad));
+      placedTop = true;
+    }
+
+    // (2) Inline quoted reply (carries its own bottom gap).
+    if (_message.replyPreview != null) {
+      children.add(padH(_buildReplyQuote(_message.replyPreview!, fg), top: placedTop ? 0 : vPad));
+      placedTop = true;
+    }
+
+    // (3) Full-bleed media — no padding; clipped to the bubble corners.
+    children.add(widget.mediaSlot!);
+
+    // (4) Caption text under the media.
+    if (_message.hasText) {
+      children.add(padH(_buildTextBody(fg), top: ChatSpacing.xs));
+    }
+
+    // (5) Link preview under the text.
+    if (widget.linkPreviewSlot != null) {
+      children.add(padH(widget.linkPreviewSlot!, top: ChatSpacing.xs));
+    }
+
+    // (6) Meta row — only when a caption exists (the media overlays its own
+    // time/status otherwise). _buildMetaRow supplies its own top gap.
+    if (_message.hasText) {
+      children.add(padH(_buildMetaRow(fg), bottom: vPad));
+    }
 
     return children;
   }

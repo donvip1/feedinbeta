@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/media/cached_image.dart';
@@ -127,8 +128,39 @@ class MediaMessageContent extends StatelessWidget {
       return _MusicChip(media: media, isMine: message.isMine);
     }
 
-    // Image / video: gated behind the download state machine for non-own media.
+    // Incoming photos can be previewed from their signed remote URL before
+    // they are explicitly saved. Keep the download affordance visible on the
+    // preview, WhatsApp-style. Active/error download states still use the
+    // state-machine tiles so progress and retry remain unambiguous.
+    // A caption-less photo/video overlays its own timestamp (and, for own
+    // messages, delivery ticks) on the image bottom-right — the enclosing
+    // bubble drops its separate meta row for these (see [wantsFullBleed]). When
+    // a caption is present the bubble owns the meta row and no overlay is drawn.
+    final Widget? metaOverlay = message.hasText
+        ? null
+        : _MediaMetaOverlay(message: message);
+
     if (!_isReady) {
+      final canPreviewRemote =
+          media.downloadState == MediaDownloadState.idle &&
+          ((media.thumbnailUrl?.isNotEmpty ?? false) ||
+              (media.remoteUrl?.isNotEmpty ?? false));
+      if (canPreviewRemote && media.kind == ChatMediaKind.image) {
+        return _ImageThumbnail(
+          media: media,
+          onTap: onOpenViewer,
+          onDownload: onDownload,
+          metaOverlay: metaOverlay,
+        );
+      }
+      if (canPreviewRemote && media.kind == ChatMediaKind.video) {
+        return _VideoThumbnail(
+          media: media,
+          onTap: onOpenViewer,
+          onDownload: onDownload,
+          metaOverlay: metaOverlay,
+        );
+      }
       return _DownloadGate(
         media: media,
         isMine: message.isMine,
@@ -138,9 +170,39 @@ class MediaMessageContent extends StatelessWidget {
     }
 
     if (media.kind == ChatMediaKind.video) {
-      return _VideoThumbnail(media: media, onTap: onOpenViewer);
+      return _VideoThumbnail(
+        media: media,
+        onTap: onOpenViewer,
+        metaOverlay: metaOverlay,
+      );
     }
-    return _ImageThumbnail(media: media, onTap: onOpenViewer);
+    return _ImageThumbnail(
+      media: media,
+      onTap: onOpenViewer,
+      metaOverlay: metaOverlay,
+    );
+  }
+
+  /// Whether this message's media renders as an edge-to-edge photo/video
+  /// thumbnail (as opposed to an inset card/tile). The bubble reads this to drop
+  /// its inner padding so the media bleeds to the rounded corners, and to
+  /// suppress its meta row for caption-less media. MUST stay in sync with the
+  /// thumbnail branches in [build].
+  static bool wantsFullBleed(ChatMessageView message) {
+    final media = message.media;
+    if (media == null) return false;
+    if (message.isDeletedForEveryone) return false;
+    if (message.viewOnce) return false;
+    if (media.kind != ChatMediaKind.image &&
+        media.kind != ChatMediaKind.video) {
+      return false;
+    }
+    final isReady = message.isMine || media.isReady;
+    final canPreviewRemote =
+        media.downloadState == MediaDownloadState.idle &&
+        ((media.thumbnailUrl?.isNotEmpty ?? false) ||
+            (media.remoteUrl?.isNotEmpty ?? false));
+    return isReady || canPreviewRemote;
   }
 }
 
@@ -149,22 +211,47 @@ class MediaMessageContent extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ImageThumbnail extends StatelessWidget {
-  const _ImageThumbnail({required this.media, this.onTap});
+  const _ImageThumbnail({
+    required this.media,
+    this.onTap,
+    this.onDownload,
+    this.metaOverlay,
+  });
 
   final MessageMedia media;
   final VoidCallback? onTap;
+  final VoidCallback? onDownload;
+
+  /// Timestamp/status pill shown bottom-right for caption-less media.
+  final Widget? metaOverlay;
 
   @override
   Widget build(BuildContext context) {
     return _FramedThumbnail(
       onTap: onTap,
+      dimensionProvider: _dimensionProvider(media),
       image: _MediaImage(media: media, preferLocal: true),
-      overlay: _BottomChromeOverlay(
-        icon: Icons.image_outlined,
-        sizeBytes: media.fileSizeBytes,
-        onMaximize: onTap,
-      ),
+      overlay: _buildOverlay(),
     );
+  }
+
+  /// Ready media shows only a self-backed time pill (no dark scrim, no
+  /// maximize button — a tap opens the viewer). Not-yet-saved incoming media
+  /// keeps a download affordance on the right.
+  Widget? _buildOverlay() {
+    final download = onDownload;
+    if (download != null) {
+      return _MediaBottomBar(
+        left: metaOverlay,
+        right: _RoundIconButton(
+          onTap: download,
+          icon: Icons.download_rounded,
+          tooltip: 'Download',
+        ),
+      );
+    }
+    if (metaOverlay != null) return _MediaBottomBar(right: metaOverlay);
+    return null;
   }
 }
 
@@ -173,20 +260,29 @@ class _ImageThumbnail extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _VideoThumbnail extends StatelessWidget {
-  const _VideoThumbnail({required this.media, this.onTap});
+  const _VideoThumbnail({
+    required this.media,
+    this.onTap,
+    this.onDownload,
+    this.metaOverlay,
+  });
 
   final MessageMedia media;
   final VoidCallback? onTap;
+  final VoidCallback? onDownload;
+
+  /// Timestamp/status pill shown bottom-right for caption-less media.
+  final Widget? metaOverlay;
 
   @override
   Widget build(BuildContext context) {
     // Poster: prefer an explicit thumbnail; fall back to the (possibly local)
     // media frame so we still show *something*. No VideoPlayer is created here.
-    final Widget poster = media.thumbnailUrl != null
+    final Widget poster = media.thumbnailUrl?.isNotEmpty == true
         ? CachedImage(
             url: media.thumbnailUrl!,
             fit: BoxFit.cover,
-            width: double.infinity,
+            placeholder: const _ShimmerBox(),
             errorWidget: const _ThumbFallback(icon: Icons.movie_outlined),
           )
         : _MediaImage(
@@ -197,18 +293,35 @@ class _VideoThumbnail extends StatelessWidget {
 
     return _FramedThumbnail(
       onTap: onTap,
+      fallbackAspectRatio: 16 / 9,
+      dimensionProvider: _dimensionProvider(media, preferThumbnail: true),
       image: poster,
       foreground: const Center(child: _PlayBadge()),
-      // Web uses a flat black/25 scrim behind the play badge for videos.
+      // A soft flat scrim keeps the play badge legible over any poster.
       scrim: const DecoratedBox(
-        decoration: BoxDecoration(color: Color(0x40000000)),
+        decoration: BoxDecoration(color: Color(0x33000000)),
       ),
-      overlay: _BottomChromeOverlay(
-        icon: Icons.movie_outlined,
-        sizeBytes: media.fileSizeBytes,
-        onMaximize: onTap,
-      ),
+      overlay: _buildOverlay(),
     );
+  }
+
+  Widget? _buildOverlay() {
+    // A duration pill (when the model carries one) sits bottom-left; the
+    // download button or the time pill sits bottom-right.
+    final durationText = formatMediaDuration(media.audioDurationMs);
+    final Widget? left = durationText.isEmpty
+        ? null
+        : _DurationPill(text: durationText);
+    final download = onDownload;
+    final Widget? right = download != null
+        ? _RoundIconButton(
+            onTap: download,
+            icon: Icons.download_rounded,
+            tooltip: 'Download',
+          )
+        : metaOverlay;
+    if (left == null && right == null) return null;
+    return _MediaBottomBar(left: left, right: right);
   }
 }
 
@@ -219,16 +332,23 @@ class _PlayBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40,
-      height: 40,
+      width: 52,
+      height: 52,
       decoration: const BoxDecoration(
-        color: Color(0x40FFFFFF),
+        color: Color(0x59000000),
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       alignment: Alignment.center,
       child: const Padding(
-        padding: EdgeInsets.only(left: 2),
-        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+        padding: EdgeInsets.only(left: 3),
+        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
       ),
     );
   }
@@ -238,13 +358,33 @@ class _PlayBadge extends StatelessWidget {
 // Shared framed thumbnail shell (used by image + video)
 // ---------------------------------------------------------------------------
 
-class _FramedThumbnail extends StatelessWidget {
+ImageProvider<Object>? _dimensionProvider(
+  MessageMedia media, {
+  bool preferThumbnail = false,
+}) {
+  final localPath = media.localPath;
+  if (localPath != null && localPath.isNotEmpty) {
+    final file = File(localPath);
+    if (file.existsSync()) return FileImage(file);
+  }
+  final remoteUrl = preferThumbnail && (media.thumbnailUrl?.isNotEmpty ?? false)
+      ? media.thumbnailUrl
+      : media.remoteUrl;
+  if (remoteUrl != null && remoteUrl.isNotEmpty) {
+    return CachedNetworkImageProvider(remoteUrl);
+  }
+  return null;
+}
+
+class _FramedThumbnail extends StatefulWidget {
   const _FramedThumbnail({
     required this.image,
     this.overlay,
     this.foreground,
     this.scrim,
     this.onTap,
+    this.dimensionProvider,
+    this.fallbackAspectRatio = 4 / 3,
   });
 
   final Widget image;
@@ -259,54 +399,117 @@ class _FramedThumbnail extends StatelessWidget {
   final Widget? scrim;
 
   final VoidCallback? onTap;
+  final ImageProvider<Object>? dimensionProvider;
+  final double fallbackAspectRatio;
+
+  @override
+  State<_FramedThumbnail> createState() => _FramedThumbnailState();
+}
+
+class _FramedThumbnailState extends State<_FramedThumbnail> {
+  ImageStream? _dimensionStream;
+  ImageStreamListener? _dimensionListener;
+  late double _aspectRatio;
+
+  @override
+  void initState() {
+    super.initState();
+    _aspectRatio = widget.fallbackAspectRatio;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolveDimensions();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FramedThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dimensionProvider != widget.dimensionProvider) {
+      _aspectRatio = widget.fallbackAspectRatio;
+      _resolveDimensions();
+    }
+  }
+
+  void _resolveDimensions() {
+    _removeDimensionListener();
+    final provider = widget.dimensionProvider;
+    if (provider == null) return;
+    final stream = provider.resolve(createLocalImageConfiguration(context));
+    final listener = ImageStreamListener((image, synchronousCall) {
+      final width = image.image.width;
+      final height = image.image.height;
+      if (width <= 0 || height <= 0 || !mounted) return;
+      final ratio = width / height;
+      if (ratio == _aspectRatio) return;
+      if (synchronousCall) {
+        _aspectRatio = ratio;
+      } else {
+        setState(() => _aspectRatio = ratio);
+      }
+    });
+    _dimensionStream = stream;
+    _dimensionListener = listener;
+    stream.addListener(listener);
+  }
+
+  void _removeDimensionListener() {
+    final stream = _dimensionStream;
+    final listener = _dimensionListener;
+    if (stream != null && listener != null) stream.removeListener(listener);
+    _dimensionStream = null;
+    _dimensionListener = null;
+  }
+
+  @override
+  void dispose() {
+    _removeDimensionListener();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.all(Radius.circular(ChatRadii.md)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: MediaMessageContent._thumbMaxWidth,
-            maxHeight: MediaMessageContent._thumbMaxHeight,
-            minWidth: 120,
-            minHeight: 90,
-          ),
-          child: Material(
-            color: ChatColors.muted,
-            child: InkWell(
-              onTap: onTap,
-              child: Stack(
-                fit: StackFit.passthrough,
-                children: [
-                  Positioned.fill(
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      clipBehavior: Clip.hardEdge,
-                      child: image,
-                    ),
+    // The media renders edge-to-edge and square; the enclosing bubble clips it
+    // to the grouped bubble radius (see [MediaMessageContent.wantsFullBleed]).
+    // The chrome is intentionally minimal — self-backed pills over a clean
+    // image rather than a full dark gradient.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        maxWidth: MediaMessageContent._thumbMaxWidth,
+        maxHeight: MediaMessageContent._thumbMaxHeight,
+        minWidth: 120,
+        minHeight: 90,
+      ),
+      // A bounded aspect-ratio shell is important here. The previous FittedBox
+      // received an image with `width: double.infinity`, which left the Stack
+      // with unbounded/intrinsic constraints and produced an empty portrait
+      // frame after an attachment was sent. A 4:3 shell is a safe fallback
+      // until intrinsic media dimensions are available; the provider then
+      // updates it to the media's true ratio.
+      child: AspectRatio(
+        aspectRatio: _aspectRatio.clamp(0.55, 2.2),
+        child: Material(
+          color: ChatColors.muted,
+          child: InkWell(
+            onTap: widget.onTap,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Positioned.fill supplies finite constraints to both local
+                // Image.file and CachedNetworkImage providers.
+                Positioned.fill(child: widget.image),
+                if (widget.scrim != null) Positioned.fill(child: widget.scrim!),
+                if (widget.foreground != null)
+                  Positioned.fill(child: widget.foreground!),
+                if (widget.overlay != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: widget.overlay!,
                   ),
-                  if (scrim != null) Positioned.fill(child: scrim!),
-                  // Top-to-bottom dark gradient so the chip/buttons stay legible.
-                  const Positioned.fill(
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [Color(0x4D000000), Color(0x00000000)],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (foreground != null) Positioned.fill(child: foreground!),
-                  if (overlay != null)
-                    Positioned(left: 0, right: 0, bottom: 0, child: overlay!),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -337,7 +540,6 @@ class _MediaImage extends StatelessWidget {
       return Image.file(
         File(localPath),
         fit: BoxFit.cover,
-        width: double.infinity,
         errorBuilder: (_, __, ___) => _remoteOrFallback(remoteUrl),
       );
     }
@@ -349,8 +551,7 @@ class _MediaImage extends StatelessWidget {
       return CachedImage(
         url: remoteUrl,
         fit: BoxFit.cover,
-        width: double.infinity,
-        placeholderColor: ChatColors.muted,
+        placeholder: const _ShimmerBox(),
         errorWidget: _ThumbFallback(icon: fallbackIcon),
       );
     }
@@ -368,8 +569,6 @@ class _ThumbFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: MediaMessageContent._thumbMaxWidth,
-      height: 160,
       color: ChatColors.muted,
       alignment: Alignment.center,
       child: Icon(icon, color: ChatColors.mutedForeground, size: 28),
@@ -377,64 +576,221 @@ class _ThumbFallback extends StatelessWidget {
   }
 }
 
-/// Bottom-edge chrome: a translucent size chip on the left, a maximize button
-/// on the right.
-class _BottomChromeOverlay extends StatelessWidget {
-  const _BottomChromeOverlay({
-    required this.icon,
-    required this.sizeBytes,
-    this.onMaximize,
-  });
+/// Bottom-edge overlay bar: an optional pill on the left (duration) and an
+/// optional widget on the right (download button or the time/status pill).
+/// Padded off the image edges; each child carries its own translucent
+/// background so no full-bleed dark scrim is needed.
+class _MediaBottomBar extends StatelessWidget {
+  const _MediaBottomBar({this.left, this.right});
 
-  final IconData icon;
-  final int? sizeBytes;
-  final VoidCallback? onMaximize;
+  final Widget? left;
+  final Widget? right;
 
   @override
   Widget build(BuildContext context) {
-    final sizeText = formatFileSize(sizeBytes);
     return Padding(
       padding: const EdgeInsets.all(6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: const BoxDecoration(
-              color: Color(0x66000000),
-              borderRadius: ChatRadii.chip,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 10, color: const Color(0xE6FFFFFF)),
-                if (sizeText.isNotEmpty) ...[
-                  const SizedBox(width: 3),
-                  Text(
-                    sizeText,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xE6FFFFFF),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          _RoundIconButton(onTap: onMaximize),
+          if (left != null) left!,
+          const Spacer(),
+          if (right != null) right!,
         ],
       ),
     );
   }
 }
 
+/// Timestamp (+ edited + delivery ticks for own messages) rendered as a
+/// self-backed pill over caption-less media, mirroring the bubble meta row the
+/// enclosing bubble suppresses for this case.
+class _MediaMetaOverlay extends StatelessWidget {
+  const _MediaMetaOverlay({required this.message});
+
+  final ChatMessageView message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: const BoxDecoration(
+        color: Color(0x59000000),
+        borderRadius: ChatRadii.chip,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (message.isEdited) ...[
+            const Text(
+              'edited',
+              style: TextStyle(
+                fontSize: 10,
+                fontStyle: FontStyle.italic,
+                color: Color(0xCCFFFFFF),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            _formatClock(message.createdAtMillis),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xE6FFFFFF),
+            ),
+          ),
+          if (message.isMine) ...[
+            const SizedBox(width: 4),
+            _MediaStatusGlyph(state: message.deliveryState),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Delivery-status tick tinted for legibility over media (white pre-read, sky
+/// once read, red on failure) — same mapping as the bubble meta row.
+class _MediaStatusGlyph extends StatelessWidget {
+  const _MediaStatusGlyph({required this.state});
+
+  final DeliveryState state;
+
+  @override
+  Widget build(BuildContext context) {
+    const double size = 13;
+    switch (state) {
+      case DeliveryState.pending:
+        return const Icon(Icons.schedule, size: size, color: Color(0xB3FFFFFF));
+      case DeliveryState.sent:
+        return const Icon(Icons.check, size: size, color: Color(0xE6FFFFFF));
+      case DeliveryState.delivered:
+        return const Icon(
+          Icons.done_all,
+          size: size,
+          color: Color(0xE6FFFFFF),
+        );
+      case DeliveryState.read:
+        return const Icon(
+          Icons.done_all,
+          size: size,
+          color: ChatColors.readTick,
+        );
+      case DeliveryState.failed:
+        return const Icon(
+          Icons.error_outline,
+          size: size,
+          color: ChatColors.destructive,
+        );
+    }
+  }
+}
+
+/// A play-glyph + duration pill shown bottom-left of a video poster (only when
+/// the model carries a duration).
+class _DurationPill extends StatelessWidget {
+  const _DurationPill({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: const BoxDecoration(
+        color: Color(0x59000000),
+        borderRadius: ChatRadii.chip,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.play_arrow_rounded,
+            size: 11,
+            color: Color(0xE6FFFFFF),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xE6FFFFFF),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Inline HH:mm formatter (avoids a date package dependency).
+String _formatClock(int millis) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
+  return '$hh:$mm';
+}
+
+/// A lightweight, dependency-free shimmer shown while a remote thumbnail loads:
+/// a highlight band sweeping across the muted bubble fill.
+class _ShimmerBox extends StatefulWidget {
+  const _ShimmerBox();
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final shift = (_controller.value * 2) - 1; // -1 .. 1
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(shift - 1, -0.2),
+              end: Alignment(shift + 1, 0.2),
+              colors: const [
+                Color(0xFF1E293B),
+                Color(0xFF2A3A4F),
+                Color(0xFF1E293B),
+              ],
+              stops: const [0.35, 0.5, 0.65],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Small translucent circular maximize button used in the bottom chrome.
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({this.onTap});
+  const _RoundIconButton({
+    this.onTap,
+    this.icon = Icons.fullscreen_rounded,
+    this.tooltip = 'Open',
+  });
 
   final VoidCallback? onTap;
+  final IconData icon;
+  final String tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -444,10 +800,13 @@ class _RoundIconButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: const SizedBox(
+        child: SizedBox(
           width: 24,
           height: 24,
-          child: Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+          child: Tooltip(
+            message: tooltip,
+            child: Icon(icon, size: 14, color: Colors.white),
+          ),
         ),
       ),
     );
