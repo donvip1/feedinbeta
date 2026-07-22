@@ -6,8 +6,16 @@ import '../../../../core/media/cached_image.dart';
 import '../chat_theme.dart';
 import '../chat_view_models.dart';
 
-/// Bottom input area for the 1:1 chat surface, ported for visual parity with
-/// the web `ModernChatInterface` composer (src/components/messages).
+class ComposerMention {
+  const ComposerMention({required this.displayName, required this.handle});
+
+  final String displayName;
+  final String handle;
+}
+
+/// Bottom input area for the native 1:1 chat surface. Its structure mirrors the
+/// supplied modern slate chat reference while preserving the existing native
+/// callbacks, typing debounce, reply state, attachments, and voice-note flow.
 ///
 /// Two stacked parts:
 ///  * TOP — the reply preview bar (only when [replyPreview] is non-null): a
@@ -16,8 +24,8 @@ import '../chat_view_models.dart';
 ///    content (or a media placeholder), and a trailing close button.
 ///  * BOTTOM — a rounded pill ([ChatColors.input] fill, [ChatRadii.pill],
 ///    subtle border) holding a leading "+" attach button, a multiline text
-///    field, an emoji button, and a right action that swaps between a circular
-///    gradient Send button (when there is text or pending media) and a Mic
+///    field, an emoji button, and a right action that swaps between a rounded
+///    sky Send button (when there is text or pending media) and a Mic
 ///    button (when empty).
 ///
 /// Intentionally omitted (per scope): gift, sticker, schedule, and AI sparkle
@@ -37,6 +45,7 @@ class ChatComposer extends StatefulWidget {
     this.onEmoji,
     this.onCancelReply,
     this.onTypingChanged,
+    this.mentionSuggestions = const [],
   });
 
   /// The shared text controller owned by the screen. The composer listens to it
@@ -69,6 +78,9 @@ class ChatComposer extends StatefulWidget {
   /// Debounced typing signal: `true` on the first keystroke of an active burst,
   /// `false` after ~3s idle or once the field becomes empty.
   final void Function(bool isActive)? onTypingChanged;
+
+  /// Participants offered when the current token starts with `@`.
+  final List<ComposerMention> mentionSuggestions;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -108,8 +120,9 @@ class _ChatComposerState extends State<ChatComposer> {
   void _handleTextChanged() {
     final hasText = widget.controller.text.trim().isNotEmpty;
     if (hasText != _hasText) {
-      setState(() => _hasText = hasText);
+      _hasText = hasText;
     }
+    if (mounted) setState(() {});
 
     if (hasText) {
       // First keystroke of a burst -> emit active.
@@ -151,6 +164,32 @@ class _ChatComposerState extends State<ChatComposer> {
 
   bool get _showSend => _hasText || widget.hasPendingMedia;
 
+  List<ComposerMention> get _visibleMentions {
+    final text = widget.controller.text;
+    final match = RegExp(r'(?:^|\s)@([\w]*)$').firstMatch(text);
+    if (match == null) return const [];
+    final query = (match.group(1) ?? '').toLowerCase();
+    return widget.mentionSuggestions
+        .where(
+          (mention) =>
+              mention.handle.toLowerCase().contains(query) ||
+              mention.displayName.toLowerCase().contains(query),
+        )
+        .take(5)
+        .toList(growable: false);
+  }
+
+  void _insertMention(ComposerMention mention) {
+    final text = widget.controller.text;
+    final at = text.lastIndexOf('@');
+    if (at < 0) return;
+    final next = '${text.substring(0, at)}@${mention.handle} ';
+    widget.controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -158,7 +197,7 @@ class _ChatComposerState extends State<ChatComposer> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: ChatColors.background,
+        color: ChatColors.card,
         border: Border(top: BorderSide(color: ChatColors.border, width: 0.5)),
       ),
       child: Padding(
@@ -174,6 +213,11 @@ class _ChatComposerState extends State<ChatComposer> {
                 preview: widget.replyPreview!,
                 onCancel: widget.onCancelReply,
               ),
+            if (_visibleMentions.isNotEmpty)
+              _MentionSuggestions(
+                mentions: _visibleMentions,
+                onSelected: _insertMention,
+              ),
             _InputRow(
               controller: widget.controller,
               showSend: _showSend,
@@ -185,6 +229,74 @@ class _ChatComposerState extends State<ChatComposer> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MentionSuggestions extends StatelessWidget {
+  const _MentionSuggestions({required this.mentions, required this.onSelected});
+
+  final List<ComposerMention> mentions;
+  final ValueChanged<ComposerMention> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxHeight: 176),
+      margin: const EdgeInsets.fromLTRB(
+        ChatSpacing.md,
+        ChatSpacing.sm,
+        ChatSpacing.md,
+        0,
+      ),
+      decoration: BoxDecoration(
+        color: ChatColors.popover,
+        borderRadius: BorderRadius.circular(ChatRadii.md),
+        border: Border.all(color: ChatColors.border),
+        boxShadow: ChatShadows.sheet,
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: ChatSpacing.xs),
+        itemCount: mentions.length,
+        itemBuilder: (context, index) {
+          final mention = mentions[index];
+          return ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            leading: CircleAvatar(
+              radius: 15,
+              backgroundColor: ChatColors.primaryFaint,
+              child: Text(
+                mention.displayName.isEmpty
+                    ? '@'
+                    : mention.displayName.characters.first.toUpperCase(),
+                style: const TextStyle(
+                  color: ChatColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            title: Text(
+              '@${mention.handle}',
+              style: const TextStyle(
+                color: ChatColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              mention.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ChatTextStyles.subtitle,
+            ),
+            onTap: () => onSelected(mention),
+          );
+        },
       ),
     );
   }
@@ -379,18 +491,23 @@ class _InputRow extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: ChatColors.input,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(ChatRadii.pill),
-                ),
+                color: ChatColors.composerFill,
+                borderRadius: const BorderRadius.all(Radius.circular(18)),
                 border: Border.all(color: ChatColors.border, width: 0.5),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
               ),
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _PillIconButton(
-                    icon: Icons.add,
+                    icon: Icons.attach_file_rounded,
                     tooltip: 'Attach',
                     onPressed: onAttach,
                   ),
@@ -409,7 +526,7 @@ class _InputRow extends StatelessWidget {
                         onSubmitted: onSubmitted,
                         decoration: const InputDecoration(
                           isDense: true,
-                          hintText: 'Message',
+                          hintText: 'Write a message…',
                           hintStyle: TextStyle(
                             fontSize: 15,
                             color: ChatColors.mutedForeground,
@@ -474,7 +591,7 @@ class _PillIconButton extends StatelessWidget {
   }
 }
 
-/// The swapping right action: a circular gradient Send button when there is
+/// The swapping right action: a rounded gradient Send button when there is
 /// content, or a flat Mic button when the field is empty.
 class _RightAction extends StatelessWidget {
   const _RightAction({
@@ -514,23 +631,25 @@ class _SendButton extends StatelessWidget {
       label: 'Send',
       child: Material(
         type: MaterialType.transparency,
-        shape: const CircleBorder(),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ChatRadii.md),
+        ),
         clipBehavior: Clip.antiAlias,
         child: Ink(
           decoration: const BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.all(Radius.circular(ChatRadii.md)),
             gradient: ChatGradients.sendAction,
             boxShadow: ChatShadows.pink,
           ),
           child: InkWell(
             onTap: onPressed,
-            customBorder: const CircleBorder(),
+            borderRadius: BorderRadius.circular(ChatRadii.md),
             child: const SizedBox(
               width: ChatSpacing.tapTarget,
               height: ChatSpacing.tapTarget,
               child: Icon(
-                Icons.arrow_upward,
-                size: 22,
+                Icons.send_rounded,
+                size: 20,
                 color: ChatColors.primaryForeground,
               ),
             ),

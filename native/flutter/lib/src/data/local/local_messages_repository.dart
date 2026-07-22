@@ -194,6 +194,7 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    String? caption,
     bool viewOnce = false,
     int? expiresAtMillis,
   }) async {
@@ -201,11 +202,14 @@ class LocalMessagesRepository implements LocalMessagesRepositoryContract {
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final kind = mediaType.trim().isEmpty ? 'file' : mediaType.trim();
+    final trimmedCaption = caption?.trim();
     final message = LocalMessage(
       id: const Uuid().v4(),
       conversationId: conversationId,
       senderName: senderName,
-      body: viewOnce ? 'Photo · View once' : _attachmentPreview(kind),
+      body: trimmedCaption != null && trimmedCaption.isNotEmpty
+          ? trimmedCaption
+          : (viewOnce ? 'Photo · View once' : _attachmentPreview(kind)),
       createdAtMillis: now,
       deliveryState: MessageDeliveryState.pending,
       messageType: kind,

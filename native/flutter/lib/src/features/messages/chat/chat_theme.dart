@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Design tokens for the 1:1 chat experience, ported 1:1 from the web app's
-/// dark-mode CSS variables (src/index.css) and tailwind.config.ts.
+/// Design tokens for the native chat experience.
 ///
-/// Everything here is `const` and depends only on the Flutter SDK so it
-/// analyzes cleanly on its own and can be shared by every chat widget without
-/// reaching into [Theme.of] (the existing app theme primary `#FF3D9A` is close
-/// but NOT exact — the web messaging surface uses `#F04299`).
+/// The palette deliberately follows the modern slate/sky visual language used
+/// by the native messaging concept instead of inheriting Feedin's pink social
+/// surfaces. Everything remains `const` and Flutter-only so every messaging
+/// widget can share the same predictable dark theme.
 ///
 /// Usage:
 ///   color: ChatColors.primary,
@@ -16,30 +15,33 @@ import 'package:flutter/material.dart';
 class ChatColors {
   const ChatColors._();
 
-  // Brand / primary.
-  static const Color primary = Color(0xFFF04299); // hsl(330 85% 60%)
+  // Brand / primary (Telegram-inspired sky blue).
+  static const Color primary = Color(0xFF2481CC);
   static const Color primaryForeground = Color(0xFFFFFFFF);
-  static const Color primaryGlow = Color(0xFFF0759E); // hsl(340 80% 70%)
-  static const Color accent = Color(0xFFE963BC); // hsl(320 75% 65%)
+  static const Color primaryGlow = Color(0xFF38BDF8); // sky-400
+  static const Color accent = Color(0xFF38BDF8);
 
-  // Surfaces.
-  static const Color background = Color(0xFF080C16); // hsl(222 47% 6%)
-  static const Color card = Color(0xFF0B111E); // hsl(222 47% 8%)
-  static const Color popover = Color(0xFF0B111E);
+  // Surfaces (Tailwind slate-950 / slate-900 / slate-800).
+  static const Color background = Color(0xFF020617);
+  static const Color card = Color(0xFF0F172A);
+  static const Color popover = Color(0xFF0F172A);
 
-  // Neutrals (muted == secondary == border == input in dark mode).
-  static const Color muted = Color(0xFF1D283A); // hsl(217 33% 17%)
-  static const Color secondary = Color(0xFF1D283A);
-  static const Color border = Color(0xFF1D283A);
-  static const Color input = Color(0xFF1D283A);
+  // Neutrals.
+  static const Color muted = Color(0xFF1E293B);
+  static const Color secondary = Color(0xFF1E293B);
+  static const Color border = Color(0xFF1E293B);
+  static const Color input = Color(0xFF1E293B);
+  static const Color composerFill = Color(0xE61E293B);
+  static const Color threadMidpoint = Color(0x66111C30);
 
   // Text.
-  static const Color foreground = Color(0xFFF8FAFC); // hsl(210 40% 98%)
-  static const Color mutedForeground = Color(0xFF94A3B8); // hsl(215 20% 65%)
+  static const Color foreground = Color(0xFFF1F5F9); // slate-100
+  static const Color mutedForeground = Color(0xFF94A3B8); // slate-400
+  static const Color subtleForeground = Color(0xFF64748B); // slate-500
 
   // Status / accents.
   static const Color destructive = Color(0xFFEF4343); // hsl(0 84% 60%)
-  static const Color readTick = Color(0xFF7DD3FC); // sky-300, read receipts
+  static const Color readTick = Color(0xFF7DD3FC); // sky-300
   static const Color online = Color(0xFF10B981); // emerald-500 online dot
   static const Color activeNow = Color(0xFF38BDF8); // sky-400 'Active now'
   static const Color amberWarning = Color(0xFFF59E0B); // amber-500 warnings
@@ -47,63 +49,61 @@ class ChatColors {
 
   // Translucent helpers (precomputed; avoid runtime withOpacity in const ctx).
   static const Color barrier = Color(0x80000000); // black/50 modal backdrop
-  static const Color primaryFaint = Color(0x1AF04299); // primary @ 10%
-  static const Color primarySoft = Color(
-    0x33F04299,
-  ); // primary @ 20% (search hl)
+  static const Color primaryFaint = Color(0x1A38BDF8); // sky-400 @ 10%
+  static const Color primarySoft = Color(0x3338BDF8); // sky-400 @ 20%
   static const Color onlineRing = background; // dot border matches bg
 
-  // The other-user bubble surface (card with a subtle border).
-  static const Color incomingBubble = card;
-  static const Color incomingBubbleBorder = border;
+  // Bubble surfaces.
+  static const Color outgoingBubble = Color(0xFF2481CC);
+  static const Color incomingBubble = Color(0xFF1E293B);
+  static const Color incomingBubbleBorder = Color(0xFF334155);
 
-  // Inbox card-row surfaces. The web `TikTokConversationItem` frames every row
-  // as a rounded card: a faint `bg-muted/20` fill with a `border-border/40`
-  // hairline, swapping to a primary wash + ring when selected.
-  static const Color rowCard = Color(0x331D283A); // muted @ 20%
-  static const Color rowCardBorder = Color(0x661D283A); // border @ 40%
-  static const Color rowCardSelectedBorder = Color(0x33F04299); // primary @ 20%
-  static const Color incomingBubbleBorderSoft = Color(0x801D283A); // border/50
+  // Inbox row surfaces. Unread and selected states gain contrast without
+  // becoming detached cards, which keeps long native lists calm and scannable.
+  static const Color rowCard = Color(0x520F172A); // slate-900 @ 32%
+  static const Color rowCardUnread = Color(0xCC172033);
+  static const Color rowCardSelected = Color(0xE61E293B); // slate-800 @ 90%
+  static const Color rowCardBorder = Color(0x661E293B);
+  static const Color rowCardSelectedBorder = Color(0x8038BDF8);
+  static const Color incomingBubbleBorderSoft = Color(0x80334155);
 }
 
-/// Linear gradients matching the web `--gradient-*` tokens.
+/// Restrained gradients used for emphasis within the slate chat surface.
 class ChatGradients {
   const ChatGradients._();
 
-  /// Outgoing bubble + send FAB. Web `--gradient-accent`
-  /// (135deg #F04299 -> #BB67E4) is used for the send action; the outgoing
-  /// bubble itself uses `--gradient-primary` (135deg #F04299 -> #ED5E76).
+  /// Telegram-blue outgoing bubble with a subtle sky lift.
   static const LinearGradient outgoingBubble = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF04299), Color(0xFFED5E76)],
+    colors: [Color(0xFF2481CC), Color(0xFF0EA5E9)],
   );
 
   static const LinearGradient sendAction = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF04299), Color(0xFFBB67E4)],
+    colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
   );
 
-  /// Pink -> blue voice-note send button (parity with VoiceRecorder send).
+  /// Blue -> cyan voice-note send button.
   static const LinearGradient voiceSend = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
-    colors: [Color(0xFFF04299), Color(0xFF3B82F6)],
+    colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
   );
 
   /// Avatar initials fallback fill.
   static const LinearGradient avatarFallback = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF04299), Color(0xFFE963BC)],
+    colors: [Color(0xFF0369A1), Color(0xFF38BDF8)],
   );
 
-  /// Stories ring (45deg #FF3399 -> #F42547 -> #FF7733).
+  /// Modern avatar/story ring.
   static const LinearGradient story = LinearGradient(
     begin: Alignment.bottomLeft,
     end: Alignment.topRight,
-    colors: [Color(0xFFFF3399), Color(0xFFF42547), Color(0xFFFF7733)],
+    colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9), Color(0xFF14B8A6)],
   );
 }
 
@@ -116,7 +116,8 @@ class ChatRadii {
   static const double sm = 8;
   static const double pill = 999;
   static const double sheet = 16; // mobile bottom sheet rounded-t-2xl
-  static const double grouped = 6; // tail corner for grouped bubbles (rounded-md)
+  static const double grouped =
+      6; // tail corner for grouped bubbles (rounded-md)
   static const double bubbleRadius = 16; // web rounded-2xl
   static const double rowCard = 12; // web inbox row rounded-xl
 
@@ -165,20 +166,20 @@ class ChatRadii {
 class ChatShadows {
   const ChatShadows._();
 
-  /// shadow-pink: 0 4px 20px rgba(#F04299, .25)
+  /// Backward-compatible name used by existing widgets; now a sky-blue glow.
   static const List<BoxShadow> pink = [
-    BoxShadow(color: Color(0x40F04299), blurRadius: 20, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x402481CC), blurRadius: 18, offset: Offset(0, 4)),
   ];
 
-  /// shadow-glow: 0 0 40px rgba(#F0759E, .5)
+  /// Focus glow for elevated primary controls.
   static const List<BoxShadow> glow = [
-    BoxShadow(color: Color(0x80F0759E), blurRadius: 40),
+    BoxShadow(color: Color(0x6638BDF8), blurRadius: 36),
   ];
 
-  /// shadow-elegant: 0 10px 30px -10px rgba(#F04299, .4)
+  /// Soft blue elevation for selected/highlighted surfaces.
   static const List<BoxShadow> elegant = [
     BoxShadow(
-      color: Color(0x66F04299),
+      color: Color(0x522481CC),
       blurRadius: 30,
       spreadRadius: -10,
       offset: Offset(0, 10),
@@ -205,10 +206,10 @@ class ChatSpacing {
   static const double listItemMinHeight = 52;
   static const double headerHeight = 56; // h-14
   static const double avatarSm = 28; // 7x7 bubble avatar (~28px)
-  static const double avatarMd = 44; // inbox row avatar (web w-11 h-11)
+  static const double avatarMd = 50; // prominent native inbox avatar
   static const double avatarLg = 48; // header avatar
   static const double onlineDot = 12; // header presence dot
-  static const double inboxOnlineDot = 16; // inbox row dot (web w-4 h-4)
+  static const double inboxOnlineDot = 14;
   static const double bubbleMaxWidthFraction = 0.75; // maxWidth 75%
   static const double scrollAwayThreshold = 150; // px before FAB shows
 }
@@ -233,9 +234,9 @@ class ChatTextStyles {
   );
 
   static const TextStyle conversationName = TextStyle(
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.2,
+    letterSpacing: -0.15,
     color: ChatColors.foreground,
   );
 
@@ -247,18 +248,21 @@ class ChatTextStyles {
 
   static const TextStyle previewMuted = TextStyle(
     fontSize: 13,
+    height: 1.25,
     color: ChatColors.mutedForeground,
   );
 
   static const TextStyle previewUnread = TextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w700,
+    height: 1.25,
     color: ChatColors.foreground,
   );
 
   static const TextStyle subtitle = TextStyle(
-    fontSize: 12,
-    color: ChatColors.mutedForeground,
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    color: ChatColors.subtleForeground,
   );
 
   static const TextStyle daySeparator = TextStyle(

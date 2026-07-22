@@ -6,11 +6,10 @@ import '../chat_view_models.dart';
 
 /// Pure presentational inbox row for the 1:1 messages list.
 ///
-/// Mirrors the web `TikTokConversationItem`: leading avatar with an online
-/// presence dot, a title row (name + verified + muted glyph + timestamp), a
-/// second line that shows either a typing/activity indicator or the last
-/// message preview (with delivery ticks when the last message is mine), and a
-/// trailing unread/pending count pill.
+/// Presents a compact native conversation row: leading avatar with online
+/// presence, name/status metadata, last-message delivery state, and unread or
+/// pending count. Selected and unread states use the slate/sky messaging theme
+/// without changing any conversation behavior.
 ///
 /// All data is supplied via [conversation] / [currentUserId]; the widget never
 /// touches Supabase or a repository. User actions are surfaced through the
@@ -60,12 +59,7 @@ class ConversationListTile extends StatelessWidget {
     // clip as the row) so the affordance reveals *within* the rounded card, not
     // the inter-card gutter.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ChatSpacing.md,
-        0,
-        ChatSpacing.md,
-        6,
-      ),
+      padding: const EdgeInsets.fromLTRB(ChatSpacing.md, 0, ChatSpacing.md, 6),
       child: ClipRRect(
         borderRadius: ChatRadii.row,
         child: Container(
@@ -98,55 +92,83 @@ class ConversationListTile extends StatelessWidget {
   }
 
   Widget _buildRow(BuildContext context) {
-    // Card-framed row matching the web `TikTokConversationItem`: every row is a
-    // rounded-xl card with a faint muted fill + hairline border, swapping to a
-    // primary wash + ring when selected. The whole card scales down slightly on
-    // press for the same tactile feel as the web `active:scale-[0.98]`.
-    final showSelection = selected;
+    final hasUnread = conversation.hasUnread;
+    final surfaceColor = selected
+        ? ChatColors.rowCardSelected
+        : hasUnread
+        ? ChatColors.rowCardUnread
+        : ChatColors.rowCard;
+    final semanticParts = <String>[
+      conversation.other.displayName,
+      if (conversation.isOnline) 'online',
+      if (conversation.isTyping) chatActivityText(conversation.activity),
+      if (hasUnread) '${conversation.unreadCount} unread',
+      if (conversation.isMuted) 'muted',
+    ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ChatSpacing.md,
-        0,
-        ChatSpacing.md,
-        6, // web mb-1.5 inter-card gap
-      ),
+      padding: const EdgeInsets.fromLTRB(ChatSpacing.sm, 2, ChatSpacing.sm, 2),
       child: _PressScale(
-        child: DecoratedBox(
+        child: AnimatedContainer(
+          key: ValueKey('conversation-row-${conversation.id}'),
+          duration: ChatMotion.normal,
+          curve: ChatMotion.emphasized,
           decoration: BoxDecoration(
-            color: showSelection ? ChatColors.primaryFaint : ChatColors.rowCard,
+            color: surfaceColor,
             borderRadius: ChatRadii.row,
             border: Border.all(
-              color: showSelection
+              color: selected
                   ? ChatColors.rowCardSelectedBorder
                   : ChatColors.rowCardBorder,
             ),
+            boxShadow: selected ? ChatShadows.elegant : null,
           ),
           child: ClipRRect(
             borderRadius: ChatRadii.row,
             child: Material(
               color: Colors.transparent,
-              child: InkWell(
-                onTap: onTap,
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minHeight: ChatSpacing.listItemMinHeight,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ChatSpacing.md,
-                    vertical: ChatSpacing.md,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _Avatar(
-                        other: conversation.other,
-                        isOnline: conversation.isOnline,
-                      ),
-                      const SizedBox(width: ChatSpacing.md),
-                      Expanded(child: _content(context)),
-                      _trailing(),
-                    ],
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: semanticParts.join(', '),
+                child: InkWell(
+                  onTap: onTap,
+                  splashColor: ChatColors.primarySoft,
+                  highlightColor: ChatColors.primaryFaint,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 72),
+                    padding: const EdgeInsets.fromLTRB(
+                      ChatSpacing.sm,
+                      10,
+                      ChatSpacing.md,
+                      10,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: ChatMotion.fast,
+                          width: 3,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? ChatColors.accent
+                                : Colors.transparent,
+                            borderRadius: ChatRadii.chip,
+                          ),
+                        ),
+                        const SizedBox(width: ChatSpacing.sm),
+                        _Avatar(
+                          other: conversation.other,
+                          isOnline: conversation.isOnline,
+                          selected: selected,
+                          surfaceColor: surfaceColor,
+                        ),
+                        const SizedBox(width: ChatSpacing.md),
+                        Expanded(child: _content(context)),
+                        _trailing(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -162,11 +184,12 @@ class ConversationListTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
-      children: [_titleRow(), const SizedBox(height: 2), _secondLine()],
+      children: [_titleRow(), const SizedBox(height: 4), _secondLine()],
     );
   }
 
   Widget _titleRow() {
+    final hasUnread = conversation.hasUnread;
     return Row(
       children: [
         Expanded(
@@ -174,12 +197,20 @@ class ConversationListTile extends StatelessWidget {
             conversation.other.displayName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: ChatTextStyles.conversationName,
+            style: hasUnread
+                ? ChatTextStyles.conversationName.copyWith(
+                    fontWeight: FontWeight.w800,
+                  )
+                : ChatTextStyles.conversationName,
           ),
         ),
         if (conversation.other.isVerified) ...[
           const SizedBox(width: ChatSpacing.xs),
-          const Icon(Icons.verified, size: 14, color: ChatColors.primary),
+          const Icon(
+            Icons.verified_rounded,
+            size: 15,
+            color: ChatColors.accent,
+          ),
         ],
         if (conversation.isMuted) ...[
           const SizedBox(width: ChatSpacing.xs),
@@ -189,10 +220,23 @@ class ConversationListTile extends StatelessWidget {
             color: ChatColors.mutedForeground,
           ),
         ],
+        if (conversation.isArchived) ...[
+          const SizedBox(width: ChatSpacing.xs),
+          const Icon(
+            Icons.archive_outlined,
+            size: 14,
+            color: ChatColors.mutedForeground,
+          ),
+        ],
         const SizedBox(width: ChatSpacing.sm),
         Text(
           _friendlyTime(conversation.updatedAtMillis),
-          style: ChatTextStyles.subtitle,
+          style: hasUnread
+              ? ChatTextStyles.subtitle.copyWith(
+                  color: ChatColors.accent,
+                  fontWeight: FontWeight.w700,
+                )
+              : ChatTextStyles.subtitle,
         ),
       ],
     );
@@ -205,7 +249,7 @@ class ConversationListTile extends StatelessWidget {
           Icon(
             _activityIcon(conversation.activity),
             size: 14,
-            color: ChatColors.primary,
+            color: ChatColors.accent,
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -216,7 +260,7 @@ class ConversationListTile extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 13,
                 fontStyle: FontStyle.italic,
-                color: ChatColors.primary,
+                color: ChatColors.accent,
               ),
             ),
           ),
@@ -295,7 +339,11 @@ class ConversationListTile extends StatelessWidget {
     if (conversation.unreadCount > 0) {
       return Padding(
         padding: const EdgeInsets.only(left: ChatSpacing.sm),
-        child: _CountPill(count: conversation.unreadCount, muted: false),
+        child: _CountPill(
+          key: ValueKey('conversation-unread-${conversation.id}'),
+          count: conversation.unreadCount,
+          muted: false,
+        ),
       );
     }
     if (conversation.pendingCount > 0) {
@@ -381,10 +429,17 @@ class _PressScaleState extends State<_PressScale> {
 /// Inbox avatar with optional network image, initials fallback and an online
 /// presence dot anchored to the bottom-right.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.other, required this.isOnline});
+  const _Avatar({
+    required this.other,
+    required this.isOnline,
+    required this.selected,
+    required this.surfaceColor,
+  });
 
   final ChatUserRef other;
   final bool isOnline;
+  final bool selected;
+  final Color surfaceColor;
 
   @override
   Widget build(BuildContext context) {
@@ -408,10 +463,22 @@ class _Avatar extends StatelessWidget {
       ),
     );
 
-    final Widget avatar = CachedCircleAvatar(
-      url: other.avatarUrl,
-      radius: size / 2,
-      fallback: fallback,
+    final Widget avatar = DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? ChatColors.accent : ChatColors.incomingBubbleBorder,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: CachedCircleAvatar(
+          url: other.avatarUrl,
+          radius: (size - 6) / 2,
+          fallback: fallback,
+        ),
+      ),
     );
 
     return SizedBox(
@@ -423,18 +490,18 @@ class _Avatar extends StatelessWidget {
           avatar,
           if (isOnline)
             Positioned(
-              right: -2,
-              bottom: -2,
+              right: -1,
+              bottom: 0,
               child: Container(
+                key: ValueKey('conversation-presence-${other.id}'),
                 width: ChatSpacing.inboxOnlineDot,
                 height: ChatSpacing.inboxOnlineDot,
                 decoration: BoxDecoration(
                   color: ChatColors.online,
                   shape: BoxShape.circle,
-                  // web border-[3px] reads against the row-card fill, not the bg.
-                  border: Border.all(color: ChatColors.rowCard, width: 3),
+                  border: Border.all(color: surfaceColor, width: 2.5),
                   boxShadow: const [
-                    BoxShadow(color: Color(0x33000000), blurRadius: 2),
+                    BoxShadow(color: Color(0x66000000), blurRadius: 4),
                   ],
                 ),
               ),
@@ -447,7 +514,7 @@ class _Avatar extends StatelessWidget {
 
 /// Rounded count badge for unread (primary, with pink glow) or pending (muted).
 class _CountPill extends StatelessWidget {
-  const _CountPill({required this.count, required this.muted});
+  const _CountPill({super.key, required this.count, required this.muted});
 
   final int count;
   final bool muted;
@@ -457,12 +524,15 @@ class _CountPill extends StatelessWidget {
     final label = count > 99 ? '99+' : '$count';
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 20),
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      constraints: const BoxConstraints(minWidth: 22),
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: muted ? ChatColors.muted : ChatColors.primary,
+        border: muted
+            ? Border.all(color: ChatColors.incomingBubbleBorder)
+            : null,
         borderRadius: ChatRadii.chip,
         boxShadow: muted ? null : ChatShadows.pink,
       ),

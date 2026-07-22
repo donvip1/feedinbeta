@@ -27,6 +27,7 @@ abstract interface class LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    String? caption,
     bool viewOnce = false,
     int? expiresAtMillis,
   });

@@ -604,6 +604,7 @@ class _MemoryMessagesRepository implements LocalMessagesRepositoryContract {
     String? mimeType,
     String? fileName,
     int? fileSizeBytes,
+    String? caption,
     bool viewOnce = false,
     int? expiresAtMillis,
   }) async {}

@@ -150,7 +150,7 @@ class SyncService implements SyncServiceContract {
           'id': message.id,
           'conversation_id': serverConversationId,
           'sender_id': userId,
-          'content': hasAttachment ? null : message.body,
+          'content': hasAttachment ? _attachmentCaption(message) : message.body,
           'message_type': hasAttachment ? message.messageType : 'text',
           'status': 'sent',
           'created_at': DateTime.fromMillisecondsSinceEpoch(
@@ -180,6 +180,19 @@ class SyncService implements SyncServiceContract {
     // data-only push (rich, grouped message notification with inline reply).
     // Best-effort: a push hiccup must never fail or retry the message replay.
     unawaited(_sendMessagePush(client, inserted['id'].toString()));
+  }
+
+  String? _attachmentCaption(LocalMessage message) {
+    final body = message.body.trim();
+    if (body.isEmpty ||
+        body == 'Photo' ||
+        body == 'Video' ||
+        body == 'Voice message' ||
+        body == 'Attachment' ||
+        body == 'Photo · View once') {
+      return null;
+    }
+    return body;
   }
 
   Future<void> _sendMessagePush(SupabaseClient client, String messageId) async {

@@ -22,6 +22,9 @@ Implemented:
   materialization, reconciliation cursor, and retry worker;
 - canonical Flutter DM text rendering/offline sending plus canonical React DM
   page reads, message-ID realtime materialization, and idempotent text sends;
+- a native-first Flutter DM interface with slate/sky inbox and thread surfaces,
+  conversation/thread search, replies, mentions, emoji/sticker selection,
+  canonical sticker sends, and a crop/rotate/filter/stamp/caption photo editor;
 - premium-gated Flutter and React community creation, paid discovery/group-link
   request flows, join-request review UI, server-priced React chat gifting, and
   canonical LiveKit room authorization;
@@ -35,7 +38,9 @@ Pending rollout work:
   legacy message queries/writes to the canonical projection during the
   dual-read rollout;
 - add canonical gift/call bubbles and gift controls to every Flutter composer;
-- finish media crop/caption and persistent voice-waveform UX on both clients;
+- finish canonical media-descriptor uploads, bring crop/caption parity to
+  React, and persist voice-waveform UX on both clients (Flutter's compatibility
+  attachment path now includes the native photo editor and caption handling);
 - remove legacy `message_attachments`, `group_messages`, and `channel_posts`
   reads only after production parity and backfill diagnostics are clean.
 

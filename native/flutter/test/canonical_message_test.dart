@@ -80,4 +80,32 @@ void main() {
     expect(local.deliveryState, MessageDeliveryState.pending);
     expect(local.createdAtMillis, timestamp.millisecondsSinceEpoch);
   });
+
+  test('projects a canonical sticker emoji into the native bubble model', () {
+    final timestamp = DateTime.utc(2026, 7, 22, 8);
+    final canonical = CanonicalMessage(
+      id: '11111111-1111-4111-8111-111111111112',
+      conversationId: '22222222-2222-4222-8222-222222222222',
+      senderId: '33333333-3333-4333-8333-333333333333',
+      contentType: CanonicalMessageContentType.sticker,
+      payload: const {'asset_key': 'rocket', 'emoji': '🚀', 'name': 'Rocket'},
+      status: CanonicalMessageStatus.sent,
+      metadata: const {'revision': 1},
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    );
+
+    final local = canonicalMessageToLocalMessage(
+      LocalCanonicalMessage(
+        message: canonical,
+        syncState: MessageSyncState.synced,
+      ),
+      currentUserId: canonical.senderId,
+      currentUserName: 'Ada',
+      otherSenderName: 'Tobi',
+    );
+
+    expect(local.body, '🚀');
+    expect(local.messageType, 'sticker');
+  });
 }

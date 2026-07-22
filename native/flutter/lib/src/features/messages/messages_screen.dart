@@ -34,7 +34,9 @@ import 'chat/widgets/audio_note_recorder_sheet.dart';
 import 'chat/widgets/chat_composer.dart';
 import 'chat/widgets/chat_message_bubble.dart';
 import 'chat/widgets/conversation_list_tile.dart';
+import 'chat/widgets/emoji_sticker_sheet.dart';
 import 'chat/widgets/media_message_content.dart';
+import 'chat/widgets/message_photo_editor.dart';
 import 'chat/widgets/message_action_sheet.dart';
 import 'chat/widgets/music_message_bubble.dart';
 import 'chat/widgets/new_conversation_sheet.dart';
@@ -104,8 +106,10 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen>
     with WidgetsBindingObserver {
+  final _chatSearchController = TextEditingController();
   String? _selectedConversationId;
   String? _selectedConversationTitle;
+  String _chatSearchQuery = '';
   late Future<List<ConversationSummary>> _conversationsFuture;
   late final ChatRealtimeDataSource _presenceDataSource;
   Timer? _presenceHeartbeat;
@@ -155,6 +159,7 @@ class _MessagesScreenState extends State<MessagesScreen>
     _presenceHeartbeat?.cancel();
     unawaited(_stopPresence());
     widget.backController?._setActiveBackHandler(null);
+    _chatSearchController.dispose();
     super.dispose();
   }
 
@@ -269,12 +274,34 @@ class _MessagesScreenState extends State<MessagesScreen>
               );
             }
 
+            final query = _chatSearchQuery.trim().toLowerCase();
+            final visibleConversations = query.isEmpty
+                ? conversations
+                : conversations
+                      .where(
+                        (conversation) =>
+                            conversation.title.toLowerCase().contains(query) ||
+                            conversation.lastMessagePreview
+                                .toLowerCase()
+                                .contains(query),
+                      )
+                      .toList(growable: false);
+
             return Column(
               children: [
-                _InboxHeader(onNewChat: _openNewConversation),
+                _InboxHeader(
+                  profile: widget.profile,
+                  searchController: _chatSearchController,
+                  onSearchChanged: (value) {
+                    setState(() => _chatSearchQuery = value);
+                  },
+                  onNewChat: _openNewConversation,
+                ),
                 Expanded(
                   child: conversations.isEmpty
                       ? const _EmptyChatsState()
+                      : visibleConversations.isEmpty
+                      ? _NoChatSearchResults(query: _chatSearchQuery)
                       : ListView.builder(
                           // Cards carry their own horizontal margin + inter-card
                           // gap; the list only adds a small top/bottom breathing
@@ -283,9 +310,9 @@ class _MessagesScreenState extends State<MessagesScreen>
                             top: ChatSpacing.xs,
                             bottom: ChatSpacing.lg,
                           ),
-                          itemCount: conversations.length,
+                          itemCount: visibleConversations.length,
                           itemBuilder: (context, index) {
-                            final summary = conversations[index];
+                            final summary = visibleConversations[index];
                             return ConversationListTile(
                               conversation: conversationSummaryToView(summary),
                               currentUserId: widget.profile.userId,
@@ -304,48 +331,129 @@ class _MessagesScreenState extends State<MessagesScreen>
 }
 
 class _InboxHeader extends StatelessWidget {
-  const _InboxHeader({required this.onNewChat});
+  const _InboxHeader({
+    required this.profile,
+    required this.searchController,
+    required this.onSearchChanged,
+    required this.onNewChat,
+  });
 
+  final UserProfile profile;
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
   final VoidCallback onNewChat;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ChatSpacing.lg,
-        ChatSpacing.md,
-        ChatSpacing.sm,
-        ChatSpacing.sm,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: ChatColors.card,
+        border: Border(bottom: BorderSide(color: ChatColors.border)),
       ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'Messages',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ChatSpacing.lg,
+          ChatSpacing.md,
+          ChatSpacing.lg,
+          ChatSpacing.md,
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                _ProfileAvatar(
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                  size: 44,
+                  showOnline: true,
+                ),
+                const SizedBox(width: ChatSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        profile.displayName.trim().isEmpty
+                            ? 'Messages'
+                            : profile.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ChatTextStyles.headerName,
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Online',
+                        style: TextStyle(
+                          color: ChatColors.online,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _HeaderAction(
+                  tooltip: 'New chat',
+                  icon: Icons.edit_square,
+                  onPressed: onNewChat,
+                  emphasized: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: ChatSpacing.md),
+            TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              textInputAction: TextInputAction.search,
+              cursorColor: ChatColors.primary,
+              style: const TextStyle(
                 color: ChatColors.foreground,
+                fontSize: 14,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: ChatColors.input,
+                hintText: 'Search chats',
+                hintStyle: ChatTextStyles.previewMuted,
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: ChatColors.mutedForeground,
+                  size: 20,
+                ),
+                suffixIcon: searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: ChatColors.mutedForeground,
+                          size: 18,
+                        ),
+                      ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(ChatRadii.md),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(ChatRadii.md),
+                  borderSide: const BorderSide(color: ChatColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(ChatRadii.md),
+                  borderSide: const BorderSide(
+                    color: ChatColors.primary,
+                    width: 1.4,
+                  ),
+                ),
               ),
             ),
-          ),
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: ChatGradients.sendAction,
-              shape: BoxShape.circle,
-              boxShadow: ChatShadows.pink,
-            ),
-            child: IconButton(
-              tooltip: 'New chat',
-              onPressed: onNewChat,
-              icon: const Icon(
-                Icons.edit_outlined,
-                color: ChatColors.primaryForeground,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -467,6 +575,7 @@ class ConversationScreen extends StatefulWidget {
 
 class _ConversationScreenState extends State<ConversationScreen> {
   final _messageController = TextEditingController();
+  final _threadSearchController = TextEditingController();
   final _picker = ImagePicker();
   final _interactions = MessageInteractionsDataSource.autoDetect();
   final _genericFilePicker = GenericFileAttachmentPicker();
@@ -486,6 +595,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Timer? _receiptRefreshTimer;
   Timer? _presenceAgeTimer;
   Set<String> _starredMessageIds = <String>{};
+  bool _isThreadSearchOpen = false;
+  String _threadSearchQuery = '';
 
   /// Per-conversation disappearing-message timer in seconds (0 = off). Loaded
   /// from the conversation summary and used to stamp outgoing messages' expiry.
@@ -518,6 +629,44 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (trimmed == null || trimmed.isEmpty) return null;
     final first = trimmed.split(RegExp(r'\s+')).first;
     return first.isEmpty ? null : first;
+  }
+
+  List<ComposerMention> get _mentionSuggestions {
+    final suggestions = <ComposerMention>[];
+    final otherName = _title?.trim();
+    if (otherName != null && otherName.isNotEmpty) {
+      suggestions.add(
+        ComposerMention(
+          displayName: otherName,
+          handle: _mentionHandle(otherName),
+        ),
+      );
+    }
+    final selfName = widget.profile.displayName.trim();
+    if (selfName.isNotEmpty) {
+      final profileHandle = widget.profile.handle.trim().replaceFirst(
+        RegExp(r'^@'),
+        '',
+      );
+      suggestions.add(
+        ComposerMention(
+          displayName: selfName,
+          handle: profileHandle.isEmpty
+              ? _mentionHandle(selfName)
+              : profileHandle,
+        ),
+      );
+    }
+    return suggestions;
+  }
+
+  static String _mentionHandle(String displayName) {
+    final normalized = displayName
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    return normalized.isEmpty ? 'member' : normalized;
   }
 
   /// Header model built from local state. The other-user identity is derived
@@ -787,6 +936,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _canonicalConversationId = null;
         _title = widget.initialTitle;
         _replyTarget = null;
+        _threadSearchController.clear();
+        _threadSearchQuery = '';
+        _isThreadSearchOpen = false;
         _messageController.clear();
       }
       setState(() {
@@ -804,8 +956,89 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _presenceAgeTimer?.cancel();
     unawaited(_canonicalMessageSubscription?.cancel());
     unawaited(_disposeRealtime());
+    _threadSearchController.dispose();
     _messageController.dispose();
     super.dispose();
+  }
+
+  void _toggleThreadSearch() {
+    setState(() {
+      _isThreadSearchOpen = !_isThreadSearchOpen;
+      if (!_isThreadSearchOpen) {
+        _threadSearchController.clear();
+        _threadSearchQuery = '';
+      }
+    });
+  }
+
+  void _openConversationOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ChatColors.card,
+      barrierColor: ChatColors.barrier,
+      shape: const RoundedRectangleBorder(borderRadius: ChatRadii.sheetTop),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ChatSpacing.md,
+            ChatSpacing.sm,
+            ChatSpacing.md,
+            ChatSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: ChatSpacing.md),
+                decoration: BoxDecoration(
+                  color: ChatColors.border,
+                  borderRadius: ChatRadii.chip,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.search_rounded,
+                  color: ChatColors.primary,
+                ),
+                title: const Text(
+                  'Search this conversation',
+                  style: TextStyle(color: ChatColors.foreground),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  if (!_isThreadSearchOpen) _toggleThreadSearch();
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  _disappearingSeconds > 0
+                      ? Icons.timer_rounded
+                      : Icons.timer_outlined,
+                  color: ChatColors.primary,
+                ),
+                title: const Text(
+                  'Disappearing messages',
+                  style: TextStyle(color: ChatColors.foreground),
+                ),
+                subtitle: Text(
+                  _disappearingSeconds > 0
+                      ? _timerLabel(_disappearingSeconds)
+                      : 'Off',
+                  style: ChatTextStyles.subtitle,
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _openDisappearingChooser();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _disposeRealtime() async {
@@ -1133,6 +1366,117 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
+  void _openEmojiStickerSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: ChatColors.barrier,
+      builder: (sheetContext) => EmojiStickerSheet(
+        onEmojiSelected: _insertEmoji,
+        onStickerSelected: (sticker) {
+          Navigator.of(sheetContext).pop();
+          unawaited(_sendSticker(sticker));
+        },
+      ),
+    );
+  }
+
+  void _insertEmoji(String emoji) {
+    final value = _messageController.value;
+    final selection = value.selection.isValid
+        ? value.selection
+        : TextSelection.collapsed(offset: value.text.length);
+    final start = selection.start.clamp(0, value.text.length);
+    final end = selection.end.clamp(0, value.text.length);
+    final next = value.text.replaceRange(start, end, emoji);
+    _messageController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  Future<void> _sendSticker(ChatSticker sticker) async {
+    final localConversationId = widget.conversationId;
+    final canonicalService = widget.incrementalMessageSyncService;
+    final canonicalConversationId = await _resolveCanonicalConversationId();
+    if (!mounted || widget.conversationId != localConversationId) return;
+
+    if (canonicalService != null &&
+        canonicalConversationId != null &&
+        _disappearingSeconds <= 0) {
+      final now = DateTime.now().toUtc();
+      final message = CanonicalMessage(
+        id: const Uuid().v4(),
+        conversationId: canonicalConversationId,
+        senderId: widget.profile.userId,
+        contentType: CanonicalMessageContentType.sticker,
+        payload: {
+          'asset_key': sticker.id,
+          'emoji': sticker.emoji,
+          'name': sticker.name,
+        },
+        replyToId: _replyTarget?.messageId,
+        status: CanonicalMessageStatus.sending,
+        metadata: {
+          'schema_version': 1,
+          'revision': 1,
+          'reactions': <Object?>[],
+          'pin': <String, Object?>{
+            'is_pinned': false,
+            'pinned_by': null,
+            'pinned_at': null,
+          },
+          'is_starred_by_me': false,
+          'forwarded': <String, Object?>{
+            'original_message_id': null,
+            'original_sender_id': null,
+            'original_sender_name': null,
+            'original_created_at': null,
+          },
+          'receipts': <String, Object?>{
+            'delivered_count': 0,
+            'read_count': 0,
+            'read_by_me_at': null,
+          },
+          'ephemeral': <String, Object?>{
+            'view_once': false,
+            'viewed_at': null,
+            'expires_at': null,
+          },
+          'edited_at': null,
+          'deleted_at': null,
+        },
+        createdAt: now,
+        updatedAt: now,
+      );
+      await canonicalService.enqueue(message);
+      final conversation = await widget.messagesRepository.loadConversation(
+        localConversationId,
+      );
+      if (conversation != null) {
+        await widget.messagesRepository.upsertConversation(
+          conversation.copyWith(
+            lastMessagePreview: '${sticker.emoji} ${sticker.name}',
+            updatedAtMillis: now.millisecondsSinceEpoch,
+          ),
+        );
+      }
+      if (!mounted || widget.conversationId != localConversationId) return;
+      setState(() {
+        _replyTarget = null;
+        _messagesFuture = _loadMessages(syncRemote: false);
+      });
+      return;
+    }
+
+    // Legacy/disappearing paths still carry the visual sticker as emoji-only
+    // text so it survives the existing sync contract and renders at sticker
+    // scale in the bubble.
+    _messageController.text = sticker.emoji;
+    await _sendMessage();
+  }
+
   /// Clearer attach entry point: a grid of attachment kinds. Each option routes
   /// to the neutral placeholder until the media-upload contract is finalised.
   void _openAttachmentOptions() {
@@ -1192,17 +1536,33 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final XFile? picked = mediaType == 'video'
         ? await _picker.pickVideo(source: source)
         : await _picker.pickImage(source: source);
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
 
-    final localPath = await _persistPickedAttachment(picked);
+    MessagePhotoEditResult? photoEdit;
+    XFile staged = picked;
+    if (mediaType == 'image') {
+      photoEdit = await MessagePhotoEditor.edit(
+        context,
+        imageFile: File(picked.path),
+      );
+      if (photoEdit == null || !mounted) return;
+      staged = XFile(
+        photoEdit.file.path,
+        mimeType: 'image/jpeg',
+        name: photoEdit.file.uri.pathSegments.last,
+      );
+    }
+
+    final localPath = await _persistPickedAttachment(staged);
     await widget.messagesRepository.queueAttachment(
       conversationId: widget.conversationId,
       senderName: widget.profile.displayName,
       localPath: localPath,
       mediaType: mediaType,
-      mimeType: picked.mimeType,
-      fileName: picked.name,
+      mimeType: staged.mimeType,
+      fileName: staged.name,
       fileSizeBytes: await File(localPath).length(),
+      caption: photoEdit?.caption,
       viewOnce: viewOnce,
       expiresAtMillis: _disappearingExpiryMillis(),
     );
@@ -1658,71 +2018,113 @@ class _ConversationScreenState extends State<ConversationScreen> {
             _ConversationHeader(
               title: _title ?? 'Conversation',
               header: _headerView,
+              avatarUrl: _otherUserAvatarUrl,
               onBack: widget.onBack,
               onVoiceCall: () => _startCall(CallType.voice),
               onVideoCall: () => _startCall(CallType.video),
-              onDisappearing: _openDisappearingChooser,
+              onSearch: _toggleThreadSearch,
+              onMore: _openConversationOptions,
               disappearingSeconds: _disappearingSeconds,
             ),
+            if (_isThreadSearchOpen)
+              _ThreadSearchBar(
+                controller: _threadSearchController,
+                onChanged: (value) {
+                  setState(() => _threadSearchQuery = value);
+                },
+                onClose: _toggleThreadSearch,
+              ),
             Expanded(
-              child: FutureBuilder<List<LocalMessage>>(
-                future: _messagesFuture,
-                builder: (context, snapshot) {
-                  final messages = snapshot.data;
-                  if (messages == null) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: ChatColors.primary,
-                      ),
-                    );
-                  }
-                  if (messages.isEmpty) {
-                    return const _EmptyConversationState();
-                  }
-
-                  // Disappearing messages vanish locally the moment they pass
-                  // their expiry, even before the server-side purge runs.
-                  final nowMillis = DateTime.now().millisecondsSinceEpoch;
-                  final live = messages
-                      .where(
-                        (m) =>
-                            m.expiresAtMillis == null ||
-                            m.expiresAtMillis! > nowMillis,
-                      )
-                      .toList(growable: false);
-                  if (live.isEmpty) {
-                    return const _EmptyConversationState();
-                  }
-
-                  final views = localMessagesToViews(
-                    live,
-                    currentUserKey: _currentUserKey,
-                    starredMessageIds: _starredMessageIds,
-                  );
-
-                  return ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ChatSpacing.md,
-                      vertical: ChatSpacing.md,
-                    ),
-                    itemCount: views.length,
-                    itemBuilder: (context, index) {
-                      final view = views[views.length - 1 - index];
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          top: view.isFirstInGroup ? ChatSpacing.sm : 2,
-                        ),
-                        child: ChatMessageBubble(
-                          message: view,
-                          mediaSlot: _mediaSlotFor(view),
-                          onLongPress: () => _openMessageActions(view),
-                          onSwipeReply: () => _setReply(view),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      ChatColors.background,
+                      ChatColors.threadMidpoint,
+                      ChatColors.background,
+                    ],
+                  ),
+                ),
+                child: FutureBuilder<List<LocalMessage>>(
+                  future: _messagesFuture,
+                  builder: (context, snapshot) {
+                    final messages = snapshot.data;
+                    if (messages == null) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: ChatColors.primary,
                         ),
                       );
-                    },
-                  );
-                },
+                    }
+                    if (messages.isEmpty) {
+                      return const _EmptyConversationState();
+                    }
+
+                    // Disappearing messages vanish locally the moment they pass
+                    // their expiry, even before the server-side purge runs.
+                    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+                    final live = messages
+                        .where(
+                          (m) =>
+                              m.expiresAtMillis == null ||
+                              m.expiresAtMillis! > nowMillis,
+                        )
+                        .toList(growable: false);
+                    if (live.isEmpty) {
+                      return const _EmptyConversationState();
+                    }
+
+                    final allViews = localMessagesToViews(
+                      live,
+                      currentUserKey: _currentUserKey,
+                      starredMessageIds: _starredMessageIds,
+                    );
+                    final query = _threadSearchQuery.trim().toLowerCase();
+                    final views = query.isEmpty
+                        ? allViews
+                        : allViews
+                              .where(
+                                (message) =>
+                                    message.body.toLowerCase().contains(
+                                      query,
+                                    ) ||
+                                    message.senderName.toLowerCase().contains(
+                                      query,
+                                    ),
+                              )
+                              .toList(growable: false);
+                    if (views.isEmpty) {
+                      return _NoMessageSearchResults(query: _threadSearchQuery);
+                    }
+
+                    return ListView.builder(
+                      reverse: true,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: ChatSpacing.md,
+                        vertical: ChatSpacing.md,
+                      ),
+                      itemCount: views.length,
+                      itemBuilder: (context, index) {
+                        final view = views[views.length - 1 - index];
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            top: view.isFirstInGroup ? ChatSpacing.sm : 2,
+                          ),
+                          child: ChatMessageBubble(
+                            message: view,
+                            mediaSlot: _mediaSlotFor(view),
+                            onLongPress: () => _openMessageActions(view),
+                            onSwipeReply: () => _setReply(view),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
             // In-thread typing/activity bubble, pinned just above the composer
@@ -1735,10 +2137,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
             ChatComposer(
               controller: _messageController,
+              mentionSuggestions: _mentionSuggestions,
               replyPreview: _replyTarget,
               onCancelReply: () => setState(() => _replyTarget = null),
               onSend: _sendMessage,
               onAttach: _openAttachmentOptions,
+              onEmoji: _openEmojiStickerSheet,
               onVoice: _recordAudioNote,
               onTypingChanged: _onTypingChanged,
             ),
@@ -1755,8 +2159,10 @@ class _ConversationHeader extends StatelessWidget {
     required this.onBack,
     required this.onVoiceCall,
     required this.onVideoCall,
-    required this.onDisappearing,
+    required this.onSearch,
+    required this.onMore,
     required this.disappearingSeconds,
+    this.avatarUrl,
     this.header,
   });
 
@@ -1766,29 +2172,28 @@ class _ConversationHeader extends StatelessWidget {
   /// local state exists; when null (the common case until the backend presence
   /// contract lands) the header falls back to the neutral sync subtitle.
   final ChatHeaderView? header;
+  final String? avatarUrl;
   final VoidCallback onBack;
   final VoidCallback onVoiceCall;
   final VoidCallback onVideoCall;
-
-  /// Open the disappearing-messages timer chooser.
-  final VoidCallback onDisappearing;
+  final VoidCallback onSearch;
+  final VoidCallback onMore;
 
   /// Current timer (seconds; 0 = off) so the overflow item can show its state.
   final int disappearingSeconds;
 
   @override
   Widget build(BuildContext context) {
-    final initial = title.trim().isEmpty
-        ? '?'
-        : title.trim().characters.first.toUpperCase();
-
     final presence = header?.presence ?? PresenceState.offline;
     final activity = header?.activity ?? ChatActivity.none;
     final showDot = presenceShowsDot(presence);
 
     return Container(
-      height: ChatSpacing.headerHeight,
-      padding: const EdgeInsets.symmetric(horizontal: ChatSpacing.xs),
+      constraints: const BoxConstraints(minHeight: 64),
+      padding: const EdgeInsets.symmetric(
+        horizontal: ChatSpacing.xs,
+        vertical: ChatSpacing.xs,
+      ),
       decoration: const BoxDecoration(
         color: ChatColors.card,
         border: Border(bottom: BorderSide(color: ChatColors.border)),
@@ -1799,46 +2204,14 @@ class _ConversationHeader extends StatelessWidget {
             icon: const Icon(Icons.arrow_back, color: ChatColors.foreground),
             onPressed: onBack,
           ),
-          SizedBox(
-            width: ChatSpacing.avatarSm + 6,
-            height: ChatSpacing.avatarSm + 6,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: ChatSpacing.avatarSm + 6,
-                  height: ChatSpacing.avatarSm + 6,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    gradient: ChatGradients.avatarFallback,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: ChatColors.primaryForeground,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (showDot)
-                  Positioned(
-                    right: -1,
-                    bottom: -1,
-                    child: Container(
-                      width: ChatSpacing.onlineDot,
-                      height: ChatSpacing.onlineDot,
-                      decoration: BoxDecoration(
-                        color: presence == PresenceState.activeNow
-                            ? ChatColors.activeNow
-                            : ChatColors.online,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: ChatColors.card, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          _ProfileAvatar(
+            displayName: title,
+            avatarUrl: avatarUrl,
+            size: 40,
+            showOnline: showDot,
+            presenceColor: presence == PresenceState.activeNow
+                ? ChatColors.activeNow
+                : ChatColors.online,
           ),
           const SizedBox(width: ChatSpacing.sm),
           Expanded(
@@ -1860,31 +2233,214 @@ class _ConversationHeader extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
+          _HeaderAction(
             tooltip: 'Voice call',
+            icon: Icons.call_outlined,
             onPressed: onVoiceCall,
-            icon: const Icon(Icons.call_outlined, color: ChatColors.foreground),
           ),
-          IconButton(
+          _HeaderAction(
             tooltip: 'Video call',
+            icon: Icons.videocam_outlined,
             onPressed: onVideoCall,
+          ),
+          _HeaderAction(
+            tooltip: 'Search conversation',
+            icon: Icons.search_rounded,
+            onPressed: onSearch,
+          ),
+          _HeaderAction(
+            tooltip: 'Conversation options',
+            icon: disappearingSeconds > 0
+                ? Icons.more_time_rounded
+                : Icons.more_vert_rounded,
+            onPressed: onMore,
+            emphasized: disappearingSeconds > 0,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThreadSearchBar extends StatelessWidget {
+  const _ThreadSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: ChatColors.card,
+      padding: const EdgeInsets.fromLTRB(
+        ChatSpacing.md,
+        ChatSpacing.xs,
+        ChatSpacing.md,
+        ChatSpacing.sm,
+      ),
+      child: TextField(
+        controller: controller,
+        autofocus: true,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        cursorColor: ChatColors.primary,
+        style: const TextStyle(color: ChatColors.foreground, fontSize: 14),
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: ChatColors.input,
+          hintText: 'Search this conversation',
+          hintStyle: ChatTextStyles.previewMuted,
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: ChatColors.mutedForeground,
+            size: 20,
+          ),
+          suffixIcon: IconButton(
+            tooltip: 'Close search',
+            onPressed: onClose,
             icon: const Icon(
-              Icons.videocam_outlined,
-              color: ChatColors.foreground,
+              Icons.close_rounded,
+              color: ChatColors.mutedForeground,
+              size: 19,
             ),
           ),
-          IconButton(
-            tooltip: 'Disappearing messages',
-            onPressed: onDisappearing,
-            icon: Icon(
-              disappearingSeconds > 0
-                  ? Icons.timer_rounded
-                  : Icons.timer_outlined,
-              color: disappearingSeconds > 0
-                  ? ChatColors.primary
-                  : ChatColors.foreground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(ChatRadii.md),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(ChatRadii.md),
+            borderSide: const BorderSide(color: ChatColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(ChatRadii.md),
+            borderSide: const BorderSide(color: ChatColors.primary, width: 1.4),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.emphasized = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 38,
+      height: 38,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          backgroundColor: emphasized
+              ? ChatColors.primaryFaint
+              : Colors.transparent,
+          foregroundColor: emphasized
+              ? ChatColors.primary
+              : ChatColors.mutedForeground,
+          shape: const CircleBorder(),
+        ),
+        icon: Icon(icon, size: 20),
+      ),
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({
+    required this.displayName,
+    required this.avatarUrl,
+    required this.size,
+    this.showOnline = false,
+    this.presenceColor = ChatColors.online,
+  });
+
+  final String displayName;
+  final String? avatarUrl;
+  final double size;
+  final bool showOnline;
+  final Color presenceColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedUrl = avatarUrl?.trim();
+    final initial = displayName.trim().isEmpty
+        ? '?'
+        : displayName.trim().characters.first.toUpperCase();
+    final fallback = DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: ChatGradients.avatarFallback,
+        shape: BoxShape.circle,
+      ),
+      child: SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: ChatColors.primaryForeground,
+              fontWeight: FontWeight.w800,
+              fontSize: size * 0.36,
             ),
           ),
+        ),
+      ),
+    );
+
+    return SizedBox.square(
+      dimension: size + 2,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(1),
+              child: trimmedUrl == null || trimmedUrl.isEmpty
+                  ? fallback
+                  : ClipOval(
+                      child: Image.network(
+                        trimmedUrl,
+                        width: size,
+                        height: size,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => fallback,
+                      ),
+                    ),
+            ),
+          ),
+          if (showOnline)
+            Positioned(
+              right: -1,
+              bottom: -1,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: presenceColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: ChatColors.card, width: 2),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1981,6 +2537,85 @@ class _EmptyChatsState extends StatelessWidget {
               style: ChatTextStyles.previewMuted,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoChatSearchResults extends StatelessWidget {
+  const _NoChatSearchResults({required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SearchEmptyState(
+      title: 'No chats found',
+      message: 'No conversation matches “${query.trim()}”.',
+    );
+  }
+}
+
+class _NoMessageSearchResults extends StatelessWidget {
+  const _NoMessageSearchResults({required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SearchEmptyState(
+      title: 'No messages found',
+      message: 'Try another word or phrase.',
+    );
+  }
+}
+
+class _SearchEmptyState extends StatelessWidget {
+  const _SearchEmptyState({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ChatSpacing.xl),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: ChatColors.card.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(ChatRadii.sheet),
+            border: Border.all(color: ChatColors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(ChatSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.search_off_rounded,
+                  color: ChatColors.primary,
+                  size: 34,
+                ),
+                const SizedBox(height: ChatSpacing.md),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: ChatColors.foreground,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: ChatSpacing.xs),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: ChatTextStyles.previewMuted,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

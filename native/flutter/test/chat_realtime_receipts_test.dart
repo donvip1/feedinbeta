@@ -242,4 +242,37 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     expect(events, [true, false]);
   });
+
+  testWidgets('composer suggests and inserts a participant mention', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            mentionSuggestions: const [
+              ComposerMention(displayName: 'Sarah Connor', handle: 'sarah'),
+            ],
+            onSend: () {},
+            onAttach: () {},
+            onVoice: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'Hello @sa');
+    await tester.pump();
+
+    expect(find.text('@sarah'), findsOneWidget);
+    expect(find.text('Sarah Connor'), findsOneWidget);
+
+    await tester.tap(find.text('@sarah'));
+    await tester.pump();
+    expect(controller.text, 'Hello @sarah ');
+  });
 }

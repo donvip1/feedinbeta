@@ -60,7 +60,10 @@ LocalMessage canonicalMessageToLocalMessage(
       CanonicalMessageContentType.gift =>
         payload['name'] == null ? 'Sent a gift' : 'Sent ${payload['name']}',
       CanonicalMessageContentType.call => _callPreview(payload),
-      CanonicalMessageContentType.sticker => 'Sticker',
+      CanonicalMessageContentType.sticker =>
+        payload['emoji']?.toString() ??
+            payload['name']?.toString() ??
+            'Sticker',
       _ => payload['caption']?.toString() ?? '',
     },
     createdAtMillis: message.createdAt.millisecondsSinceEpoch,
