@@ -13,6 +13,11 @@ class FeedImmersiveTheme {
   static const Color brandPink = Color(0xFFFF3D9A);
   static const Color brandOrange = Color(0xFFFF7A45);
   static const Color brandDeepPurple = Color(0xFF6B1FB3);
+  static const Color brandViolet = Color(0xFF8B5CF6);
+
+  /// Accent for @mentions in captions — distinct from the pink used for
+  /// #hashtags, mirroring the prototype's cyan mention treatment.
+  static const Color mentionCyan = Color(0xFF22D3EE);
   static const Color canvas = Color(0xFF070A12);
   static const Color mediaBackdrop = Colors.black;
   static const Color surface = Color(0xFF101521);
@@ -285,4 +290,44 @@ class FeedImmersiveTheme {
   // -------------------------------------------------------------------------
   static const Color pillBackground = Color(0xB3000000); // black @ 70%
   static const Color pillBorder = Color(0x1AFFFFFF); // white @ 10%
+
+  // -------------------------------------------------------------------------
+  // Live indicator (feed tab)
+  // -------------------------------------------------------------------------
+  static const Color liveDot = brandPink;
+  static const double liveDotSize = 7;
+  static const Color liveDotGlow = Color(0x99FF3D9A);
+  static const Duration motionLivePulse = Duration(milliseconds: 1100);
+
+  // -------------------------------------------------------------------------
+  // Glass bottom navigation
+  // -------------------------------------------------------------------------
+  /// Translucent canvas so the blurred media/backdrop shows through the bar,
+  /// matching the prototype's `bg-feed-dark/95 backdrop-blur-xl` nav.
+  static const Color navGlassSurface = Color(0xF0070A12);
+  static const Color navBorderTop = Color(0x1FFFFFFF);
+  static const double navBlur = 18;
+  static const double navHeight = 64;
+
+  /// Gradient create pill (center "+" action).
+  static const LinearGradient createPillGradient = LinearGradient(
+    colors: [brandPink, brandViolet],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+  static const List<BoxShadow> createPillGlow = [
+    BoxShadow(color: Color(0x4DFF3D9A), blurRadius: 16, offset: Offset(0, 4)),
+  ];
+  static const double createPillWidth = 48;
+  static const double createPillHeight = 40;
+
+  // -------------------------------------------------------------------------
+  // Comment sheet surfaces
+  // -------------------------------------------------------------------------
+  static const Color sheetBarrier = Color(0xB3000000); // black @ 70%
+  static const double sheetBarrierBlur = 6;
+  static const Color sheetSurface = surface;
+  static const Color sheetInputSurface = canvas;
+  static const double sheetRadius = 28;
+  static const double sheetHeightFactor = 0.66;
 }
