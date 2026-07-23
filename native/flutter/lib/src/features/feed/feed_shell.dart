@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,7 +35,7 @@ import '../contacts/contacts_screen.dart';
 import '../groups/screens/groups_screen.dart';
 import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
-import '../create/create_post_screen.dart';
+import '../create/camera_studio/camera_studio_screen.dart';
 import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
 import '../notifications/parity/widgets/notification_bell_badge.dart';
@@ -43,6 +44,8 @@ import '../profile/profile_screen.dart';
 import '../profile/user_profile.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
+import 'immersive/comment_sheet.dart';
+import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
 import 'immersive/immersive_post_card.dart';
 
@@ -369,19 +372,19 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     return null;
   }
 
-  /// Create is a floating "+" action (web parity), pushed as a full route.
+  /// Create is a floating "+" action (web parity). It opens the live camera
+  /// studio, which hands any captured media to the existing [CreatePostScreen]
+  /// publish pipeline on Next.
   Future<void> _openCreate() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Create')),
-          body: CreatePostScreen(
-            draftRepository: widget.postDraftRepository,
-            uploadQueueRepository: widget.uploadQueueRepository,
-            uploadQueueService: widget.uploadQueueService,
-            connectivityService: widget.connectivityService,
-            onPostUploaded: () => setState(() => _feedRealtimeVersion++),
-          ),
+        fullscreenDialog: true,
+        builder: (_) => CameraStudioScreen(
+          draftRepository: widget.postDraftRepository,
+          uploadQueueRepository: widget.uploadQueueRepository,
+          uploadQueueService: widget.uploadQueueService,
+          connectivityService: widget.connectivityService,
+          onPostUploaded: () => setState(() => _feedRealtimeVersion++),
         ),
       ),
     );
@@ -713,48 +716,61 @@ class _FeedBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    // A translucent, blurred glass bar with a hairline top border — the media
+    // and page content show faintly through it (prototype's `backdrop-blur-xl`).
     return SafeArea(
       top: false,
-      child: Material(
-        elevation: 8,
-        color: scheme.surface,
-        child: SizedBox(
-          height: 70,
-          child: Row(
-            children: [
-              _BottomNavItem(
-                label: 'Feed',
-                icon: Icons.home_outlined,
-                selectedIcon: Icons.home,
-                selected: selectedIndex == 0,
-                onTap: () => onSelected(0),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(
+            sigmaX: FeedImmersiveTheme.navBlur,
+            sigmaY: FeedImmersiveTheme.navBlur,
+          ),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: FeedImmersiveTheme.navGlassSurface,
+              border: Border(
+                top: BorderSide(color: FeedImmersiveTheme.navBorderTop),
               ),
-              _BottomNavItem(
-                label: 'Chats',
-                icon: Icons.mail_outline,
-                selectedIcon: Icons.mail,
-                selected: selectedIndex == 1,
-                onTap: () => onSelected(1),
+            ),
+            child: SizedBox(
+              height: FeedImmersiveTheme.navHeight,
+              child: Row(
+                children: [
+                  _BottomNavItem(
+                    label: 'Feed',
+                    icon: Icons.home_outlined,
+                    selectedIcon: Icons.home,
+                    selected: selectedIndex == 0,
+                    onTap: () => onSelected(0),
+                  ),
+                  _BottomNavItem(
+                    label: 'Chats',
+                    icon: Icons.mail_outline,
+                    selectedIcon: Icons.mail,
+                    selected: selectedIndex == 1,
+                    onTap: () => onSelected(1),
+                  ),
+                  Expanded(
+                    child: Center(child: _CreateNavButton(onTap: onCreate)),
+                  ),
+                  _BottomNavItem(
+                    label: 'Wallet',
+                    icon: Icons.account_balance_wallet_outlined,
+                    selectedIcon: Icons.account_balance_wallet,
+                    selected: selectedIndex == 2,
+                    onTap: () => onSelected(2),
+                  ),
+                  _BottomNavItem(
+                    label: 'Profile',
+                    icon: Icons.person_outline,
+                    selectedIcon: Icons.person,
+                    selected: selectedIndex == 3,
+                    onTap: () => onSelected(3),
+                  ),
+                ],
               ),
-              Expanded(
-                child: Center(child: _CreateNavButton(onTap: onCreate)),
-              ),
-              _BottomNavItem(
-                label: 'Wallet',
-                icon: Icons.account_balance_wallet_outlined,
-                selectedIcon: Icons.account_balance_wallet,
-                selected: selectedIndex == 2,
-                onTap: () => onSelected(2),
-              ),
-              _BottomNavItem(
-                label: 'Profile',
-                icon: Icons.person_outline,
-                selectedIcon: Icons.person,
-                selected: selectedIndex == 3,
-                onTap: () => onSelected(3),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -779,8 +795,9 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    final color = selected
+        ? FeedImmersiveTheme.brandPink
+        : FeedImmersiveTheme.inkMuted;
     return Expanded(
       child: Semantics(
         button: true,
@@ -793,7 +810,16 @@ class _BottomNavItem extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(selected ? selectedIcon : icon, color: color, size: 24),
+                AnimatedScale(
+                  scale: selected ? 1.06 : 1,
+                  duration: FeedImmersiveTheme.motionFast,
+                  curve: FeedImmersiveTheme.premiumSettleCurve,
+                  child: Icon(
+                    selected ? selectedIcon : icon,
+                    color: color,
+                    size: 24,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   label,
@@ -821,30 +847,25 @@ class _CreateNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const radius = BorderRadius.all(Radius.circular(FeedImmersiveTheme.radiusMd));
     return Semantics(
       button: true,
       label: 'Create',
       child: Material(
         color: Colors.transparent,
-        shape: const CircleBorder(),
+        borderRadius: radius,
         child: InkWell(
-          customBorder: const CircleBorder(),
+          borderRadius: radius,
           onTap: onTap,
           child: Ink(
-            width: 48,
-            height: 48,
+            width: FeedImmersiveTheme.createPillWidth,
+            height: FeedImmersiveTheme.createPillHeight,
             decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: FeedImmersiveTheme.brandGradient,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x59FF3D9A),
-                  blurRadius: 14,
-                  offset: Offset(0, 4),
-                ),
-              ],
+              borderRadius: radius,
+              gradient: FeedImmersiveTheme.createPillGradient,
+              boxShadow: FeedImmersiveTheme.createPillGlow,
             ),
-            child: const Icon(Icons.add, color: Colors.white, size: 28),
+            child: const Icon(Icons.add, color: Colors.white, size: 24),
           ),
         ),
       ),
@@ -1195,6 +1216,23 @@ class _FeedScreenState extends State<FeedScreen> {
     ].join('\n\n');
   }
 
+  Future<void> _openCreatorPreview(FeedPost post) async {
+    final content = post.displayedPost;
+    await showCreatorPreview(
+      context,
+      heroTag: 'creator-avatar-${post.id}',
+      name: content.authorName,
+      handle: content.authorHandle ?? content.meta,
+      avatarUrl: content.avatarUrl,
+      onFollow: () {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Following ${content.authorName}')),
+        );
+      },
+    );
+  }
+
   Future<void> _openComments(FeedPost post) async {
     List<FeedComment> comments = const [];
     try {
@@ -1203,29 +1241,19 @@ class _FeedScreenState extends State<FeedScreen> {
       // The composer remains usable if an older backend cannot list comments.
     }
     if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      sheetAnimationStyle: const AnimationStyle(
-        duration: FeedImmersiveTheme.motionSheet,
-        reverseDuration: FeedImmersiveTheme.motionSheetReverse,
-        curve: FeedImmersiveTheme.sheetCurve,
-        reverseCurve: FeedImmersiveTheme.sheetReverseCurve,
-      ),
-      builder: (context) => _CommentSheet(
-        post: post,
-        comments: comments,
-        onSubmit: (body) async {
-          final created = await widget.feedRepository.addComment(post.id, body);
-          if (mounted) {
-            setState(() {
-              _commentDeltas[post.id] = (_commentDeltas[post.id] ?? 0) + 1;
-            });
-          }
-          return created;
-        },
-      ),
+    await showCommentSheet(
+      context,
+      post: post,
+      comments: comments,
+      onSubmit: (body) async {
+        final created = await widget.feedRepository.addComment(post.id, body);
+        if (mounted) {
+          setState(() {
+            _commentDeltas[post.id] = (_commentDeltas[post.id] ?? 0) + 1;
+          });
+        }
+        return created;
+      },
     );
   }
 
@@ -1390,6 +1418,7 @@ class _FeedScreenState extends State<FeedScreen> {
           onRefeed: () => _refeedPost(post),
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
+          onAvatar: () => _openCreatorPreview(post),
         );
         return _PageTransition(
           controller: _pageController,
@@ -1412,8 +1441,16 @@ class _FeedScreenState extends State<FeedScreen> {
             children: [
               Row(
                 children: [
-                  const Text(
-                    'feedIn',
+                  const Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'feed'),
+                        TextSpan(
+                          text: 'In',
+                          style: TextStyle(color: FeedImmersiveTheme.brandPink),
+                        ),
+                      ],
+                    ),
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -1515,6 +1552,7 @@ class _ImmersiveFeedTabs extends StatelessWidget {
           _ImmersiveTab(
             label: _labels[i],
             selected: i == selectedIndex,
+            isLive: _labels[i] == 'Live',
             onTap: () => onChanged(i),
           ),
       ],
@@ -1527,10 +1565,12 @@ class _ImmersiveTab extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.isLive = false,
   });
 
   final String label;
   final bool selected;
+  final bool isLive;
   final VoidCallback onTap;
 
   @override
@@ -1558,17 +1598,26 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedDefaultTextStyle(
-                duration: FeedImmersiveTheme.motionFast,
-                curve: FeedImmersiveTheme.premiumSettleCurve,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.white60,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 16,
-                  letterSpacing: selected ? 0.0 : 0.1,
-                  shadows: FeedImmersiveTheme.textShadow,
-                ),
-                child: Text(widget.label),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.isLive) ...[
+                    const _LiveDot(),
+                    const SizedBox(width: 6),
+                  ],
+                  AnimatedDefaultTextStyle(
+                    duration: FeedImmersiveTheme.motionFast,
+                    curve: FeedImmersiveTheme.premiumSettleCurve,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.white60,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 16,
+                      letterSpacing: selected ? 0.0 : 0.1,
+                      shadows: FeedImmersiveTheme.textShadow,
+                    ),
+                    child: Text(widget.label),
+                  ),
+                ],
               ),
               const SizedBox(height: 5),
               AnimatedContainer(
@@ -1584,6 +1633,61 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Softly pulsing "live" indicator dot used on the Live feed tab.
+class _LiveDot extends StatefulWidget {
+  const _LiveDot();
+
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: FeedImmersiveTheme.motionLivePulse,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final t = Curves.easeInOut.transform(_pulse.value);
+          return Container(
+            width: FeedImmersiveTheme.liveDotSize,
+            height: FeedImmersiveTheme.liveDotSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: FeedImmersiveTheme.liveDot,
+              boxShadow: [
+                BoxShadow(
+                  color: FeedImmersiveTheme.liveDotGlow,
+                  blurRadius: 4 + (6 * t),
+                  spreadRadius: 0.5 * t,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1752,201 +1856,6 @@ class _FeedStatusBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CommentSheet extends StatefulWidget {
-  const _CommentSheet({
-    required this.post,
-    required this.comments,
-    required this.onSubmit,
-  });
-
-  final FeedPost post;
-  final List<FeedComment> comments;
-  final Future<FeedComment> Function(String body) onSubmit;
-
-  @override
-  State<_CommentSheet> createState() => _CommentSheetState();
-}
-
-class _CommentSheetState extends State<_CommentSheet> {
-  final _controller = TextEditingController();
-  late final List<FeedComment> _comments = [...widget.comments];
-  bool _sending = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 620),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Comments',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.post.displayedPost.body,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: _comments.isEmpty
-                  ? const Center(child: Text('No comments yet.'))
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: _comments.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final comment = _comments[index];
-                        final initial = comment.authorName.trim().isEmpty
-                            ? '?'
-                            : comment.authorName.characters.first;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: 19,
-                                backgroundImage: comment.avatarUrl == null
-                                    ? null
-                                    : NetworkImage(comment.avatarUrl!),
-                                child: comment.avatarUrl == null
-                                    ? Text(initial)
-                                    : null,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            comment.authorName,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                        if (comment.authorHandle != null) ...[
-                                          const SizedBox(width: 5),
-                                          Flexible(
-                                            child: Text(
-                                              comment.authorHandle!,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.bodySmall,
-                                            ),
-                                          ),
-                                        ],
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _relativeCommentTime(
-                                            comment.createdAtMillis,
-                                          ),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(comment.content),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              minLines: 2,
-              maxLines: 5,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Add a comment',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: _sending ? null : _submit,
-                icon: const Icon(Icons.send),
-                label: Text(_sending ? 'Posting...' : 'Comment'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    final body = _controller.text.trim();
-    if (body.isEmpty) return;
-    setState(() => _sending = true);
-    try {
-      final comment = await widget.onSubmit(body);
-      if (!mounted) return;
-      setState(() {
-        _comments.add(comment);
-        _controller.clear();
-      });
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not post comment.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-}
-
-String _relativeCommentTime(int createdAtMillis) {
-  final elapsed = DateTime.now().difference(
-    DateTime.fromMillisecondsSinceEpoch(createdAtMillis),
-  );
-  if (elapsed.inMinutes < 1) return 'now';
-  if (elapsed.inHours < 1) return '${elapsed.inMinutes}m';
-  if (elapsed.inDays < 1) return '${elapsed.inHours}h';
-  if (elapsed.inDays < 7) return '${elapsed.inDays}d';
-  return '${DateTime.fromMillisecondsSinceEpoch(createdAtMillis).day}/'
-      '${DateTime.fromMillisecondsSinceEpoch(createdAtMillis).month}';
 }
 
 class ProfilePanel extends StatelessWidget {

@@ -39,6 +39,8 @@ class CreatePostScreen extends StatefulWidget {
     required this.uploadQueueService,
     required this.connectivityService,
     required this.onPostUploaded,
+    this.initialMediaPath,
+    this.initialMediaKind,
   });
 
   final PostDraftRepository draftRepository;
@@ -46,6 +48,12 @@ class CreatePostScreen extends StatefulWidget {
   final UploadQueueService uploadQueueService;
   final ConnectivityService connectivityService;
   final VoidCallback onPostUploaded;
+
+  /// Optional media captured upstream (e.g. by the camera studio) that seeds the
+  /// composer so the user lands straight on caption/publish. Purely additive:
+  /// when null the screen behaves exactly as before.
+  final String? initialMediaPath;
+  final CreateMediaKind? initialMediaKind;
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -93,6 +101,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   void initState() {
     super.initState();
     _refreshDrafts();
+    _seedInitialMedia();
+  }
+
+  /// Seeds [_media] with media captured upstream (camera studio) using the same
+  /// persistence path as a normal pick, so the existing publish flow is reused.
+  Future<void> _seedInitialMedia() async {
+    final path = widget.initialMediaPath;
+    if (path == null || path.trim().isEmpty) return;
+    final file = XFile(path);
+    final stored = await _persistPickedMedia(file);
+    if (!mounted) return;
+    setState(() {
+      _media = [
+        ..._media,
+        ComposerMediaItem(
+          id: _uuid.v4(),
+          path: stored,
+          kind: widget.initialMediaKind ?? _kindFor(file),
+        ),
+      ];
+    });
   }
 
   // -------------------------------------------------------------------------
