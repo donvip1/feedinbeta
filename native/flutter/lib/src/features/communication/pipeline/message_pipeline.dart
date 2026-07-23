@@ -168,8 +168,9 @@ class MessagePipeline {
 
   /// Page changes from the persisted cursor until the server says caught-up.
   /// Applies every envelope through the same merge as realtime, then persists
-  /// the advanced cursor — so a crash mid-reconcile resumes, never re-diverges.
-  /// Returns the number of envelopes applied.
+  /// the advanced cursor after EVERY page — so a crash mid-reconcile resumes,
+  /// never re-diverges, and the final page is never refetched. Returns the
+  /// number of envelopes applied.
   Future<Result<int>> reconcile({int pageLimit = 100}) async {
     var applied = 0;
     var cursor = await _cursors.read(messagesCursorScope);
@@ -184,9 +185,11 @@ class MessagePipeline {
         await applyRemote(envelope);
         applied += 1;
       }
-      if (value.nextCursor == null) break;
-      cursor = value.nextCursor;
-      await _cursors.write(messagesCursorScope, cursor!, nowMillis: _now());
+      if (value.nextCursor != null) {
+        cursor = value.nextCursor;
+        await _cursors.write(messagesCursorScope, cursor!, nowMillis: _now());
+      }
+      if (!value.hasMore) break;
     }
     return Ok(applied);
   }

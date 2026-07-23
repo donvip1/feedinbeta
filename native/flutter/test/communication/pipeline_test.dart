@@ -160,23 +160,26 @@ void main() {
         SyncPage(
           envelopes: [make('a', millis: 1), make('b', millis: 2)],
           nextCursor: 'cur-1',
+          hasMore: true,
         ),
         SyncPage(
           envelopes: [make('c', millis: 3)],
-          nextCursor: null, // caught up
+          nextCursor: 'cur-2',
+          hasMore: false, // caught up
         ),
       ];
       final result = await pipeline.reconcile();
       expect(result.valueOrNull, 3);
       expect(await store.countForConversation('c1'), 3);
-      expect(await cursors.read(MessagePipeline.messagesCursorScope), 'cur-1');
+      // Cursor covers the FINAL page too, so it is never refetched.
+      expect(await cursors.read(MessagePipeline.messagesCursorScope), 'cur-2');
       // The second fetch resumed from the first page's cursor.
       expect(transport.fetchCursors, [null, 'cur-1']);
     });
 
     test('reconcile resumes from the persisted cursor after a failure', () async {
       transport.pages = [
-        SyncPage(envelopes: [make('a', millis: 1)], nextCursor: 'cur-1'),
+        SyncPage(envelopes: [make('a', millis: 1)], nextCursor: 'cur-1', hasMore: true),
       ];
       transport.failFetchAfterPages = 1; // page 2 fails
       final first = await pipeline.reconcile();
@@ -188,7 +191,7 @@ void main() {
       // Recovery: next reconcile resumes from cur-1, not from scratch.
       transport.failFetchAfterPages = null;
       transport.pages = [
-        SyncPage(envelopes: [make('b', millis: 2)], nextCursor: null),
+        SyncPage(envelopes: [make('b', millis: 2)], nextCursor: 'cur-2', hasMore: false),
       ];
       transport.fetchCursors.clear();
       final second = await pipeline.reconcile();

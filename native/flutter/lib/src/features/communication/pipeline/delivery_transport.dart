@@ -2,12 +2,20 @@ import '../core/encryption/encryption_codec.dart';
 import '../domain/message_envelope.dart';
 import '../domain/result.dart';
 
-/// A page of changed envelopes from the server plus the cursor to persist after
-/// applying it. [nextCursor] null means "caught up".
+/// A page of changed envelopes from the server plus the cursor state after
+/// consuming it. [nextCursor] is the resume point covering everything in this
+/// page (null only when the page is empty); [hasMore] tells the caller whether
+/// another page should be fetched immediately.
 class SyncPage {
-  const SyncPage({required this.envelopes, this.nextCursor});
+  const SyncPage({
+    required this.envelopes,
+    this.nextCursor,
+    this.hasMore = false,
+  });
+
   final List<MessageEnvelope> envelopes;
   final String? nextCursor;
+  final bool hasMore;
 }
 
 /// Provider-agnostic delivery + history transport. The Supabase adapter (a later
