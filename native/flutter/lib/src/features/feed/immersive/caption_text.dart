@@ -17,11 +17,18 @@ class ExpandableCaption extends StatefulWidget {
     required this.text,
     this.collapsedLines = 2,
     this.linkColor,
+    this.mentionColor,
   });
 
   final String text;
   final int collapsedLines;
+
+  /// Colour for #hashtags. Defaults to the brand pink.
   final Color? linkColor;
+
+  /// Colour for @mentions. Defaults to the cyan mention accent, giving
+  /// mentions a distinct hue from hashtags (mirrors the prototype).
+  final Color? mentionColor;
 
   @override
   State<ExpandableCaption> createState() => _ExpandableCaptionState();
@@ -47,6 +54,7 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
     }
 
     final linkColor = widget.linkColor ?? FeedImmersiveTheme.brandPink;
+    final mentionColor = widget.mentionColor ?? FeedImmersiveTheme.mentionCyan;
     final baseStyle = _baseStyle(context);
 
     return LayoutBuilder(
@@ -79,7 +87,7 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
                 overflow: _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
                 text: TextSpan(
                   style: baseStyle,
-                  children: _buildSpans(text, baseStyle, linkColor),
+                  children: _buildSpans(text, baseStyle, linkColor, mentionColor),
                 ),
               ),
             ),
@@ -110,10 +118,13 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
   }
 
   /// Splits [text] into plain runs and highlighted #hashtag / @mention runs.
+  /// Hashtags take [linkColor]; mentions take [mentionColor], so the two token
+  /// kinds read as distinct affordances just like the prototype.
   List<InlineSpan> _buildSpans(
     String text,
     TextStyle baseStyle,
     Color linkColor,
+    Color mentionColor,
   ) {
     final spans = <InlineSpan>[];
     // Capture hashtags and mentions as discrete tokens, keeping all other text.
@@ -125,13 +136,14 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
         spans.add(TextSpan(text: text.substring(start, match.start)));
       }
       final token = match.group(0)!;
+      final isMention = token.startsWith('@');
       spans.add(
         TextSpan(
           text: token,
           // Visually highlighted; tapping is a no-op for now (no recognizer,
           // so taps fall through to the parent gesture handler).
           style: baseStyle.copyWith(
-            color: linkColor,
+            color: isMention ? mentionColor : linkColor,
             fontWeight: FontWeight.w600,
           ),
         ),
