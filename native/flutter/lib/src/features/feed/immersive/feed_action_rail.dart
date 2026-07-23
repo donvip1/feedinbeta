@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'feed_immersive_theme.dart';
+import 'hero_transition_layer.dart';
 
 /// Premium vertical actions for an immersive post.
 ///
@@ -28,6 +29,7 @@ class FeedActionRail extends StatelessWidget {
     required this.onSave,
     required this.onShare,
     this.onAvatar,
+    this.avatarHeroTag,
   });
 
   final int likesCount;
@@ -45,6 +47,9 @@ class FeedActionRail extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onShare;
   final VoidCallback? onAvatar;
+
+  /// Shared Hero tag for the avatar, matching the creator preview it opens.
+  final Object? avatarHeroTag;
 
   static const double _actionSize = FeedImmersiveTheme.touchTargetAction;
   static const double _verticalGap = FeedImmersiveTheme.railGap;
@@ -66,6 +71,7 @@ class FeedActionRail extends StatelessWidget {
               avatarText: avatarText,
               avatarUrl: avatarUrl,
               onTap: onAvatar,
+              heroTag: avatarHeroTag,
             ),
             const SizedBox(height: _verticalGap + 5),
             _RailAction(
@@ -133,11 +139,13 @@ class _RailAvatar extends StatefulWidget {
     required this.avatarText,
     required this.avatarUrl,
     required this.onTap,
+    this.heroTag,
   });
 
   final String avatarText;
   final String? avatarUrl;
   final VoidCallback? onTap;
+  final Object? heroTag;
 
   @override
   State<_RailAvatar> createState() => _RailAvatarState();
@@ -211,6 +219,7 @@ class _RailAvatarState extends State<_RailAvatar> {
                     url: widget.avatarUrl,
                     fallbackText: widget.avatarText,
                     emphasized: _hovered || _focused,
+                    heroTag: widget.heroTag,
                   ),
                   Positioned(
                     bottom: 0,
@@ -255,17 +264,19 @@ class _AvatarSurface extends StatelessWidget {
     required this.url,
     required this.fallbackText,
     required this.emphasized,
+    this.heroTag,
   });
 
   final double size;
   final String? url;
   final String fallbackText;
   final bool emphasized;
+  final Object? heroTag;
 
   @override
   Widget build(BuildContext context) {
     final hasImage = url?.trim().isNotEmpty == true;
-    return AnimatedContainer(
+    final surface = AnimatedContainer(
       duration: FeedImmersiveTheme.motionFast,
       curve: FeedImmersiveTheme.premiumSettleCurve,
       width: size,
@@ -294,6 +305,8 @@ class _AvatarSurface extends StatelessWidget {
             : _AvatarFallback(text: fallbackText),
       ),
     );
+    if (heroTag == null) return surface;
+    return CreatorAvatarHero(tag: heroTag!, child: surface);
   }
 }
 
