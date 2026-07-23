@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'feed_immersive_theme.dart';
 
@@ -68,8 +71,8 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
           children: [
             // Smoothly grow/shrink between collapsed and expanded heights.
             AnimatedSize(
-              duration: FeedImmersiveTheme.motionMedium,
-              curve: FeedImmersiveTheme.settleCurve,
+              duration: FeedImmersiveTheme.motionCaption,
+              curve: FeedImmersiveTheme.premiumSettleCurve,
               alignment: Alignment.topLeft,
               child: RichText(
                 maxLines: _expanded ? null : widget.collapsedLines,
@@ -85,7 +88,10 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
                 padding: const EdgeInsets.only(top: 8),
                 child: _MoreLessPill(
                   expanded: _expanded,
-                  onTap: () => setState(() => _expanded = !_expanded),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _expanded = !_expanded);
+                  },
                 ),
               ),
           ],
@@ -98,7 +104,7 @@ class _ExpandableCaptionState extends State<ExpandableCaption> {
     // Prefer the theme's caption style; ensure white + legibility shadow.
     final captionStyle = FeedImmersiveTheme.caption;
     return captionStyle.copyWith(
-      color: captionStyle.color ?? Colors.white,
+      color: captionStyle.color ?? FeedImmersiveTheme.onMedia,
       shadows: captionStyle.shadows ?? FeedImmersiveTheme.textShadow,
     );
   }
@@ -158,42 +164,59 @@ class _MoreLessPillState extends State<_MoreLessPill> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      onTapDown: (_) => setState(() => _held = true),
-      onTapUp: (_) => setState(() => _held = false),
-      onTapCancel: () => setState(() => _held = false),
-      child: AnimatedScale(
-        scale: _held ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 90),
-        curve: Curves.easeOut,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
-          decoration: BoxDecoration(
-            color: FeedImmersiveTheme.pillBackground,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: FeedImmersiveTheme.pillBorder),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.expanded ? 'LESS' : 'MORE',
-                style: FeedImmersiveTheme.pillLabel,
+    return Semantics(
+      button: true,
+      label: widget.expanded ? 'Collapse caption' : 'Expand caption',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _held = true),
+        onTapUp: (_) => setState(() => _held = false),
+        onTapCancel: () => setState(() => _held = false),
+        child: AnimatedScale(
+          scale: _held ? 0.94 : 1.0,
+          duration: FeedImmersiveTheme.motionPress,
+          curve: FeedImmersiveTheme.premiumSettleCurve,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusPill),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(
+                sigmaX: FeedImmersiveTheme.blurPill,
+                sigmaY: FeedImmersiveTheme.blurPill,
               ),
-              const SizedBox(width: 2),
-              AnimatedRotation(
-                turns: widget.expanded ? 0.5 : 0.0,
-                duration: FeedImmersiveTheme.motionFast,
-                curve: FeedImmersiveTheme.settleCurve,
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: FeedImmersiveTheme.onMedia,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: FeedImmersiveTheme.pillBackground,
+                  borderRadius: BorderRadius.circular(
+                    FeedImmersiveTheme.radiusPill,
+                  ),
+                  border: Border.all(color: FeedImmersiveTheme.glassBorder),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.expanded ? 'LESS' : 'MORE',
+                        style: FeedImmersiveTheme.pillLabel,
+                      ),
+                      const SizedBox(width: 2),
+                      AnimatedRotation(
+                        turns: widget.expanded ? 0.5 : 0.0,
+                        duration: FeedImmersiveTheme.motionFast,
+                        curve: FeedImmersiveTheme.premiumSettleCurve,
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: FeedImmersiveTheme.onMedia,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

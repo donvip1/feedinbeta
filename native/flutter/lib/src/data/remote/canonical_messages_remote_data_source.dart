@@ -116,8 +116,9 @@ class CanonicalMessagesRemoteDataSource
       params: {'p_message': message.toJson()},
     );
     final sent = _decodeEnvelope(value);
-    if (sent == null)
+    if (sent == null) {
       throw const FormatException('Invalid send_message response.');
+    }
     return sent;
   }
 
@@ -135,8 +136,9 @@ class CanonicalMessagesRemoteDataSource
     }
 
     final file = File(localPath);
-    if (!file.existsSync())
+    if (!file.existsSync()) {
       throw StateError('Staged message media is missing.');
+    }
     await _client.storage
         .from(bucket)
         .upload(

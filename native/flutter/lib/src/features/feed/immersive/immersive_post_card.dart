@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../feed_post.dart';
 import 'caption_text.dart';
@@ -52,6 +53,10 @@ class ImmersivePostCard extends StatefulWidget {
 
 class _ImmersivePostCardState extends State<ImmersivePostCard>
     with SingleTickerProviderStateMixin {
+  static const double _railWidth = FeedImmersiveTheme.postRailInset;
+  static const double _contentInset =
+      FeedImmersiveTheme.contentHorizontalPadding;
+
   late final AnimationController _burstController;
   late final Animation<double> _burstScale;
   late final Animation<double> _burstOpacity;
@@ -70,7 +75,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
         tween: Tween(
           begin: 0.4,
           end: 1.15,
-        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        ).chain(CurveTween(curve: FeedImmersiveTheme.popCurve)),
         weight: 45,
       ),
       TweenSequenceItem(tween: ConstantTween(1.15), weight: 25),
@@ -78,7 +83,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
         tween: Tween(
           begin: 1.15,
           end: 1.45,
-        ).chain(CurveTween(curve: Curves.easeIn)),
+        ).chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve)),
         weight: 30,
       ),
     ]).animate(_burstController);
@@ -87,7 +92,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
         tween: Tween(
           begin: 0.0,
           end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeOut)),
+        ).chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve)),
         weight: 25,
       ),
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 40),
@@ -95,7 +100,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
         tween: Tween(
           begin: 1.0,
           end: 0.0,
-        ).chain(CurveTween(curve: Curves.easeIn)),
+        ).chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve)),
         weight: 35,
       ),
     ]).animate(_burstController);
@@ -103,7 +108,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
     // A soft ring that expands outward from the heart and fades — adds a
     // "pop" of energy without a second widget tree to manage.
     _ringScale = Tween(begin: 0.2, end: 1.9)
-        .chain(CurveTween(curve: Curves.easeOutCubic))
+        .chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve))
         .animate(
           CurvedAnimation(
             parent: _burstController,
@@ -111,7 +116,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
           ),
         );
     _ringOpacity = Tween(begin: 0.55, end: 0.0)
-        .chain(CurveTween(curve: Curves.easeOut))
+        .chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve))
         .animate(
           CurvedAnimation(
             parent: _burstController,
@@ -127,6 +132,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
   }
 
   void _handleDoubleTapLike() {
+    HapticFeedback.mediumImpact();
     _burstController.forward(from: 0);
     if (!widget.isLiked) widget.onLike();
   }
@@ -174,60 +180,58 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
     final bottomInset = media.padding.bottom;
 
     return ColoredBox(
-      color: Colors.black,
+      color: FeedImmersiveTheme.mediaBackdrop,
       child: Stack(
         fit: StackFit.expand,
         children: [
           // 1. Background media layer.
-          Positioned.fill(child: _buildMedia()),
+          Positioned.fill(child: RepaintBoundary(child: _buildMedia())),
 
           // 2. The shared top scrim is drawn once by FeedScreen's overlay
           //    (above the pager), so the card omits its own to avoid the
           //    over-darkened "double scrim" at the top of the media.
 
-          // 3. Bottom scrim for overlay legibility.
-          const Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 320,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: FeedImmersiveTheme.bottomScrim,
-                ),
-              ),
-            ),
-          ),
+          // 3. Layered edge treatment: a vertical scrim protects captions and
+          //    a restrained side vignette adds depth without blurring video.
+          const Positioned.fill(child: _ReadabilityScrims()),
 
           // 4. Bottom-left text overlay.
           Positioned(
-            left: 16,
-            right: 78,
-            bottom: 28 + bottomInset,
-            child: _buildOverlay(context),
+            left: _contentInset,
+            right: _railWidth,
+            bottom: FeedImmersiveTheme.overlayBottomPadding + bottomInset,
+            child: _ActiveOverlayTransition(
+              active: widget.isActive,
+              child: _buildOverlay(context),
+            ),
           ),
 
           // 5. Right action rail.
           Positioned(
-            right: 8,
-            bottom: 28 + bottomInset,
-            child: FeedActionRail(
-              likesCount: widget.post.likesCount,
-              commentsCount: widget.post.commentsCount,
-              refeedsCount: widget.post.refeedsCount,
-              viewsCount: widget.post.viewsCount,
-              isLiked: widget.isLiked,
-              isRefeeded: widget.isRefeeded,
-              isSaved: widget.isSaved,
-              avatarText: _contentPost.authorName,
-              avatarUrl: _contentPost.avatarUrl,
-              onLike: widget.onLike,
-              onComment: widget.onComment,
-              onRefeed: widget.onRefeed,
-              onSave: widget.onSave,
-              onShare: widget.onShare,
-              onAvatar: widget.onAvatar,
+            right: FeedImmersiveTheme.railRightInset,
+            bottom: FeedImmersiveTheme.overlayBottomPadding + bottomInset,
+            child: _ActiveOverlayTransition(
+              active: widget.isActive,
+              offset: const Offset(0.04, 0),
+              child: RepaintBoundary(
+                child: FeedActionRail(
+                  likesCount: widget.post.likesCount,
+                  commentsCount: widget.post.commentsCount,
+                  refeedsCount: widget.post.refeedsCount,
+                  viewsCount: widget.post.viewsCount,
+                  isLiked: widget.isLiked,
+                  isRefeeded: widget.isRefeeded,
+                  isSaved: widget.isSaved,
+                  avatarText: _contentPost.authorName,
+                  avatarUrl: _contentPost.avatarUrl,
+                  onLike: widget.onLike,
+                  onComment: widget.onComment,
+                  onRefeed: widget.onRefeed,
+                  onSave: widget.onSave,
+                  onShare: widget.onShare,
+                  onAvatar: widget.onAvatar,
+                ),
+              ),
             ),
           ),
 
@@ -275,24 +279,29 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onDoubleTap: _handleDoubleTapLike,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: FeedImmersiveTheme.brandGradient,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 0, 88, 0),
-          child: Center(
-            child: Text(
-              _contentPost.body,
-              textAlign: TextAlign.center,
-              maxLines: 8,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                height: 1.25,
-                fontWeight: FontWeight.w800,
-                shadows: FeedImmersiveTheme.textShadow,
+      child: Semantics(
+        label: 'Text post by ${_contentPost.authorName}',
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                FeedImmersiveTheme.brandDeepPurple,
+                FeedImmersiveTheme.brandPink,
+                FeedImmersiveTheme.brandOrange,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(30, 0, 96, 0),
+            child: Center(
+              child: Text(
+                _contentPost.body,
+                textAlign: TextAlign.center,
+                maxLines: 8,
+                overflow: TextOverflow.ellipsis,
+                style: FeedImmersiveTheme.textPost,
               ),
             ),
           ),
@@ -307,88 +316,82 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
     final handle = post.meta.trim();
     final hasLocation = post.location?.trim().isNotEmpty ?? false;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (wrapper.originalPost != null) ...[
+    return Semantics(
+      container: true,
+      label: 'Post by ${post.authorName}',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (wrapper.originalPost != null) ...[
+            _OverlayBadge(
+              icon: Icons.repeat_rounded,
+              label: '${wrapper.authorName} re-shared',
+            ),
+            const SizedBox(height: 10),
+          ],
+          // Creator identity gets the strongest typographic emphasis while the
+          // handle stays quiet and never competes with the caption.
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.repeat_rounded,
-                size: 14,
-                color: FeedImmersiveTheme.onMediaMuted,
-              ),
-              const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  '${wrapper.authorName} re-shared',
+                  post.authorName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: FeedImmersiveTheme.metaLabel,
+                  style: FeedImmersiveTheme.authorName,
                 ),
               ),
+              if (_isVerified) ...[
+                const SizedBox(width: 5),
+                const Icon(
+                  Icons.verified_rounded,
+                  color: FeedImmersiveTheme.brandPink,
+                  size: 16,
+                  shadows: FeedImmersiveTheme.textShadow,
+                ),
+              ],
+              if (handle.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    handle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: FeedImmersiveTheme.handle,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
-        ],
-        // Author row.
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                post.authorName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: FeedImmersiveTheme.authorName,
-              ),
+
+          // Caption.
+          if (post.body.trim().isNotEmpty) ...[
+            const SizedBox(height: 9),
+            ExpandableCaption(
+              text: post.body,
+              collapsedLines: 2,
+              linkColor: FeedImmersiveTheme.brandPink,
             ),
-            if (_isVerified) ...[
-              const SizedBox(width: 5),
-              const Icon(
-                Icons.verified,
-                color: FeedImmersiveTheme.brandPink,
-                size: 16,
-                shadows: FeedImmersiveTheme.textShadow,
-              ),
-            ],
-            if (handle.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  handle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: FeedImmersiveTheme.handle,
-                ),
-              ),
-            ],
           ],
-        ),
 
-        // Caption.
-        if (post.body.trim().isNotEmpty) ...[
-          const SizedBox(height: 10),
-          ExpandableCaption(
-            text: post.body,
-            collapsedLines: 2,
-            linkColor: FeedImmersiveTheme.brandPink,
+          // Metadata is compact and pill-shaped so it reads as context, not a
+          // second caption block.
+          if (hasLocation) ...[
+            const SizedBox(height: 11),
+            _OverlayBadge(
+              icon: Icons.place_rounded,
+              label: post.location!.trim(),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _OverlayBadge(
+            icon: Icons.music_note_rounded,
+            label: 'Original audio · ${post.authorName}',
           ),
         ],
-
-        // Meta row(s): location and audio.
-        const SizedBox(height: 12),
-        if (hasLocation) ...[
-          _MetaRow(icon: Icons.place, label: post.location!.trim()),
-          const SizedBox(height: 7),
-        ],
-        _MetaRow(
-          icon: Icons.music_note,
-          label: 'Original audio · ${post.authorName}',
-        ),
-      ],
+      ),
     );
   }
 
@@ -444,33 +447,112 @@ class _ImmersivePostCardState extends State<ImmersivePostCard>
   }
 }
 
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({required this.icon, required this.label});
+class _ReadabilityScrims extends StatelessWidget {
+  const _ReadabilityScrims();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: double.infinity,
+              height: FeedImmersiveTheme.overlayBottomHeight,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: FeedImmersiveTheme.bottomScrim,
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: Container(
+              height: FeedImmersiveTheme.overlayVignetteHeight,
+              width: FeedImmersiveTheme.overlayVignetteWidth,
+              decoration: const BoxDecoration(
+                gradient: FeedImmersiveTheme.sideScrim,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveOverlayTransition extends StatelessWidget {
+  const _ActiveOverlayTransition({
+    required this.active,
+    required this.child,
+    this.offset = const Offset(0, 0.025),
+  });
+
+  final bool active;
+  final Widget child;
+  final Offset offset;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      offset: active ? Offset.zero : offset,
+      duration: FeedImmersiveTheme.motionMedium,
+      curve: FeedImmersiveTheme.premiumSettleCurve,
+      child: AnimatedOpacity(
+        opacity: active
+            ? FeedImmersiveTheme.opacityVisible
+            : FeedImmersiveTheme.opacityInactive,
+        duration: FeedImmersiveTheme.motionMedium,
+        curve: FeedImmersiveTheme.premiumSettleCurve,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _OverlayBadge extends StatelessWidget {
+  const _OverlayBadge({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 15,
-          color: FeedImmersiveTheme.onMediaMuted,
-          shadows: FeedImmersiveTheme.textShadow,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: FeedImmersiveTheme.glassSurface,
+        borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusPill),
+        border: Border.all(color: FeedImmersiveTheme.glassBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: FeedImmersiveTheme.spacingSm + 1,
+          vertical: FeedImmersiveTheme.spacingXs + 1,
         ),
-        const SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: FeedImmersiveTheme.metaLabel,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: FeedImmersiveTheme.onMediaMuted,
+              shadows: FeedImmersiveTheme.textShadow,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: FeedImmersiveTheme.metaLabel.copyWith(fontSize: 12),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

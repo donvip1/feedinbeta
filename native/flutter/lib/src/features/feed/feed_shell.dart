@@ -1207,6 +1207,12 @@ class _FeedScreenState extends State<FeedScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: FeedImmersiveTheme.motionSheet,
+        reverseDuration: FeedImmersiveTheme.motionSheetReverse,
+        curve: FeedImmersiveTheme.sheetCurve,
+        reverseCurve: FeedImmersiveTheme.sheetReverseCurve,
+      ),
       builder: (context) => _CommentSheet(
         post: post,
         comments: comments,
@@ -1307,13 +1313,26 @@ class _FeedScreenState extends State<FeedScreen> {
                 right: 0,
                 child: _buildTopOverlay(context),
               ),
-              if (_message != null)
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  child: _FeedStatusBanner(message: _message),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: IgnorePointer(
+                  child: AnimatedSlide(
+                    offset: _message == null
+                        ? const Offset(0, 0.35)
+                        : Offset.zero,
+                    duration: FeedImmersiveTheme.motionStatus,
+                    curve: FeedImmersiveTheme.premiumSettleCurve,
+                    child: AnimatedOpacity(
+                      opacity: _message == null ? 0 : 1,
+                      duration: FeedImmersiveTheme.motionFast,
+                      curve: FeedImmersiveTheme.premiumSettleCurve,
+                      child: _FeedStatusBanner(message: _message),
+                    ),
+                  ),
                 ),
+              ),
             ],
           ),
         );
@@ -1532,8 +1551,8 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
       onTapCancel: () => setState(() => _held = false),
       child: AnimatedScale(
         scale: _held ? 0.93 : 1.0,
-        duration: const Duration(milliseconds: 90),
-        curve: Curves.easeOut,
+        duration: FeedImmersiveTheme.motionPress,
+        curve: FeedImmersiveTheme.premiumSettleCurve,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Column(
@@ -1541,7 +1560,7 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
             children: [
               AnimatedDefaultTextStyle(
                 duration: FeedImmersiveTheme.motionFast,
-                curve: FeedImmersiveTheme.settleCurve,
+                curve: FeedImmersiveTheme.premiumSettleCurve,
                 style: TextStyle(
                   color: selected ? Colors.white : Colors.white60,
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
@@ -1554,7 +1573,7 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
               const SizedBox(height: 5),
               AnimatedContainer(
                 duration: FeedImmersiveTheme.motionFast,
-                curve: FeedImmersiveTheme.settleCurve,
+                curve: FeedImmersiveTheme.premiumSettleCurve,
                 height: 3,
                 width: selected ? 24 : 0,
                 decoration: const BoxDecoration(
@@ -1651,7 +1670,7 @@ class _ImmersiveLoadingStateState extends State<_ImmersiveLoadingState>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: FeedImmersiveTheme.motionLoading,
     )..repeat(reverse: true);
   }
 
@@ -1673,7 +1692,10 @@ class _ImmersiveLoadingStateState extends State<_ImmersiveLoadingState>
               opacity: Tween(begin: 0.45, end: 1.0).animate(_controller),
               child: ScaleTransition(
                 scale: Tween(begin: 0.92, end: 1.04).animate(
-                  CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+                  CurvedAnimation(
+                    parent: _controller,
+                    curve: FeedImmersiveTheme.gentleCurve,
+                  ),
                 ),
                 child: Container(
                   width: 56,
@@ -1681,9 +1703,7 @@ class _ImmersiveLoadingStateState extends State<_ImmersiveLoadingState>
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: FeedImmersiveTheme.brandGradient,
-                    boxShadow: [
-                      BoxShadow(color: Color(0x66FF3D9A), blurRadius: 24),
-                    ],
+                    boxShadow: FeedImmersiveTheme.brandGlow,
                   ),
                   child: const Icon(
                     Icons.play_arrow_rounded,

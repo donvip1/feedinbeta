@@ -1,15 +1,14 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../lib/src/core/connectivity/connectivity_service.dart';
-import '../lib/src/core/sync/incremental_message_sync_service.dart';
-import '../lib/src/data/local/canonical_message_store.dart';
-import '../lib/src/data/remote/canonical_messages_remote_data_source.dart';
-import '../lib/src/features/messages/canonical_message.dart';
+import 'package:feedin/src/core/connectivity/connectivity_service.dart';
+import 'package:feedin/src/core/sync/incremental_message_sync_service.dart';
+import 'package:feedin/src/data/local/canonical_message_store.dart';
+import 'package:feedin/src/data/remote/canonical_messages_remote_data_source.dart';
+import 'package:feedin/src/features/messages/canonical_message.dart';
 
 void main() {
   late Directory directory;

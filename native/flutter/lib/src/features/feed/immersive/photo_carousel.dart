@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'feed_immersive_theme.dart';
 
@@ -65,14 +66,17 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         fit: StackFit.expand,
         children: [
           // Dark backdrop so any letterboxing / loading reads as black, not white.
-          const ColoredBox(color: Colors.black),
+          const ColoredBox(color: FeedImmersiveTheme.mediaBackdrop),
           PageView.builder(
             controller: _controller,
             physics: hasMultiple
                 ? const PageScrollPhysics()
                 : const NeverScrollableScrollPhysics(),
             itemCount: count,
-            onPageChanged: (index) => setState(() => _currentIndex = index),
+            onPageChanged: (index) {
+              HapticFeedback.selectionClick();
+              setState(() => _currentIndex = index);
+            },
             itemBuilder: (context, index) {
               return _CarouselImage(
                 url: urls[index],
@@ -84,8 +88,8 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
           // Top-right "1/3" counter pill.
           if (hasMultiple)
             Positioned(
-              top: 12,
-              right: 12,
+              top: FeedImmersiveTheme.spacingMd,
+              right: FeedImmersiveTheme.spacingMd,
               child: _CounterPill(current: _currentIndex + 1, total: count),
             ),
 
@@ -94,7 +98,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 90,
+              bottom: FeedImmersiveTheme.carouselIndicatorBottom,
               child: _PageDots(count: count, activeIndex: _currentIndex),
             ),
         ],
@@ -151,14 +155,16 @@ class _PhotoPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const ColoredBox(
-      color: Color(0xFF111111),
+      color: FeedImmersiveTheme.mediaPlaceholder,
       child: Center(
         child: SizedBox(
-          width: 28,
-          height: 28,
+          width: FeedImmersiveTheme.loadingIndicatorSm,
+          height: FeedImmersiveTheme.loadingIndicatorSm,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white30),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              FeedImmersiveTheme.mediaGlyphMuted,
+            ),
           ),
         ),
       ),
@@ -173,12 +179,12 @@ class _PhotoError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: const Color(0xFF111111),
-      child: Center(
+      color: FeedImmersiveTheme.mediaPlaceholder,
+      child: const Center(
         child: Icon(
           Icons.broken_image_outlined,
-          size: 48,
-          color: Colors.white.withValues(alpha: 0.4),
+          size: FeedImmersiveTheme.iconXl,
+          color: FeedImmersiveTheme.mediaGlyphMuted,
         ),
       ),
     );
@@ -195,16 +201,18 @@ class _CounterPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FeedImmersiveTheme.spacingSm + 2,
+        vertical: FeedImmersiveTheme.spacingXs,
+      ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(999),
+        color: FeedImmersiveTheme.glassSurfaceStrong,
+        borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusPill),
+        border: Border.all(color: FeedImmersiveTheme.glassBorder),
       ),
       child: Text(
         '$current/$total',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
+        style: FeedImmersiveTheme.chipLabel.copyWith(
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -226,16 +234,20 @@ class _PageDots extends StatelessWidget {
       children: List.generate(count, (index) {
         final isActive = index == activeIndex;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: isActive ? 18 : 6,
-          height: 6,
+          duration: FeedImmersiveTheme.motionCarousel,
+          curve: FeedImmersiveTheme.premiumSettleCurve,
+          margin: const EdgeInsets.symmetric(
+            horizontal: FeedImmersiveTheme.spacingXs - 1,
+          ),
+          width: isActive
+              ? FeedImmersiveTheme.carouselDotActiveWidth
+              : FeedImmersiveTheme.carouselDotSize,
+          height: FeedImmersiveTheme.carouselDotSize,
           decoration: BoxDecoration(
             color: isActive
                 ? FeedImmersiveTheme.brandPink
-                : Colors.white.withValues(alpha: 0.38),
-            borderRadius: BorderRadius.circular(999),
+                : FeedImmersiveTheme.indicatorInactive,
+            borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusPill),
           ),
         );
       }),

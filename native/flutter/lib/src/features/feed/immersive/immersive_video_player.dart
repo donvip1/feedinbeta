@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/media/reel_preloader.dart';
@@ -107,8 +108,9 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     // Prefer an explicit local file; otherwise use a preloaded cache file when
     // one is ready so a swiped-to reel starts instantly instead of cold-
     // streaming. Falls back to the network URL when nothing is cached yet.
-    String? filePath =
-        (localPath != null && File(localPath).existsSync()) ? localPath : null;
+    String? filePath = (localPath != null && File(localPath).existsSync())
+        ? localPath
+        : null;
     filePath ??= await ReelPreloader.instance.cachedFileFor(url);
     if (!mounted) return; // widget disposed during the cache lookup
 
@@ -214,13 +216,14 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     } else {
       controller.play();
     }
+    HapticFeedback.selectionClick();
     _flashTapIcon(wasPlaying ? Icons.pause : Icons.play_arrow);
   }
 
   void _flashTapIcon(IconData icon) {
     _tapIconTimer?.cancel();
     setState(() => _tapIcon = icon);
-    _tapIconTimer = Timer(const Duration(milliseconds: 600), () {
+    _tapIconTimer = Timer(FeedImmersiveTheme.motionPlaybackVisible, () {
       if (mounted) setState(() => _tapIcon = null);
     });
   }
@@ -250,7 +253,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
       onTap: _handleTap,
       onDoubleTap: widget.onDoubleTapLike,
       child: ColoredBox(
-        color: Colors.black,
+        color: FeedImmersiveTheme.mediaBackdrop,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -294,8 +297,8 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
       child: loading
           ? const Center(
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: FeedImmersiveTheme.loadingIndicatorSm,
+                height: FeedImmersiveTheme.loadingIndicatorSm,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.4,
                   valueColor: AlwaysStoppedAnimation<Color>(
@@ -313,8 +316,8 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   Widget _buildBufferingSpinner() {
     return const Center(
       child: SizedBox(
-        width: 34,
-        height: 34,
+        width: FeedImmersiveTheme.loadingIndicatorMd,
+        height: FeedImmersiveTheme.loadingIndicatorMd,
         child: CircularProgressIndicator(
           strokeWidth: 2.6,
           valueColor: AlwaysStoppedAnimation<Color>(FeedImmersiveTheme.onMedia),
@@ -326,20 +329,30 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   Widget _buildTapFeedback() {
     final icon = _tapIcon;
     return Center(
-      child: AnimatedOpacity(
-        opacity: icon == null ? 0 : 1,
-        duration: const Duration(milliseconds: 150),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: const BoxDecoration(
-            color: Color(0x55000000),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon ?? Icons.play_arrow,
-            color: FeedImmersiveTheme.onMedia,
-            size: 56,
-            shadows: FeedImmersiveTheme.textShadow,
+      child: AnimatedScale(
+        scale: icon == null ? 0.84 : FeedImmersiveTheme.opacityVisible,
+        duration: FeedImmersiveTheme.motionPlaybackFeedback,
+        curve: FeedImmersiveTheme.premiumSettleCurve,
+        child: AnimatedOpacity(
+          opacity: icon == null
+              ? FeedImmersiveTheme.opacityHidden
+              : FeedImmersiveTheme.opacityVisible,
+          duration: FeedImmersiveTheme.motionPlaybackFade,
+          curve: FeedImmersiveTheme.premiumSettleCurve,
+          child: Container(
+            padding: const EdgeInsets.all(
+              FeedImmersiveTheme.playbackFeedbackPadding,
+            ),
+            decoration: const BoxDecoration(
+              color: FeedImmersiveTheme.overlayControl,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon ?? Icons.play_arrow,
+              color: FeedImmersiveTheme.onMedia,
+              size: FeedImmersiveTheme.playbackFeedbackIcon,
+              shadows: FeedImmersiveTheme.textShadow,
+            ),
           ),
         ),
       ),
@@ -350,15 +363,15 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
-        height: 3,
+        height: FeedImmersiveTheme.progressTrackHeight,
         child: VideoProgressIndicator(
           controller,
           allowScrubbing: false,
           padding: EdgeInsets.zero,
           colors: const VideoProgressColors(
             playedColor: FeedImmersiveTheme.brandPink,
-            bufferedColor: Color(0x66FFFFFF),
-            backgroundColor: Color(0x33FFFFFF),
+            bufferedColor: FeedImmersiveTheme.progressBuffered,
+            backgroundColor: FeedImmersiveTheme.progressTrack,
           ),
         ),
       ),
@@ -371,17 +384,21 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
       alignment: Alignment.bottomRight,
       child: Padding(
         // Sit just above the progress bar.
-        padding: const EdgeInsets.only(right: 10, bottom: 14),
+        padding: const EdgeInsets.only(
+          right: FeedImmersiveTheme.muteControlRightInset,
+          bottom: FeedImmersiveTheme.muteControlBottomInset,
+        ),
         child: DecoratedBox(
           decoration: const BoxDecoration(
-            color: Color(0x40000000),
+            color: FeedImmersiveTheme.overlayControlSoft,
             shape: BoxShape.circle,
+            boxShadow: FeedImmersiveTheme.mediaControlShadow,
           ),
           child: IconButton(
             tooltip: muted ? 'Unmute' : 'Mute',
             onPressed: enabled ? _toggleMute : null,
             color: FeedImmersiveTheme.onMedia,
-            iconSize: 22,
+            iconSize: FeedImmersiveTheme.iconMd,
             icon: Icon(muted ? Icons.volume_off : Icons.volume_up),
           ),
         ),

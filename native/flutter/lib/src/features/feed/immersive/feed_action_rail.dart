@@ -1,15 +1,15 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'feed_immersive_theme.dart';
 
-/// The right-side vertical action rail for the immersive (TikTok-style) feed.
+/// Premium vertical actions for an immersive post.
 ///
-/// Mirrors the web `ImmersivePostCard` sidebar: a tappable avatar followed by
-/// like / comment / refeed / save / share controls stacked vertically and
-/// centered. Each glyph sits inside a translucent circular chip
-/// (`bg-black/40 backdrop-blur-sm` in the web app); the chip tints to the
-/// brand accent when its control is active (liked / saved) and the like heart
-/// switches to [FeedImmersiveTheme.likeActive].
+/// This widget is intentionally presentation-only. The callbacks and state
+/// supplied by [ImmersivePostCard] remain the source of truth for all writes.
+/// The rail owns only touch feedback, motion, semantics, and composition.
 class FeedActionRail extends StatelessWidget {
   const FeedActionRail({
     super.key,
@@ -46,71 +46,88 @@ class FeedActionRail extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback? onAvatar;
 
+  static const double _actionSize = FeedImmersiveTheme.touchTargetAction;
+  static const double _verticalGap = FeedImmersiveTheme.railGap;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _RailAvatar(
-          avatarText: avatarText,
-          avatarUrl: avatarUrl,
-          onTap: onAvatar,
+    return Semantics(
+      container: true,
+      label: 'Post actions',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: FeedImmersiveTheme.railWidth,
+          maxWidth: FeedImmersiveTheme.railMaxWidth,
         ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailButton(
-          icon: isLiked ? Icons.favorite : Icons.favorite_border,
-          color: isLiked ? FeedImmersiveTheme.likeActive : Colors.white,
-          chipColor: isLiked ? FeedImmersiveTheme.likeChip : null,
-          active: isLiked,
-          label: _compactCount(likesCount),
-          onTap: onLike,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _RailAvatar(
+              avatarText: avatarText,
+              avatarUrl: avatarUrl,
+              onTap: onAvatar,
+            ),
+            const SizedBox(height: _verticalGap + 5),
+            _RailAction(
+              icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border,
+              iconColor: isLiked
+                  ? FeedImmersiveTheme.likeActive
+                  : FeedImmersiveTheme.onMedia,
+              activeColor: isLiked ? FeedImmersiveTheme.likeChip : null,
+              active: isLiked,
+              label: 'Like',
+              value: _compactCount(likesCount),
+              onTap: onLike,
+            ),
+            const SizedBox(height: _verticalGap),
+            _RailAction(
+              icon: Icons.mode_comment_outlined,
+              label: 'Comment',
+              value: _compactCount(commentsCount),
+              onTap: onComment,
+            ),
+            const SizedBox(height: _verticalGap),
+            _RailAction(
+              icon: Icons.repeat_rounded,
+              iconColor: isRefeeded
+                  ? FeedImmersiveTheme.refeedActive
+                  : FeedImmersiveTheme.onMedia,
+              activeColor: isRefeeded ? FeedImmersiveTheme.refeedChip : null,
+              active: isRefeeded,
+              label: 'Refeed',
+              value: _compactCount(refeedsCount),
+              onTap: onRefeed,
+            ),
+            const SizedBox(height: _verticalGap),
+            _RailAction(
+              icon: Icons.ios_share_rounded,
+              label: 'Share',
+              onTap: onShare,
+            ),
+            const SizedBox(height: _verticalGap),
+            _RailAction(
+              icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border,
+              iconColor: isSaved
+                  ? FeedImmersiveTheme.saveActive
+                  : FeedImmersiveTheme.onMedia,
+              activeColor: isSaved ? FeedImmersiveTheme.saveChip : null,
+              active: isSaved,
+              label: 'Bookmark',
+              onTap: onSave,
+            ),
+            if (viewsCount > 0) ...[
+              const SizedBox(height: _verticalGap),
+              _RailMetric(label: 'Views', value: _compactCount(viewsCount)),
+            ],
+            const SizedBox(height: _verticalGap),
+            const _AudioDisc(),
+          ],
         ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailButton(
-          icon: Icons.mode_comment_outlined,
-          label: _compactCount(commentsCount),
-          onTap: onComment,
-        ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailButton(
-          icon: Icons.repeat,
-          color: isRefeeded ? const Color(0xFF22C55E) : Colors.white,
-          chipColor: isRefeeded ? const Color(0x3322C55E) : null,
-          active: isRefeeded,
-          label: _compactCount(refeedsCount),
-          onTap: onRefeed,
-        ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailButton(
-          icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
-          color: isSaved ? FeedImmersiveTheme.saveActive : Colors.white,
-          chipColor: isSaved ? FeedImmersiveTheme.saveChip : null,
-          active: isSaved,
-          label: 'Save',
-          onTap: onSave,
-        ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailButton(icon: Icons.ios_share, label: 'Share', onTap: onShare),
-        // Views is a passive metric (no tap target), mirroring the web rail's
-        // Eye counter; rendered muted so it reads as informational.
-        if (viewsCount > 0) ...[
-          const SizedBox(height: FeedImmersiveTheme.railGap),
-          _RailMetric(
-            icon: Icons.visibility_outlined,
-            label: _compactCount(viewsCount),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
 
-/// Circular avatar at the top of the rail. Shows a network image when
-/// [avatarUrl] is provided, otherwise a brand-gradient circle with the first
-/// character of [avatarText]. A brand-gradient ring frames the avatar and a
-/// small "+" follow badge overlaps the bottom-center. Presses scale down for
-/// tactile feedback (mirrors `active:scale-95` in the web app).
 class _RailAvatar extends StatefulWidget {
   const _RailAvatar({
     required this.avatarText,
@@ -127,86 +144,154 @@ class _RailAvatar extends StatefulWidget {
 }
 
 class _RailAvatarState extends State<_RailAvatar> {
-  bool _held = false;
+  bool _pressed = false;
+  bool _hovered = false;
+  bool _focused = false;
+
+  void _activate() {
+    if (widget.onTap == null) return;
+    HapticFeedback.selectionClick();
+    widget.onTap!();
+  }
 
   @override
   Widget build(BuildContext context) {
     const size = FeedImmersiveTheme.avatarSize;
-    final url = widget.avatarUrl;
-    final hasImage = url != null && url.isNotEmpty;
+    final label = widget.onTap == null
+        ? 'Profile picture of ${widget.avatarText}'
+        : 'Open ${widget.avatarText} profile';
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _held = true),
-      onTapUp: (_) => setState(() => _held = false),
-      onTapCancel: () => setState(() => _held = false),
-      child: AnimatedScale(
-        scale: _held ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOut,
-        child: SizedBox(
-          // Extra height so the overlapping follow badge isn't clipped.
-          width: size,
-          height: size + 10,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.topCenter,
-            children: [
-              // Gradient ring framing the avatar.
-              Container(
-                width: size,
-                height: size,
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: FeedImmersiveTheme.brandGradient,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x59000000),
-                      blurRadius: 10,
-                      offset: Offset(0, 2),
+    return Semantics(
+      button: widget.onTap != null,
+      label: label,
+      child: FocusableActionDetector(
+        enabled: widget.onTap != null,
+        mouseCursor: widget.onTap == null
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        onShowHoverHighlight: (value) => setState(() => _hovered = value),
+        onShowFocusHighlight: (value) => setState(() => _focused = value),
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        },
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              _activate();
+              return null;
+            },
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap == null ? null : _activate,
+          onTapDown: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = true),
+          onTapUp: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = false),
+          onTapCancel: widget.onTap == null
+              ? null
+              : () => setState(() => _pressed = false),
+          child: AnimatedScale(
+            scale: _pressed ? 0.92 : (_hovered || _focused ? 1.04 : 1),
+            duration: FeedImmersiveTheme.motionFast,
+            curve: FeedImmersiveTheme.premiumSettleCurve,
+            child: SizedBox(
+              width: size,
+              height: size + 12,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topCenter,
+                children: [
+                  _AvatarSurface(
+                    size: size,
+                    url: widget.avatarUrl,
+                    fallbackText: widget.avatarText,
+                    emphasized: _hovered || _focused,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    child: ExcludeSemantics(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: FeedImmersiveTheme.brandGradient,
+                          border: Border.all(
+                            color: FeedImmersiveTheme.onMedia,
+                            width: 1.5,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: FeedImmersiveTheme.overlayControl,
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: Icon(Icons.add_rounded, size: 14),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black, width: 1.5),
-                    gradient: hasImage
-                        ? null
-                        : FeedImmersiveTheme.brandGradient,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: hasImage
-                      ? Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _AvatarFallback(text: widget.avatarText),
-                        )
-                      : _AvatarFallback(text: widget.avatarText),
-                ),
+                ],
               ),
-              Positioned(
-                bottom: 0,
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: FeedImmersiveTheme.brandGradient,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x4D000000), blurRadius: 4),
-                    ],
-                  ),
-                  child: const Icon(Icons.add, size: 14, color: Colors.white),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AvatarSurface extends StatelessWidget {
+  const _AvatarSurface({
+    required this.size,
+    required this.url,
+    required this.fallbackText,
+    required this.emphasized,
+  });
+
+  final double size;
+  final String? url;
+  final String fallbackText;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = url?.trim().isNotEmpty == true;
+    return AnimatedContainer(
+      duration: FeedImmersiveTheme.motionFast,
+      curve: FeedImmersiveTheme.premiumSettleCurve,
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(emphasized ? 2.5 : 2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: FeedImmersiveTheme.brandGradient,
+        boxShadow: [
+          BoxShadow(
+            color: FeedImmersiveTheme.overlayBottomSoft,
+            blurRadius: emphasized ? 16 : 10,
+            offset: const Offset(0, 3),
+          ),
+          if (emphasized) ...FeedImmersiveTheme.brandGlow,
+        ],
+      ),
+      child: ClipOval(
+        child: hasImage
+            ? Image.network(
+                url!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, _, _) => _AvatarFallback(text: fallbackText),
+              )
+            : _AvatarFallback(text: fallbackText),
       ),
     );
   }
@@ -232,7 +317,7 @@ class _AvatarFallback extends StatelessWidget {
         child: Text(
           initial,
           style: const TextStyle(
-            color: Colors.white,
+            color: FeedImmersiveTheme.onMedia,
             fontSize: 20,
             fontWeight: FontWeight.w900,
           ),
@@ -242,50 +327,36 @@ class _AvatarFallback extends StatelessWidget {
   }
 }
 
-/// A single icon + label entry in the action rail.
-///
-/// The glyph sits inside a translucent circular chip (matching the web app's
-/// `bg-black/40` rounded buttons) which tints to [chipColor] when the control
-/// is [active]. Provides three layered micro-interactions:
-/// * a subtle press-in scale-down while the finger is held (`active:scale-95`
-///   in the web app),
-/// * a springy "pop" on release, and
-/// * a one-shot thump + smooth color cross-fade when the control toggles to its
-///   [active] state (like / save).
-class _RailButton extends StatefulWidget {
-  const _RailButton({
+class _RailAction extends StatefulWidget {
+  const _RailAction({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.color = Colors.white,
-    this.chipColor,
+    this.value,
+    this.iconColor = FeedImmersiveTheme.onMedia,
+    this.activeColor,
     this.active = false,
   });
 
   final IconData icon;
   final String label;
+  final String? value;
   final VoidCallback onTap;
-  final Color color;
-
-  /// Background tint for the icon chip when [active]; null falls back to the
-  /// default translucent black chip.
-  final Color? chipColor;
-
-  /// Whether the control is in its highlighted state (liked / saved). Drives
-  /// the chip + color cross-fade and a one-shot pop when it flips to true.
+  final Color iconColor;
+  final Color? activeColor;
   final bool active;
 
   @override
-  State<_RailButton> createState() => _RailButtonState();
+  State<_RailAction> createState() => _RailActionState();
 }
 
-class _RailButtonState extends State<_RailButton>
+class _RailActionState extends State<_RailAction>
     with SingleTickerProviderStateMixin {
   late final AnimationController _popController;
   late final Animation<double> _popScale;
-
-  // Finger-held press state (cheap, rebuilds via AnimatedScale only).
-  bool _held = false;
+  bool _pressed = false;
+  bool _hovered = false;
+  bool _focused = false;
 
   @override
   void initState() {
@@ -293,33 +364,29 @@ class _RailButtonState extends State<_RailButton>
     _popController = AnimationController(
       vsync: this,
       duration: FeedImmersiveTheme.motionPop,
-      reverseDuration: const Duration(milliseconds: 220),
     );
     _popScale = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween(
           begin: 1.0,
-          end: FeedImmersiveTheme.pressPopScale,
+          end: 1.14,
         ).chain(CurveTween(curve: FeedImmersiveTheme.popCurve)),
-        weight: 45,
+        weight: 42,
       ),
       TweenSequenceItem(
         tween: Tween(
-          begin: FeedImmersiveTheme.pressPopScale,
+          begin: 1.14,
           end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 55,
+        ).chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve)),
+        weight: 58,
       ),
     ]).animate(_popController);
   }
 
   @override
-  void didUpdateWidget(covariant _RailButton oldWidget) {
+  void didUpdateWidget(covariant _RailAction oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Thump only on the off -> on transition so toggling off is calm.
-    if (widget.active && !oldWidget.active) {
-      _pop();
-    }
+    if (widget.active && !oldWidget.active) _pop();
   }
 
   @override
@@ -330,129 +397,256 @@ class _RailButtonState extends State<_RailButton>
 
   void _pop() => _popController.forward(from: 0);
 
-  void _handleTap() {
+  void _activate() {
+    HapticFeedback.selectionClick();
     _pop();
     widget.onTap();
   }
 
   @override
   Widget build(BuildContext context) {
-    final chipColor = widget.active && widget.chipColor != null
-        ? widget.chipColor!
+    final highlighted = _hovered || _focused;
+    final background = widget.active && widget.activeColor != null
+        ? widget.activeColor!
         : FeedImmersiveTheme.railChip;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _handleTap,
-      onTapDown: (_) => setState(() => _held = true),
-      onTapUp: (_) => setState(() => _held = false),
-      onTapCancel: () => setState(() => _held = false),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedScale(
-            scale: _held ? 0.9 : 1.0,
-            duration: const Duration(milliseconds: 90),
-            curve: Curves.easeOut,
-            child: ScaleTransition(
-              scale: _popScale,
-              // Translucent circular chip behind the glyph, tinting to the
-              // active accent on like / save.
-              child: TweenAnimationBuilder<Color?>(
-                duration: FeedImmersiveTheme.motionFast,
-                curve: FeedImmersiveTheme.settleCurve,
-                tween: ColorTween(end: chipColor),
-                builder: (context, chip, _) => Container(
-                  width: FeedImmersiveTheme.railChipSize,
-                  height: FeedImmersiveTheme.railChipSize,
-                  decoration: BoxDecoration(
-                    color: chip ?? chipColor,
-                    shape: BoxShape.circle,
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x40000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: TweenAnimationBuilder<Color?>(
-                    duration: FeedImmersiveTheme.motionFast,
-                    curve: FeedImmersiveTheme.settleCurve,
-                    tween: ColorTween(end: widget.color),
-                    builder: (context, color, child) => Icon(
-                      widget.icon,
-                      size: FeedImmersiveTheme.railIconSize,
-                      color: color ?? widget.color,
-                      shadows: FeedImmersiveTheme.textShadow,
+    final semanticValue = widget.value == null
+        ? null
+        : '${widget.value} ${widget.label.toLowerCase()}';
+
+    return Semantics(
+      button: true,
+      label: widget.label,
+      value: semanticValue,
+      toggled: widget.active,
+      hint: 'Double tap to activate',
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: (value) => setState(() => _hovered = value),
+        onShowFocusHighlight: (value) => setState(() => _focused = value),
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        },
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              _activate();
+              return null;
+            },
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _activate,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: SizedBox(
+            width: _RailActionSize.width,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: _pressed ? 0.91 : (highlighted ? 1.04 : 1),
+                  duration: FeedImmersiveTheme.motionPress,
+                  curve: FeedImmersiveTheme.premiumSettleCurve,
+                  child: ScaleTransition(
+                    scale: _popScale,
+                    child: _GlassActionSurface(
+                      background: background,
+                      highlighted: highlighted,
+                      icon: widget.icon,
+                      iconColor: widget.iconColor,
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 5),
+                Text(
+                  widget.value ?? widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: FeedImmersiveTheme.countLabel.copyWith(
+                    color: highlighted
+                        ? Colors.white
+                        : FeedImmersiveTheme.onMedia,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(widget.label, style: FeedImmersiveTheme.countLabel),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// A passive (non-tappable) metric entry in the rail, e.g. the views counter.
-/// Mirrors the web rail's Eye chip + count; rendered muted so it reads as
-/// informational rather than an action.
-class _RailMetric extends StatelessWidget {
-  const _RailMetric({required this.icon, required this.label});
+class _RailActionSize {
+  const _RailActionSize._();
 
+  static const double width = FeedImmersiveTheme.railWidth;
+}
+
+class _GlassActionSurface extends StatelessWidget {
+  const _GlassActionSurface({
+    required this.background,
+    required this.highlighted,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  final Color background;
+  final bool highlighted;
   final IconData icon;
-  final String label;
+  final Color iconColor;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: FeedImmersiveTheme.railChipSize,
-          height: FeedImmersiveTheme.railChipSize,
-          decoration: const BoxDecoration(
-            color: FeedImmersiveTheme.railChip,
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(
+          sigmaX: FeedImmersiveTheme.blurControl,
+          sigmaY: FeedImmersiveTheme.blurControl,
+        ),
+        child: AnimatedContainer(
+          duration: FeedImmersiveTheme.motionFast,
+          curve: FeedImmersiveTheme.premiumSettleCurve,
+          width: _RailActionSize.width,
+          height: FeedActionRail._actionSize,
+          decoration: BoxDecoration(
+            color: background,
             shape: BoxShape.circle,
+            border: Border.all(
+              color: highlighted
+                  ? FeedImmersiveTheme.glassFocusBorder
+                  : FeedImmersiveTheme.glassBorder,
+              width: highlighted ? 1.2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: FeedImmersiveTheme.overlayControl,
+                blurRadius: highlighted ? 14 : 9,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            size: FeedImmersiveTheme.railIconSize - 2,
-            color: FeedImmersiveTheme.onMediaMuted,
-            shadows: FeedImmersiveTheme.textShadow,
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: FeedImmersiveTheme.motionPress,
+              switchInCurve: FeedImmersiveTheme.popCurve,
+              switchOutCurve: FeedImmersiveTheme.sheetReverseCurve,
+              transitionBuilder: (child, animation) => ScaleTransition(
+                scale: animation,
+                child: FadeTransition(opacity: animation, child: child),
+              ),
+              child: Icon(
+                icon,
+                key: ValueKey<IconData>(icon),
+                size: FeedImmersiveTheme.railIconSize,
+                color: iconColor,
+                shadows: FeedImmersiveTheme.textShadow,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: FeedImmersiveTheme.countLabel.copyWith(
-            color: FeedImmersiveTheme.onMediaMuted,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-/// Formats a count compactly (e.g. 1.2K, 3.4M). Returns "0" for non-positive.
+class _RailMetric extends StatelessWidget {
+  const _RailMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: label,
+      value: value,
+      child: SizedBox(
+        width: _RailActionSize.width,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _GlassActionSurface(
+              background: FeedImmersiveTheme.railChip,
+              highlighted: false,
+              icon: Icons.visibility_outlined,
+              iconColor: FeedImmersiveTheme.onMediaMuted,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: FeedImmersiveTheme.countLabel.copyWith(
+                color: FeedImmersiveTheme.onMediaMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact non-interactive record that gives the rail a recognizable audio
+/// endpoint without inventing a new business callback.
+class _AudioDisc extends StatelessWidget {
+  const _AudioDisc();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Original audio',
+      child: SizedBox(
+        width: _RailActionSize.width,
+        height: _RailActionSize.width,
+        child: Center(
+          child: Container(
+            width: FeedImmersiveTheme.audioDiscSize,
+            height: FeedImmersiveTheme.audioDiscSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: FeedImmersiveTheme.audioDiscGradient,
+              boxShadow: const [
+                BoxShadow(
+                  color: FeedImmersiveTheme.overlayControl,
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(FeedImmersiveTheme.audioDiscInset),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: FeedImmersiveTheme.audioDiscSurface,
+              ),
+              child: const Icon(
+                Icons.music_note_rounded,
+                size: FeedImmersiveTheme.iconSm,
+                color: FeedImmersiveTheme.onMedia,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 String _compactCount(int value) {
   if (value <= 0) return '0';
-  if (value >= 1000000) {
-    return '${_trim(value / 1000000)}M';
-  }
-  if (value >= 1000) {
-    return '${_trim(value / 1000)}K';
-  }
+  if (value >= 1000000) return '${_trim(value / 1000000)}M';
+  if (value >= 1000) return '${_trim(value / 1000)}K';
   return value.toString();
 }
 
-/// Drops a trailing ".0" so 1.0K renders as "1K" while 1.2K stays "1.2K".
 String _trim(double value) {
   final fixed = value.toStringAsFixed(1);
   return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;

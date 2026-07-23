@@ -245,8 +245,9 @@ String? _optionalString(Object? value) {
 
 Map<String, Object?> _requiredMap(Map<String, Object?> json, String key) {
   final raw = json[key];
-  if (raw is! Map)
+  if (raw is! Map) {
     throw FormatException('Canonical field $key must be an object.');
+  }
   return Map<String, Object?>.from(raw);
 }
 
