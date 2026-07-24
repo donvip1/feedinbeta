@@ -13,7 +13,7 @@ class CommunicationDatabase {
 
   final Database db;
 
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
 
   static Future<CommunicationDatabase> open(
     DatabaseFactory factory,
@@ -25,6 +25,7 @@ class CommunicationDatabase {
         version: schemaVersion,
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _createSchema,
+        onUpgrade: _upgradeSchema,
       ),
     );
     return CommunicationDatabase._(db);
@@ -79,6 +80,45 @@ class CommunicationDatabase {
         cursor TEXT NOT NULL,
         updated_at INTEGER NOT NULL
       )
+    ''');
+
+    await _createUploadsTable(db);
+  }
+
+  /// v1 -> v2: the Media Engine's persisted upload state.
+  static Future<void> _upgradeSchema(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      await _createUploadsTable(db);
+    }
+  }
+
+  /// Resumable upload tasks: one row per attachment from enqueue until
+  /// verified/cancelled, carrying the byte offset so an upload survives process
+  /// death and resumes instead of restarting.
+  static Future<void> _createUploadsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE comm_uploads (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL,
+        local_path TEXT NOT NULL,
+        remote_path TEXT,
+        mime_type TEXT,
+        total_bytes INTEGER NOT NULL DEFAULT 0,
+        sent_bytes INTEGER NOT NULL DEFAULT 0,
+        sha256 TEXT,
+        state TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_comm_uploads_due ON comm_uploads (state, next_attempt_at)
     ''');
   }
 
