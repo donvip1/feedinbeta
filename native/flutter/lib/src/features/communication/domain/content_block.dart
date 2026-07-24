@@ -127,6 +127,17 @@ class MediaRef {
   }
 }
 
+/// Implemented by every block that carries a [MediaRef], so the media pipeline
+/// can read the local source and swap in the uploaded reference without
+/// knowing the concrete block type.
+abstract interface class MediaContentBlock {
+  MediaRef get media;
+
+  /// A copy of this block pointing at [media] (used after upload+verify to
+  /// replace the local path with the remote path + integrity hash).
+  ContentBlock withMedia(MediaRef media);
+}
+
 class TextBlock extends ContentBlock {
   const TextBlock(this.text);
   final String text;
@@ -165,8 +176,9 @@ class StickerBlock extends ContentBlock {
   Map<String, Object?> toJson() => {'kind': kind.name, 'stickerId': stickerId};
 }
 
-class ImageBlock extends ContentBlock {
+class ImageBlock extends ContentBlock implements MediaContentBlock {
   const ImageBlock(this.media);
+  @override
   final MediaRef media;
 
   @override
@@ -176,11 +188,15 @@ class ImageBlock extends ContentBlock {
   Result<void> validate() => media.validate();
 
   @override
+  ContentBlock withMedia(MediaRef media) => ImageBlock(media);
+
+  @override
   Map<String, Object?> toJson() => {'kind': kind.name, ...media.toJson()};
 }
 
-class VideoBlock extends ContentBlock {
+class VideoBlock extends ContentBlock implements MediaContentBlock {
   const VideoBlock(this.media, {this.durationMs = 0});
+  @override
   final MediaRef media;
   final int durationMs;
 
@@ -191,6 +207,10 @@ class VideoBlock extends ContentBlock {
   Result<void> validate() => media.validate();
 
   @override
+  ContentBlock withMedia(MediaRef media) =>
+      VideoBlock(media, durationMs: durationMs);
+
+  @override
   Map<String, Object?> toJson() => {
     'kind': kind.name,
     'durationMs': durationMs,
@@ -198,8 +218,9 @@ class VideoBlock extends ContentBlock {
   };
 }
 
-class VoiceNoteBlock extends ContentBlock {
+class VoiceNoteBlock extends ContentBlock implements MediaContentBlock {
   const VoiceNoteBlock(this.media, {this.durationMs = 0});
+  @override
   final MediaRef media;
   final int durationMs;
 
@@ -215,6 +236,10 @@ class VoiceNoteBlock extends ContentBlock {
   }
 
   @override
+  ContentBlock withMedia(MediaRef media) =>
+      VoiceNoteBlock(media, durationMs: durationMs);
+
+  @override
   Map<String, Object?> toJson() => {
     'kind': kind.name,
     'durationMs': durationMs,
@@ -222,8 +247,9 @@ class VoiceNoteBlock extends ContentBlock {
   };
 }
 
-class FileBlock extends ContentBlock {
+class FileBlock extends ContentBlock implements MediaContentBlock {
   const FileBlock(this.media, {required this.fileName});
+  @override
   final MediaRef media;
   final String fileName;
 
@@ -233,6 +259,10 @@ class FileBlock extends ContentBlock {
   @override
   Result<void> validate() =>
       fileName.isEmpty ? Err(CommError.validation('File name is empty')) : media.validate();
+
+  @override
+  ContentBlock withMedia(MediaRef media) =>
+      FileBlock(media, fileName: fileName);
 
   @override
   Map<String, Object?> toJson() => {

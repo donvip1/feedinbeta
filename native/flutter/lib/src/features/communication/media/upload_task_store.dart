@@ -68,6 +68,19 @@ class UploadTaskStore {
     return rows.map(_fromRow).toList();
   }
 
+  /// Verified tasks whose row still exists — i.e. upload finished but the
+  /// message handoff hasn't completed (crash between verify and send). The
+  /// coordinator deletes the row after a successful handoff, so anything
+  /// returned here needs recovery.
+  Future<List<UploadTask>> verifiedTasks() async {
+    final rows = await _db.query(
+      _table,
+      where: 'state = ?',
+      whereArgs: [UploadState.verified.name],
+    );
+    return rows.map(_fromRow).toList();
+  }
+
   Future<void> delete(String id) =>
       _db.delete(_table, where: 'id = ?', whereArgs: [id]);
 

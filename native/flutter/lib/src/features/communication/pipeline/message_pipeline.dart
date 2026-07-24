@@ -195,6 +195,14 @@ class MessagePipeline {
   }
 
   Future<void> dispose() async {
+    // Settle any in-flight background drain (send() fires one unawaited) so
+    // teardown never races a live database transaction.
+    final inFlight = _drainInFlight;
+    if (inFlight != null) {
+      try {
+        await inFlight;
+      } catch (_) {}
+    }
     await _updates.close();
   }
 }
