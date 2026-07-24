@@ -13,7 +13,7 @@ class CommunicationDatabase {
 
   final Database db;
 
-  static const int schemaVersion = 3;
+  static const int schemaVersion = 4;
 
   static Future<CommunicationDatabase> open(
     DatabaseFactory factory,
@@ -84,10 +84,12 @@ class CommunicationDatabase {
 
     await _createUploadsTable(db);
     await _createConversationsTable(db);
+    await _createReceiptsTable(db);
   }
 
   /// v1 -> v2: the Media Engine's persisted upload state.
   /// v2 -> v3: the unified conversation store.
+  /// v3 -> v4: per-message receipts.
   static Future<void> _upgradeSchema(
     Database db,
     int oldVersion,
@@ -99,6 +101,34 @@ class CommunicationDatabase {
     if (oldVersion < 3) {
       await _createConversationsTable(db);
     }
+    if (oldVersion < 4) {
+      await _createReceiptsTable(db);
+    }
+  }
+
+  /// Per-(message, user) delivery/read receipts — the primitive the legacy
+  /// stack faked. `pending_sync` marks locally-recorded receipts (our own
+  /// delivered/read marks) that still need to reach the server; timestamps are
+  /// monotonic-earliest so merges are idempotent.
+  static Future<void> _createReceiptsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE comm_receipts (
+        message_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        delivered_at INTEGER,
+        read_at INTEGER,
+        pending_sync INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (message_id, user_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_comm_receipts_pending ON comm_receipts (pending_sync)
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_comm_receipts_conversation
+        ON comm_receipts (conversation_id, user_id)
+    ''');
   }
 
   /// One row per conversation of EVERY type (dm/group/community/channel/
