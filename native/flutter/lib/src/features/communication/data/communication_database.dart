@@ -13,7 +13,7 @@ class CommunicationDatabase {
 
   final Database db;
 
-  static const int schemaVersion = 4;
+  static const int schemaVersion = 5;
 
   static Future<CommunicationDatabase> open(
     DatabaseFactory factory,
@@ -85,11 +85,13 @@ class CommunicationDatabase {
     await _createUploadsTable(db);
     await _createConversationsTable(db);
     await _createReceiptsTable(db);
+    await _createNotificationTables(db);
   }
 
   /// v1 -> v2: the Media Engine's persisted upload state.
   /// v2 -> v3: the unified conversation store.
   /// v3 -> v4: per-message receipts.
+  /// v4 -> v5: notification preferences + mutes.
   static Future<void> _upgradeSchema(
     Database db,
     int oldVersion,
@@ -104,6 +106,26 @@ class CommunicationDatabase {
     if (oldVersion < 4) {
       await _createReceiptsTable(db);
     }
+    if (oldVersion < 5) {
+      await _createNotificationTables(db);
+    }
+  }
+
+  /// Per-category notification preferences and per-conversation mutes
+  /// (mute-until 0 = muted forever, else epoch-millis expiry).
+  static Future<void> _createNotificationTables(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE comm_notification_prefs (
+        category TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE comm_conversation_mutes (
+        conversation_id TEXT PRIMARY KEY,
+        muted_until INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
   }
 
   /// Per-(message, user) delivery/read receipts — the primitive the legacy
