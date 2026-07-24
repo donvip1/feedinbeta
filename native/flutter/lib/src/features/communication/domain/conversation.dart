@@ -63,6 +63,24 @@ class ConversationPolicy {
   bool canStartCall(MemberRole role) => role.isPrivileged || membersCanCall;
 
   bool canInvite(MemberRole role) => role.isPrivileged || membersCanInvite;
+
+  Map<String, Object?> toJson() => {
+    'membersCanPost': membersCanPost,
+    'membersCanCall': membersCanCall,
+    'membersCanInvite': membersCanInvite,
+    'maxCallParticipants': maxCallParticipants,
+  };
+
+  factory ConversationPolicy.fromJson(Map<String, Object?>? json) =>
+      json == null
+      ? ConversationPolicy.dmDefault
+      : ConversationPolicy(
+          membersCanPost: json['membersCanPost'] != false,
+          membersCanCall: json['membersCanCall'] != false,
+          membersCanInvite: json['membersCanInvite'] == true,
+          maxCallParticipants:
+              (json['maxCallParticipants'] as num?)?.toInt() ?? 8,
+        );
 }
 
 class Conversation {
@@ -119,11 +137,12 @@ class Conversation {
     bool? e2ee,
     List<String>? pinnedMessageIds,
     int? lastMessageAt,
+    List<String>? memberIds,
   }) {
     return Conversation(
       id: id,
       type: type,
-      memberIds: memberIds,
+      memberIds: memberIds ?? this.memberIds,
       roles: roles ?? this.roles,
       policy: policy ?? this.policy,
       title: title ?? this.title,
@@ -132,4 +151,47 @@ class Conversation {
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
     );
   }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'type': type.name,
+    'memberIds': memberIds,
+    'roles': roles.map((k, v) => MapEntry(k, v.name)),
+    'policy': policy.toJson(),
+    if (title != null) 'title': title,
+    'e2ee': e2ee,
+    if (pinnedMessageIds.isNotEmpty) 'pinnedMessageIds': pinnedMessageIds,
+    if (lastMessageAt != null) 'lastMessageAt': lastMessageAt,
+  };
+
+  factory Conversation.fromJson(Map<String, Object?> json) => Conversation(
+    id: json['id']?.toString() ?? '',
+    type: ConversationType.values.firstWhere(
+      (t) => t.name == json['type'],
+      orElse: () => ConversationType.dm,
+    ),
+    memberIds:
+        (json['memberIds'] as List?)?.map((e) => e.toString()).toList() ??
+        const [],
+    roles: ((json['roles'] as Map?)?.cast<String, Object?>() ?? const {}).map(
+      (k, v) => MapEntry(
+        k,
+        MemberRole.values.firstWhere(
+          (r) => r.name == v,
+          orElse: () => MemberRole.member,
+        ),
+      ),
+    ),
+    policy: ConversationPolicy.fromJson(
+      (json['policy'] as Map?)?.cast<String, Object?>(),
+    ),
+    title: json['title']?.toString(),
+    e2ee: json['e2ee'] == true,
+    pinnedMessageIds:
+        (json['pinnedMessageIds'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const [],
+    lastMessageAt: (json['lastMessageAt'] as num?)?.toInt(),
+  );
 }

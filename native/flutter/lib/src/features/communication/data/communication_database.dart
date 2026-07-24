@@ -13,7 +13,7 @@ class CommunicationDatabase {
 
   final Database db;
 
-  static const int schemaVersion = 2;
+  static const int schemaVersion = 3;
 
   static Future<CommunicationDatabase> open(
     DatabaseFactory factory,
@@ -83,9 +83,11 @@ class CommunicationDatabase {
     ''');
 
     await _createUploadsTable(db);
+    await _createConversationsTable(db);
   }
 
   /// v1 -> v2: the Media Engine's persisted upload state.
+  /// v2 -> v3: the unified conversation store.
   static Future<void> _upgradeSchema(
     Database db,
     int oldVersion,
@@ -94,6 +96,31 @@ class CommunicationDatabase {
     if (oldVersion < 2) {
       await _createUploadsTable(db);
     }
+    if (oldVersion < 3) {
+      await _createConversationsTable(db);
+    }
+  }
+
+  /// One row per conversation of EVERY type (dm/group/community/channel/
+  /// broadcast/support/ai) — the single inbox source replacing the per-type
+  /// stacks. The full domain object is stored as JSON; extracted columns exist
+  /// only to index the inbox ordering and type filters.
+  static Future<void> _createConversationsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE comm_conversations (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        last_message_at INTEGER NOT NULL DEFAULT 0,
+        body TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_comm_conversations_inbox
+        ON comm_conversations (last_message_at DESC, id DESC)
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_comm_conversations_type ON comm_conversations (type)
+    ''');
   }
 
   /// Resumable upload tasks: one row per attachment from enqueue until
