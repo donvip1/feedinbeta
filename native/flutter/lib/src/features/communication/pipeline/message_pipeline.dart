@@ -169,17 +169,33 @@ class MessagePipeline {
   /// Page changes from the persisted cursor until the server says caught-up.
   /// Applies every envelope through the same merge as realtime, then persists
   /// the advanced cursor after EVERY page — so a crash mid-reconcile resumes,
-  /// never re-diverges, and the final page is never refetched. Returns the
-  /// number of envelopes applied.
-  Future<Result<int>> reconcile({int pageLimit = 100}) async {
+  /// never re-diverges, and the final page is never refetched. Concurrent
+  /// calls coalesce onto one pass (and dispose() settles an in-flight one).
+  /// Returns the number of envelopes applied.
+  Future<Result<int>> reconcile({int pageLimit = 100}) {
+    final inFlight = _reconcileInFlight;
+    if (inFlight != null) return inFlight;
+    final pass = _reconcilePass(pageLimit: pageLimit);
+    _reconcileInFlight = pass;
+    pass.whenComplete(() {
+      if (identical(_reconcileInFlight, pass)) _reconcileInFlight = null;
+    });
+    return pass;
+  }
+
+  Future<Result<int>>? _reconcileInFlight;
+
+  Future<Result<int>> _reconcilePass({required int pageLimit}) async {
     var applied = 0;
     var cursor = await _cursors.read(messagesCursorScope);
     while (true) {
+      if (_disposed) return Ok(applied);
       final page = await _transport.fetchChanges(
         cursor: cursor,
         limit: pageLimit,
       );
       if (page.isErr) return Err(page.errorOrNull!);
+      if (_disposed) return Ok(applied);
       final value = page.valueOrNull!;
       for (final envelope in value.envelopes) {
         await applyRemote(envelope);
@@ -194,13 +210,23 @@ class MessagePipeline {
     return Ok(applied);
   }
 
+  bool _disposed = false;
+
   Future<void> dispose() async {
-    // Settle any in-flight background drain (send() fires one unawaited) so
-    // teardown never races a live database transaction.
-    final inFlight = _drainInFlight;
-    if (inFlight != null) {
+    _disposed = true;
+    // Settle any in-flight background work (send() fires an unawaited drain;
+    // hosts fire unawaited reconciles) so teardown never races a live
+    // database transaction.
+    final drain = _drainInFlight;
+    if (drain != null) {
       try {
-        await inFlight;
+        await drain;
+      } catch (_) {}
+    }
+    final reconcile = _reconcileInFlight;
+    if (reconcile != null) {
+      try {
+        await reconcile;
       } catch (_) {}
     }
     await _updates.close();
