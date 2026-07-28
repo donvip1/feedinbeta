@@ -17,6 +17,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# WorkBuddy project-local state
+.workbuddy-ai/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

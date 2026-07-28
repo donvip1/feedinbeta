@@ -47,6 +47,7 @@ class FeedinServices {
     required this.profileRepository,
     required this.feedRepository,
     required this.messagesRepository,
+    required this.messagesRemoteDataSource,
     required this.notificationRepository,
     required this.preferencesRepository,
     required this.conversationStarter,
@@ -70,6 +71,7 @@ class FeedinServices {
   final ProfileRepositoryContract profileRepository;
   final LocalFeedRepositoryContract feedRepository;
   final LocalMessagesRepositoryContract messagesRepository;
+  final MessagesRemoteDataSource messagesRemoteDataSource;
   final NotificationRepositoryContract notificationRepository;
   final PreferencesRepositoryContract preferencesRepository;
   final ConversationStarter conversationStarter;
@@ -198,6 +200,7 @@ class FeedinServices {
         seedDemoContent: !config.hasSupabaseConfig,
       ),
       messagesRepository: messagesRepository,
+      messagesRemoteDataSource: messagesRemoteDataSource,
       notificationRepository: notificationRepository,
       preferencesRepository: preferencesRepository,
       conversationStarter: conversationStarter,

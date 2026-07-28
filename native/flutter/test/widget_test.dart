@@ -21,6 +21,7 @@ import 'package:feedin/src/data/local/preferences_repository_contract.dart';
 import 'package:feedin/src/data/local/post_draft_repository.dart';
 import 'package:feedin/src/data/local/profile_repository_contract.dart';
 import 'package:feedin/src/data/local/upload_queue_repository.dart';
+import 'package:feedin/src/data/remote/messages_remote_data_source.dart';
 import 'package:feedin/src/features/auth/data/auth_repository.dart';
 import 'package:feedin/src/features/auth/data/auth_repository_contract.dart';
 import 'package:feedin/src/features/create/post_draft.dart';
@@ -41,6 +42,9 @@ void main() {
       profileRepository: _MemoryProfileRepository(),
       feedRepository: _MemoryFeedRepository(),
       messagesRepository: _MemoryMessagesRepository(),
+      messagesRemoteDataSource: const MessagesRemoteDataSource(
+        isConfigured: false,
+      ),
       notificationRepository: _FakeNotificationRepository(),
       preferencesRepository: _FakePreferencesRepository(),
       conversationStarter: const _FakeConversationStarter(),

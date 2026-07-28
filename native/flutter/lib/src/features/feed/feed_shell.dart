@@ -21,6 +21,7 @@ import '../../core/sync/upload_queue_service.dart';
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/local/local_messages_repository_contract.dart';
 import '../../data/local/notification_repository_contract.dart';
+import '../../data/remote/messages_remote_data_source.dart';
 import '../../data/local/preferences_repository_contract.dart';
 import '../../data/local/post_draft_repository.dart';
 import '../../data/local/profile_repository_contract.dart';
@@ -56,6 +57,7 @@ class FeedShell extends StatefulWidget {
     required this.profile,
     required this.feedRepository,
     required this.messagesRepository,
+    required this.messagesRemoteDataSource,
     required this.notificationRepository,
     required this.preferencesRepository,
     required this.conversationStarter,
@@ -80,6 +82,7 @@ class FeedShell extends StatefulWidget {
   final UserProfile profile;
   final LocalFeedRepositoryContract feedRepository;
   final LocalMessagesRepositoryContract messagesRepository;
+  final MessagesRemoteDataSource messagesRemoteDataSource;
   final NotificationRepositoryContract notificationRepository;
   final PreferencesRepositoryContract preferencesRepository;
   final ConversationStarter conversationStarter;
@@ -592,6 +595,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
       ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
+        messagesRemoteDataSource: widget.messagesRemoteDataSource,
         conversationStarter: widget.conversationStarter,
         syncService: widget.syncService,
         connectivityService: widget.connectivityService,
@@ -847,7 +851,9 @@ class _CreateNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const radius = BorderRadius.all(Radius.circular(FeedImmersiveTheme.radiusMd));
+    const radius = BorderRadius.all(
+      Radius.circular(FeedImmersiveTheme.radiusMd),
+    );
     return Semantics(
       button: true,
       label: 'Create',

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,9 +18,16 @@ import '../../core/sync/incremental_message_sync_service.dart';
 import '../../core/sync/sync_service.dart';
 import '../../data/local/canonical_message_store.dart';
 import '../../data/local/local_messages_repository_contract.dart';
+import '../../data/remote/messages_remote_data_source.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_models.dart';
 import '../calls/call_screen.dart';
+import '../communication/communication_platform.dart';
+import '../communication/comms_flags.dart';
+import '../communication/domain/conversation.dart' as comms;
+import '../communication/transport/conversations_backfill.dart';
+import '../communication/ui/chats_inbox_screen.dart';
+import '../communication/ui/conversation_list_controller.dart';
 import '../profile/user_profile.dart';
 import 'chat/audio_backends_impl.dart';
 import 'chat/message_interactions_data_source.dart';
@@ -69,6 +77,7 @@ class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
     super.key,
     required this.messagesRepository,
+    required this.messagesRemoteDataSource,
     required this.conversationStarter,
     required this.syncService,
     required this.connectivityService,
@@ -82,6 +91,7 @@ class MessagesScreen extends StatefulWidget {
   });
 
   final LocalMessagesRepositoryContract messagesRepository;
+  final MessagesRemoteDataSource messagesRemoteDataSource;
   final ConversationStarter conversationStarter;
   final SyncServiceContract syncService;
   final ConnectivityService connectivityService;
@@ -112,6 +122,11 @@ class _MessagesScreenState extends State<MessagesScreen>
   String _chatSearchQuery = '';
   late Future<List<ConversationSummary>> _conversationsFuture;
   late final ChatRealtimeDataSource _presenceDataSource;
+  Future<CommunicationPlatform>? _communicationPlatformFuture;
+  CommunicationPlatform? _communicationPlatform;
+  ConversationListController? _communicationInboxController;
+  StreamSubscription<bool>? _communicationConnectivitySubscription;
+  bool _communicationOnline = true;
   Timer? _presenceHeartbeat;
 
   @override
@@ -121,6 +136,28 @@ class _MessagesScreenState extends State<MessagesScreen>
     _presenceDataSource = ChatRealtimeDataSource.autoDetect();
     _selectedConversationId = widget.initialConversationId;
     _conversationsFuture = widget.messagesRepository.loadConversations();
+    _communicationOnline = widget.connectivityService.isOnline;
+    if (CommsFlags.newChatsTab) {
+      _communicationPlatformFuture = _bootCommunicationInbox();
+      _communicationConnectivitySubscription = widget
+          .connectivityService
+          .onStatusChange
+          .listen((online) {
+            if (!mounted) return;
+            setState(() => _communicationOnline = online);
+            if (online) {
+              unawaited(_communicationPlatform?.drainNow());
+              unawaited(_communicationInboxController?.refresh());
+            }
+          });
+      unawaited(
+        widget.connectivityService.refresh().then((online) {
+          if (mounted && online != _communicationOnline) {
+            setState(() => _communicationOnline = online);
+          }
+        }),
+      );
+    }
     _syncBackController();
     _startPresenceHeartbeat();
   }
@@ -157,6 +194,10 @@ class _MessagesScreenState extends State<MessagesScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _presenceHeartbeat?.cancel();
+    _communicationConnectivitySubscription?.cancel();
+    _communicationInboxController?.dispose();
+    final platform = _communicationPlatform;
+    if (platform != null) unawaited(platform.dispose());
     unawaited(_stopPresence());
     widget.backController?._setActiveBackHandler(null);
     _chatSearchController.dispose();
@@ -243,6 +284,84 @@ class _MessagesScreenState extends State<MessagesScreen>
     );
   }
 
+  Future<CommunicationPlatform> _bootCommunicationInbox() async {
+    final supportDirectory = await getApplicationSupportDirectory();
+    final platform = await CommunicationPlatform.boot(
+      selfUserId: widget.profile.userId,
+      databaseFactory: databaseFactory,
+      databasePath: '${supportDirectory.path}/feedin_communication.db',
+    );
+    await platform.start();
+    if (!mounted) {
+      await platform.dispose();
+      throw StateError('Messages screen disposed during communication boot');
+    }
+    _communicationPlatform = platform;
+    final backfill = ConversationsBackfill(
+      remote: widget.messagesRemoteDataSource,
+      store: platform.conversationStore,
+      selfUserId: widget.profile.userId,
+    );
+    final controller = ConversationListController(
+      store: platform.conversationStore,
+      backfill: backfill.run,
+    );
+    _communicationInboxController = controller;
+    await controller.init();
+    return platform;
+  }
+
+  Future<void> _openCommunicationConversation(
+    comms.Conversation conversation,
+  ) async {
+    final legacyConversation = await widget.messagesRepository
+        .loadConversationByServerId(conversation.id);
+    if (!mounted) return;
+    setState(() {
+      _selectedConversationId = legacyConversation?.id ?? conversation.id;
+      _selectedConversationTitle = conversation.title;
+    });
+    _syncBackController();
+  }
+
+  Future<void> _startCommunicationCall(
+    comms.Conversation conversation,
+    CallType type,
+  ) async {
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return;
+    }
+    final controller = widget.callController;
+    final peerId = conversation.dmPeer(widget.profile.userId);
+    if (controller == null || peerId == null || peerId.isEmpty) {
+      _showInboxMessage('Calling is unavailable for this conversation.');
+      return;
+    }
+    final session = await CallScreen.start(
+      context,
+      controller: controller,
+      callee: CallParticipant(
+        userId: peerId,
+        displayName: conversation.title ?? 'feedIn user',
+        avatarUrl: conversation.avatarUrl,
+      ),
+      type: type,
+    );
+    if (session == null && mounted) {
+      _showInboxMessage(
+        "Couldn't start the call. Check your connection and try again.",
+      );
+    }
+  }
+
+  void _showInboxMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_selectedConversationId != null) {
@@ -259,7 +378,48 @@ class _MessagesScreenState extends State<MessagesScreen>
         incrementalMessageSyncService: widget.incrementalMessageSyncService,
       );
     }
+    return CommsFlags.newChatsTab
+        ? _buildCommunicationInbox()
+        : _buildLegacyInbox();
+  }
 
+  Widget _buildCommunicationInbox() {
+    final future = _communicationPlatformFuture;
+    if (future == null) return _buildLegacyInbox();
+    return FutureBuilder<CommunicationPlatform>(
+      future: future,
+      builder: (context, snapshot) {
+        final controller = _communicationInboxController;
+        if (snapshot.hasError) {
+          return _CommunicationInboxFallback(
+            onRetry: () {
+              setState(() {
+                _communicationPlatformFuture = _bootCommunicationInbox();
+              });
+            },
+            legacyInbox: _buildLegacyInbox(),
+          );
+        }
+        if (controller == null) {
+          return const ColoredBox(
+            color: Color(0xFF0F172A),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return ChatsInboxScreen(
+          controller: controller,
+          online: _communicationOnline,
+          onOpenConversation: _openCommunicationConversation,
+          onVoiceCall: (conversation) =>
+              _startCommunicationCall(conversation, CallType.voice),
+          onVideoCall: (conversation) =>
+              _startCommunicationCall(conversation, CallType.video),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegacyInbox() {
     return ColoredBox(
       color: ChatColors.background,
       child: SafeArea(
@@ -326,6 +486,48 @@ class _MessagesScreenState extends State<MessagesScreen>
           },
         ),
       ),
+    );
+  }
+}
+
+class _CommunicationInboxFallback extends StatelessWidget {
+  const _CommunicationInboxFallback({
+    required this.onRetry,
+    required this.legacyInbox,
+  });
+
+  final VoidCallback onRetry;
+  final Widget legacyInbox;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        legacyInbox,
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 16,
+          child: Material(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'The new Chats view could not start. Using the current inbox.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  TextButton(onPressed: onRetry, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2264,7 +2466,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           child: ChatMessageBubble(
                             message: view,
                             mediaSlot: _mediaSlotFor(view),
-                            mediaBleeds: MediaMessageContent.wantsFullBleed(view),
+                            mediaBleeds: MediaMessageContent.wantsFullBleed(
+                              view,
+                            ),
                             onLongPress: () => _openMessageActions(view),
                             onSwipeReply: () => _setReply(view),
                           ),

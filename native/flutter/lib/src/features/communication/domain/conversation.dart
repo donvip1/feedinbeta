@@ -94,6 +94,9 @@ class Conversation {
     this.e2ee = false,
     this.pinnedMessageIds = const [],
     this.lastMessageAt,
+    this.avatarUrl,
+    this.lastMessagePreview,
+    this.unreadCount = 0,
   });
 
   final String id;
@@ -107,6 +110,12 @@ class Conversation {
   final bool e2ee;
   final List<String> pinnedMessageIds;
   final int? lastMessageAt;
+
+  /// Inbox presentation state (kept on the conversation per the design's
+  /// `unreadState`): tile avatar, last-message preview, unread badge.
+  final String? avatarUrl;
+  final String? lastMessagePreview;
+  final int unreadCount;
 
   MemberRole roleOf(String userId) => roles[userId] ?? MemberRole.member;
 
@@ -138,6 +147,9 @@ class Conversation {
     List<String>? pinnedMessageIds,
     int? lastMessageAt,
     List<String>? memberIds,
+    String? avatarUrl,
+    String? lastMessagePreview,
+    int? unreadCount,
   }) {
     return Conversation(
       id: id,
@@ -149,6 +161,9 @@ class Conversation {
       e2ee: e2ee ?? this.e2ee,
       pinnedMessageIds: pinnedMessageIds ?? this.pinnedMessageIds,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      lastMessagePreview: lastMessagePreview ?? this.lastMessagePreview,
+      unreadCount: unreadCount ?? this.unreadCount,
     );
   }
 
@@ -162,6 +177,9 @@ class Conversation {
     'e2ee': e2ee,
     if (pinnedMessageIds.isNotEmpty) 'pinnedMessageIds': pinnedMessageIds,
     if (lastMessageAt != null) 'lastMessageAt': lastMessageAt,
+    if (avatarUrl != null) 'avatarUrl': avatarUrl,
+    if (lastMessagePreview != null) 'lastMessagePreview': lastMessagePreview,
+    if (unreadCount != 0) 'unreadCount': unreadCount,
   };
 
   factory Conversation.fromJson(Map<String, Object?> json) => Conversation(
@@ -193,5 +211,8 @@ class Conversation {
             .toList() ??
         const [],
     lastMessageAt: (json['lastMessageAt'] as num?)?.toInt(),
+    avatarUrl: json['avatarUrl']?.toString(),
+    lastMessagePreview: json['lastMessagePreview']?.toString(),
+    unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
   );
 }

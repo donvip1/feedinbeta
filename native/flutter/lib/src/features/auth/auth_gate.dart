@@ -367,6 +367,7 @@ class _AuthGateState extends State<AuthGate> {
         profile: profile,
         feedRepository: widget.services.feedRepository,
         messagesRepository: widget.services.messagesRepository,
+        messagesRemoteDataSource: widget.services.messagesRemoteDataSource,
         notificationRepository: widget.services.notificationRepository,
         preferencesRepository: widget.services.preferencesRepository,
         conversationStarter: widget.services.conversationStarter,
