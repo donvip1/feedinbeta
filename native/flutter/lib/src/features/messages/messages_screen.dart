@@ -952,7 +952,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (!mounted) return;
     final canonicalId = _canonicalConversationId;
     if (canonicalId == null || change.conversationId != canonicalId) return;
-    setState(() => _messagesFuture = _loadMessages(syncRemote: false));
+    setState(() {
+      _messagesFuture = _loadMessages(syncRemote: false);
+    });
   }
 
   Future<String?> _resolveCanonicalConversationId() async {
@@ -2078,7 +2080,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
         client.close(force: true);
       }
       if (!mounted) return;
-      setState(() => _messagesFuture = _loadMessages(syncRemote: false));
+      setState(() {
+        _messagesFuture = _loadMessages(syncRemote: false);
+      });
       _toast('Attachment downloaded.');
     } catch (_) {
       if (mounted) _toast('Could not download this attachment. Try again.');
