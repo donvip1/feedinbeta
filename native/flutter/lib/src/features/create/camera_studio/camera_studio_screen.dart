@@ -36,7 +36,7 @@ class CameraStudioScreen extends StatefulWidget {
   final UploadQueueRepository uploadQueueRepository;
   final UploadQueueService uploadQueueService;
   final ConnectivityService connectivityService;
-  final ValueChanged<String> onPostUploaded;
+  final ValueChanged<String?> onPostUploaded;
   final StudioCaptureMode initialMode;
 
   @override

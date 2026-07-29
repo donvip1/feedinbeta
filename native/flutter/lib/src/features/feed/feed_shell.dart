@@ -125,7 +125,6 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   StreamSubscription<PendingReply>? _replySub;
   StreamSubscription<CallKitAction>? _callKitSub;
   int _feedRealtimeVersion = 0;
-  String? _pendingPublishedPostId;
   int _messagesRealtimeVersion = 0;
   final int _newConversationRequests = 0;
   String? _initialConversationId;
@@ -397,12 +396,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     );
   }
 
-  void _handlePostUploaded(String postId) {
+  void _handlePostUploaded(String? postId) {
     if (!mounted) return;
-    setState(() {
-      _feedRealtimeVersion++;
-      _pendingPublishedPostId = postId;
-    });
+    setState(() => _feedRealtimeVersion++);
   }
 
   Future<void> _openSelectedCreateMethod(CaptureMethod method) async {

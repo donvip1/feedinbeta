@@ -67,7 +67,7 @@ class CreatePostScreen extends StatefulWidget {
   final UploadQueueRepository uploadQueueRepository;
   final UploadQueueService uploadQueueService;
   final ConnectivityService connectivityService;
-  final ValueChanged<String> onPostUploaded;
+  final ValueChanged<String?> onPostUploaded;
 
   /// Optional media captured upstream (e.g. by the camera studio) that seeds the
   /// composer so the user lands straight on caption/publish. Purely additive:
@@ -556,8 +556,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       uploadState: DraftUploadState.queued,
     );
     final summary = await widget.uploadQueueService.processQueue();
-    if (summary.uploaded > 0) {
-      widget.onPostUploaded();
+    for (final postId in summary.publishedPostIds) {
+      widget.onPostUploaded(postId);
     }
     if (!mounted) return;
     setState(() => _summary = _summaryView(summary));
@@ -668,7 +668,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final sheetNavigator = Navigator.of(sheetContext);
     try {
       final message = await action();
-      widget.onPostUploaded();
+      widget.onPostUploaded(null);
       if (sheetNavigator.canPop()) {
         sheetNavigator.pop();
       }
