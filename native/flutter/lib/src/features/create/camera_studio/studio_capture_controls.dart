@@ -20,8 +20,8 @@ extension StudioCaptureModeX on StudioCaptureMode {
   };
 }
 
-/// Bottom capture bar: the mode selector, then the gallery / shutter / effects
-/// row, over a bottom scrim.
+/// Bottom capture bar: the mode selector, then gallery and shutter controls
+/// over a bottom scrim. Creative filters live only in the right-side tool rail.
 class StudioCaptureControls extends StatelessWidget {
   const StudioCaptureControls({
     super.key,
@@ -30,7 +30,6 @@ class StudioCaptureControls extends StatelessWidget {
     required this.onModeChanged,
     required this.onShutter,
     required this.onGallery,
-    required this.onEffects,
   });
 
   final StudioCaptureMode mode;
@@ -38,7 +37,6 @@ class StudioCaptureControls extends StatelessWidget {
   final ValueChanged<StudioCaptureMode> onModeChanged;
   final VoidCallback onShutter;
   final VoidCallback onGallery;
-  final VoidCallback onEffects;
 
   @override
   Widget build(BuildContext context) {
@@ -68,19 +66,15 @@ class StudioCaptureControls extends StatelessWidget {
               ] else
                 const SizedBox(height: 40),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _SquareGlassButton(
                     icon: Icons.photo_library_rounded,
                     label: 'Gallery',
                     onTap: isRecording ? null : onGallery,
                   ),
+                  const SizedBox(width: 40),
                   StudioShutter(isRecording: isRecording, onTap: onShutter),
-                  _SquareGlassButton(
-                    icon: Icons.auto_awesome_rounded,
-                    label: 'Effects',
-                    onTap: isRecording ? null : onEffects,
-                  ),
                 ],
               ),
             ],

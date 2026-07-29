@@ -54,6 +54,7 @@ class UploadQueueService {
     var skipped = 0;
     var postsPublished = 0;
     var storiesPublished = 0;
+    final publishedPostIds = <String>[];
 
     for (final item in queue) {
       final draft = drafts[item.draftId];
@@ -89,23 +90,21 @@ class UploadQueueService {
             storiesPublished++;
             break;
           case 'post':
-            await _publishPostDraft(
+            final postId = await _publishPostDraft(
               client,
               userId,
               draft,
               mediaUrls,
               mediaTypes,
             );
+            publishedPostIds.add(postId);
             postsPublished++;
             break;
         }
 
-        await _draftRepository.markState(
-          draftId: draft.id,
-          uploadState: DraftUploadState.uploaded,
-        );
         await _uploadQueueRepository.updateProgress(draft.id, 100);
         await _uploadQueueRepository.remove(draft.id);
+        await _draftRepository.deleteDraft(draft.id);
         uploaded++;
       } catch (error) {
         await _draftRepository.markState(
@@ -119,6 +118,7 @@ class UploadQueueService {
           uploaded: uploaded,
           failed: failed,
           message: 'Upload failed: ${_formatError(error)}',
+          publishedPostIds: publishedPostIds,
         );
       }
     }
@@ -132,27 +132,37 @@ class UploadQueueService {
         storiesPublished: storiesPublished,
         skipped: skipped,
       ),
+      publishedPostIds: publishedPostIds,
     );
   }
 
-  Future<void> _publishPostDraft(
+  Future<String> _publishPostDraft(
     SupabaseClient client,
     String userId,
     PostDraft draft,
     List<String> mediaUrls,
     List<String> mediaTypes,
   ) async {
-    await client.from('posts').insert({
-      'user_id': userId,
-      'content': draft.content.isEmpty ? null : draft.content,
-      'media_url': mediaUrls.firstOrNull,
-      'media_type': mediaTypes.firstOrNull,
-      'media_urls': mediaUrls,
-      'media_types': mediaTypes,
-      'privacy': draft.privacy,
-      'post_type': 'post',
-      'status': 'active',
-    });
+    final row = await client
+        .from('posts')
+        .insert({
+          'user_id': userId,
+          'content': draft.content.isEmpty ? null : draft.content,
+          'media_url': mediaUrls.firstOrNull,
+          'media_type': mediaTypes.firstOrNull,
+          'media_urls': mediaUrls,
+          'media_types': mediaTypes,
+          'privacy': draft.privacy,
+          'post_type': 'post',
+          'status': 'active',
+        })
+        .select('id')
+        .single();
+    final postId = row['id']?.toString();
+    if (postId == null || postId.isEmpty) {
+      throw StateError('Published post did not return an ID.');
+    }
+    return postId;
   }
 
   Future<void> _publishStoryDraft(
@@ -319,10 +329,12 @@ class UploadQueueSummary {
     required this.uploaded,
     required this.failed,
     required this.message,
+    this.publishedPostIds = const [],
   });
 
   final bool attempted;
   final int uploaded;
   final int failed;
   final String message;
+  final List<String> publishedPostIds;
 }

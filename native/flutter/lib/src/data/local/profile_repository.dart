@@ -30,11 +30,7 @@ class ProfileRepository implements ProfileRepositoryContract {
     final local = await loadCurrentProfile();
     if (local?.userId == userId) return local;
 
-    final remote = await _remoteDataSource.fetchProfile(userId);
-    if (remote != null) {
-      await saveCurrentProfile(remote);
-    }
-    return remote;
+    return _remoteDataSource.fetchProfile(userId);
   }
 
   @override

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/connectivity/connectivity_service.dart';
 import '../../core/connectivity/offline_notice.dart';
+import '../../core/feedin_route_observer.dart';
 import '../../core/notifications/callkit_service.dart';
 import '../../core/notifications/local_notifications_service.dart';
 import '../../core/notifications/pending_reply_store.dart';
@@ -28,6 +29,7 @@ import '../../data/local/profile_repository_contract.dart';
 import '../../data/local/upload_queue_repository.dart';
 import '../../core/media/reel_preloader.dart';
 import '../../data/remote/post_views_remote_data_source.dart';
+import '../../data/remote/social_graph_remote_data_source.dart';
 import '../calls/call_controller.dart';
 import '../calls/call_screen.dart';
 import '../calls/livekit_call_media_engine.dart';
@@ -37,18 +39,26 @@ import '../groups/screens/groups_screen.dart';
 import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../create/camera_studio/camera_studio_screen.dart';
+import '../create/camera_studio/studio_capture_controls.dart';
+import '../create/create_post_screen.dart';
+import '../create/parity/create_view_models.dart';
 import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
 import '../notifications/parity/widgets/notification_bell_badge.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../profile/user_profile.dart';
+import '../profile/user_profile_screen.dart';
+import '../search/feed_search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
+import 'feed_post_pager_screen.dart';
+import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
 import 'immersive/immersive_post_card.dart';
+import 'immersive/refeed_sheet.dart';
 
 class FeedShell extends StatefulWidget {
   const FeedShell({
@@ -115,8 +125,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   StreamSubscription<PendingReply>? _replySub;
   StreamSubscription<CallKitAction>? _callKitSub;
   int _feedRealtimeVersion = 0;
+  String? _pendingPublishedPostId;
   int _messagesRealtimeVersion = 0;
-  int _newConversationRequests = 0;
+  final int _newConversationRequests = 0;
   String? _initialConversationId;
   final FeedScreenBackController _feedBackController =
       FeedScreenBackController();
@@ -127,6 +138,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   DateTime? _lastHomeBackTapAt;
   late UserProfile _profile;
   late Future<int> _notificationUnreadCountFuture;
+  late final SocialGraphRemoteDataSource _socialGraph;
 
   /// Shared, long-lived call controller: drives both outgoing calls placed from
   /// a chat header and the app-wide incoming-call presenter below.
@@ -137,6 +149,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _profile = widget.profile;
+    _socialGraph = SocialGraphRemoteDataSource.autoDetect();
     unawaited(widget.incrementalMessageSyncService?.start(_profile.userId));
     WidgetsBinding.instance.addObserver(this);
     _notificationUnreadCountFuture = widget.notificationRepository
@@ -375,19 +388,59 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     return null;
   }
 
-  /// Create is a floating "+" action (web parity). It opens the live camera
-  /// studio, which hands any captured media to the existing [CreatePostScreen]
-  /// publish pipeline on Next.
-  Future<void> _openCreate() async {
+  /// Create is a floating "+" action. Source selection happens before camera
+  /// initialization, so opening Create never requests camera access by itself.
+  void _openCreate() {
+    showCreateMediaSourceSheet(
+      context,
+      onMethod: (method) => unawaited(_openSelectedCreateMethod(method)),
+    );
+  }
+
+  void _handlePostUploaded(String postId) {
+    if (!mounted) return;
+    setState(() {
+      _feedRealtimeVersion++;
+      _pendingPublishedPostId = postId;
+    });
+  }
+
+  Future<void> _openSelectedCreateMethod(CaptureMethod method) async {
+    final isCamera =
+        method == CaptureMethod.takePhoto ||
+        method == CaptureMethod.recordVideo;
+    if (isCamera) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => CameraStudioScreen(
+            draftRepository: widget.postDraftRepository,
+            uploadQueueRepository: widget.uploadQueueRepository,
+            uploadQueueService: widget.uploadQueueService,
+            connectivityService: widget.connectivityService,
+            initialMode: method == CaptureMethod.recordVideo
+                ? StudioCaptureMode.video60
+                : StudioCaptureMode.photo,
+            onPostUploaded: _handlePostUploaded,
+          ),
+        ),
+      );
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => CameraStudioScreen(
-          draftRepository: widget.postDraftRepository,
-          uploadQueueRepository: widget.uploadQueueRepository,
-          uploadQueueService: widget.uploadQueueService,
-          connectivityService: widget.connectivityService,
-          onPostUploaded: () => setState(() => _feedRealtimeVersion++),
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Create post')),
+          body: CreatePostScreen(
+            draftRepository: widget.postDraftRepository,
+            uploadQueueRepository: widget.uploadQueueRepository,
+            uploadQueueService: widget.uploadQueueService,
+            connectivityService: widget.connectivityService,
+            initialCaptureMethod: method,
+            onPostUploaded: _handlePostUploaded,
+          ),
         ),
       ),
     );
@@ -464,15 +517,65 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     );
   }
 
-  /// The shared search affordance should land on an actionable search surface.
-  /// Reuse the Messages tab's existing recipient search/new-chat sheet so the
-  /// feed/home search icon no longer appears inert.
   void _openSearch() {
-    setState(() {
-      _selectTabState(1);
-      _initialConversationId = null;
-      _newConversationRequests++;
-    });
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedSearchScreen(
+          feedRepository: widget.feedRepository,
+          onOpenPerson: (person) {
+            Navigator.of(context).pop();
+            _openUserProfile(person.userId);
+          },
+          onOpenPost: (post) {
+            Navigator.of(context).pop();
+            _openSearchPost(post);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openSearchPost(FeedPost post) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedPostPagerScreen(
+          posts: [post],
+          initialIndex: 0,
+          feedRepository: widget.feedRepository,
+          syncService: widget.syncService,
+          connectivityService: widget.connectivityService,
+          currentUserId: _profile.userId,
+          onOpenUserProfile: _openUserProfile,
+          socialGraphDataSource: _socialGraph,
+        ),
+      ),
+    );
+  }
+
+  void _openUserProfile(String userId) {
+    if (userId.isEmpty) return;
+    if (userId == _profile.userId) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      if (!mounted) return;
+      setState(() => _selectTabState(3));
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => UserProfileScreen(
+          userId: userId,
+          profileRepository: widget.profileRepository,
+          feedRepository: widget.feedRepository,
+          connectivityService: widget.connectivityService,
+          syncService: widget.syncService,
+          currentUserId: _profile.userId,
+          onOpenUserProfile: _openUserProfile,
+          socialGraphDataSource: _socialGraph,
+        ),
+      ),
+    );
   }
 
   void _selectTabState(int value) {
@@ -592,6 +695,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         onOpenSearch: _openSearch,
         backController: _feedBackController,
         notificationUnreadCountFuture: _notificationUnreadCountFuture,
+        onOpenUserProfile: _openUserProfile,
+        socialGraphDataSource: _socialGraph,
+        currentUserId: _profile.userId,
       ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
@@ -616,6 +722,8 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         connectivityService: widget.connectivityService,
         onEditSaved: (profile) => setState(() => _profile = profile),
         onOpenSettings: _openSettings,
+        socialGraphDataSource: _socialGraph,
+        onOpenUserProfile: _openUserProfile,
       ),
     ];
 
@@ -935,6 +1043,10 @@ class FeedScreen extends StatefulWidget {
     required this.onOpenSearch,
     required this.backController,
     required this.notificationUnreadCountFuture,
+    required this.onOpenUserProfile,
+    required this.socialGraphDataSource,
+    required this.currentUserId,
+    this.shareService = const FeedShareService(),
   });
 
   final LocalFeedRepositoryContract feedRepository;
@@ -945,12 +1057,16 @@ class FeedScreen extends StatefulWidget {
   final VoidCallback onOpenSearch;
   final FeedScreenBackController backController;
   final Future<int> notificationUnreadCountFuture;
+  final ValueChanged<String> onOpenUserProfile;
+  final SocialGraphRemoteDataSource socialGraphDataSource;
+  final String currentUserId;
+  final FeedShareService shareService;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen> with RouteAware {
   late Future<List<FeedPost>> _postsFuture;
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
@@ -970,6 +1086,8 @@ class _FeedScreenState extends State<FeedScreen> {
   final Map<String, int> _commentDeltas = {};
   final Map<String, int> _refeedDeltas = {};
   Timer? _realtimeRefreshDebounce;
+  ModalRoute<void>? _subscribedRoute;
+  bool _routeVisible = true;
   // Posts whose view has been recorded this session, so a post is counted once
   // even if it scrolls in and out of focus.
   final Set<String> _recordedViewIds = {};
@@ -982,7 +1100,30 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == null || identical(route, _subscribedRoute)) return;
+    if (_subscribedRoute != null) {
+      feedinRouteObserver.unsubscribe(this);
+    }
+    _subscribedRoute = route;
+    feedinRouteObserver.subscribe(this, route);
+  }
+
+  @override
+  void didPushNext() {
+    if (_routeVisible) setState(() => _routeVisible = false);
+  }
+
+  @override
+  void didPopNext() {
+    if (!_routeVisible) setState(() => _routeVisible = true);
+  }
+
+  @override
   void dispose() {
+    feedinRouteObserver.unsubscribe(this);
     widget.backController.setActiveBackHandler(null);
     _realtimeRefreshDebounce?.cancel();
     _pageController.dispose();
@@ -1196,46 +1337,111 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> _sharePost(FeedPost post) async {
-    // Copying the share text is a local action and stays available offline;
-    // recording the share event to the backend requires connectivity.
-    final text = _shareTextForPost(post);
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!_requireOnline()) {
+  Future<void> _deletePost(FeedPost post) async {
+    if (post.userId != widget.currentUserId || !_requireOnline()) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This permanently deletes the post.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.feedRepository.deletePost(post.id);
       if (!mounted) return;
-      setState(() => _message = 'Share text copied.');
-      return;
+      final currentPosts = await _postsFuture;
+      if (!mounted) return;
+      final remaining = currentPosts
+          .where((item) => item.id != post.id)
+          .toList(growable: false);
+      setState(() {
+        _postsFuture = Future.value(remaining);
+        _savedPostIds.remove(post.id);
+        _unsavedPostIds.remove(post.id);
+        _likedPostIds.remove(post.id);
+        _unlikedPostIds.remove(post.id);
+        _refeededPostIds.remove(post.id);
+        _unrefeededPostIds.remove(post.id);
+        _likeDeltas.remove(post.id);
+        _commentDeltas.remove(post.id);
+        _refeedDeltas.remove(post.id);
+        _activePage = remaining.isEmpty
+            ? 0
+            : _activePage.clamp(0, remaining.length - 1);
+        _message = 'Post deleted.';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_pageController.hasClients || remaining.isEmpty) {
+          return;
+        }
+        _pageController.jumpToPage(_activePage);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _message = 'Could not delete this post.');
     }
-    await widget.feedRepository.queueShare(post.id);
-    await widget.syncService.syncNow();
-    if (!mounted) return;
-    setState(() => _message = 'Share text copied.');
   }
 
-  String _shareTextForPost(FeedPost post) {
-    final sharedPost = post.displayedPost;
-    final mediaUrl = sharedPost.mediaUrl ?? sharedPost.mediaUrls.firstOrNull;
-    return [
-      '${sharedPost.authorName} on feedIn',
-      if (sharedPost.body.trim().isNotEmpty) sharedPost.body.trim(),
-      if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
-    ].join('\n\n');
+  Future<void> _sharePost(FeedPost post) async {
+    final action = await showFeedShareSheet(context, post: post);
+    if (!mounted || action == null) return;
+    if (action == FeedShareAction.copyLink) {
+      await widget.shareService.copyPostLink(post);
+      if (!mounted) return;
+      setState(() => _message = 'Post link copied.');
+      return;
+    }
+
+    try {
+      await widget.shareService.openNativeShareSheet(post);
+      await widget.shareService.recordShare(
+        post: post,
+        repository: widget.feedRepository,
+        syncService: widget.syncService,
+        connectivityService: widget.connectivityService,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _message = 'Could not open the share sheet.');
+    }
   }
 
   Future<void> _openCreatorPreview(FeedPost post) async {
     final content = post.displayedPost;
+    final isOwnProfile = content.userId == widget.currentUserId;
+    var initiallyFollowing = false;
+    if (!isOwnProfile && content.userId.isNotEmpty) {
+      try {
+        initiallyFollowing = await widget.socialGraphDataSource
+            .isCurrentUserFollowing(content.userId);
+      } catch (_) {
+        // The preview still opens; follow can report its own update failure.
+      }
+    }
+    if (!mounted) return;
     await showCreatorPreview(
       context,
       heroTag: 'creator-avatar-${post.id}',
       name: content.authorName,
       handle: content.authorHandle ?? content.meta,
       avatarUrl: content.avatarUrl,
-      onFollow: () {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Following ${content.authorName}')),
-        );
-      },
+      initiallyFollowing: initiallyFollowing,
+      onToggleFollow: isOwnProfile
+          ? null
+          : () => widget.socialGraphDataSource.toggleFollow(content.userId),
+      onViewProfile: () => widget.onOpenUserProfile(content.userId),
     );
   }
 
@@ -1251,15 +1457,24 @@ class _FeedScreenState extends State<FeedScreen> {
       context,
       post: post,
       comments: comments,
-      onSubmit: (body) async {
-        final created = await widget.feedRepository.addComment(post.id, body);
-        if (mounted) {
+      onSubmit: (body, parentCommentId) async {
+        final created = await widget.feedRepository.addComment(
+          post.id,
+          body,
+          parentCommentId: parentCommentId,
+        );
+        if (mounted && parentCommentId == null) {
           setState(() {
             _commentDeltas[post.id] = (_commentDeltas[post.id] ?? 0) + 1;
           });
         }
         return created;
       },
+      onToggleLike: (comment, liked) =>
+          widget.feedRepository.toggleCommentLike(comment.id, liked: liked),
+      onDelete: (comment) => widget.feedRepository.deleteComment(comment.id),
+      onOpenUserProfile: widget.onOpenUserProfile,
+      currentUserId: widget.currentUserId,
     );
   }
 
@@ -1268,6 +1483,28 @@ class _FeedScreenState extends State<FeedScreen> {
     final currentlyRefeeded =
         !_unrefeededPostIds.contains(post.id) &&
         (_refeededPostIds.contains(post.id) || post.viewerHasRefeeded);
+    final action = await showRefeedActionSheet(
+      context,
+      isRefeeded: currentlyRefeeded,
+    );
+    if (!mounted || action == null) return;
+    if (action == RefeedAction.quoteRefeed) {
+      final quote = await showQuoteRefeedComposer(context, post: post);
+      if (!mounted || quote == null) return;
+      try {
+        await widget.feedRepository.createQuoteRefeed(post.id, quote);
+        if (!mounted) return;
+        setState(() {
+          _refeedDeltas[post.id] = (_refeedDeltas[post.id] ?? 0) + 1;
+          _message = 'Quote shared to your feed.';
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _message = 'Could not share this quote.');
+      }
+      return;
+    }
+
     setState(() {
       if (currentlyRefeeded) {
         _refeededPostIds.remove(post.id);
@@ -1287,8 +1524,8 @@ class _FeedScreenState extends State<FeedScreen> {
       if (!mounted) return;
       setState(() {
         _message = currentlyRefeeded
-            ? 'Re-share removed.'
-            : 'Re-shared to your feed.';
+            ? 'Refeed removed.'
+            : 'Refeeded to your feed.';
       });
     } catch (_) {
       if (!mounted) return;
@@ -1302,7 +1539,7 @@ class _FeedScreenState extends State<FeedScreen> {
         }
         _refeedDeltas[post.id] =
             (_refeedDeltas[post.id] ?? 0) - (currentlyRefeeded ? -1 : 1);
-        _message = 'Could not update this re-share.';
+        _message = 'Could not update this Refeed.';
       });
     }
   }
@@ -1345,7 +1582,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 top: 0,
                 left: 0,
                 right: 0,
-                child: _buildTopOverlay(context),
+                child: _buildTopOverlay(context, posts: posts),
               ),
               Positioned(
                 left: 12,
@@ -1409,7 +1646,7 @@ class _FeedScreenState extends State<FeedScreen> {
         );
         final card = ImmersivePostCard(
           post: renderedPost,
-          isActive: index == _activePage,
+          isActive: _routeVisible && index == _activePage,
           isLiked:
               !_unlikedPostIds.contains(post.id) &&
               (_likedPostIds.contains(post.id) || post.viewerHasLiked),
@@ -1425,6 +1662,8 @@ class _FeedScreenState extends State<FeedScreen> {
           onSave: () => _savePost(post),
           onShare: () => _sharePost(post),
           onAvatar: () => _openCreatorPreview(post),
+          onCreatorName: () =>
+              widget.onOpenUserProfile(post.displayedPost.userId),
         );
         return _PageTransition(
           controller: _pageController,
@@ -1435,7 +1674,10 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildTopOverlay(BuildContext context) {
+  Widget _buildTopOverlay(
+    BuildContext context, {
+    required List<FeedPost>? posts,
+  }) {
     return DecoratedBox(
       decoration: const BoxDecoration(gradient: FeedImmersiveTheme.topScrim),
       child: SafeArea(
@@ -1475,6 +1717,27 @@ class _FeedScreenState extends State<FeedScreen> {
                     onTap: widget.onOpenNotifications,
                     foregroundColor: Colors.white,
                   ),
+                  if (posts != null && posts.isNotEmpty && _tabIndex != 2)
+                    Builder(
+                      builder: (context) {
+                        final filtered = _filterPosts(posts);
+                        if (filtered.isEmpty) return const SizedBox.shrink();
+                        final active =
+                            filtered[_activePage.clamp(0, filtered.length - 1)];
+                        if (active.userId != widget.currentUserId) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
+                          key: const Key('feed-post-more-actions'),
+                          tooltip: 'Post actions',
+                          onPressed: () => unawaited(_deletePost(active)),
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
               _ImmersiveFeedTabs(

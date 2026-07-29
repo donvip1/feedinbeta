@@ -137,6 +137,73 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<List<FeedPost>> loadSavedPosts() async {
+    try {
+      return await _remoteDataSource.fetchSavedPosts();
+    } catch (_) {
+      final posts = await loadPosts();
+      return posts.where((post) => post.viewerHasSaved).toList();
+    }
+  }
+
+  @override
+  Future<void> deletePost(String postId) async {
+    await _remoteDataSource.deletePost(postId);
+    await _box.delete(postId);
+  }
+
+  @override
+  Future<FeedSearchResults> search(String query, {int limit = 30}) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) return const FeedSearchResults();
+
+    try {
+      final remote = await _remoteDataSource.search(normalized, limit: limit);
+      if (!remote.isEmpty || _remoteDataSource.isConfigured) return remote;
+    } catch (_) {
+      // Fall through to cached search when remote search is unavailable.
+    }
+    final needle = normalized.replaceFirst(RegExp(r'^#'), '').toLowerCase();
+    final posts = await loadPosts();
+    final matches = posts
+        .where((post) {
+          final content = post.displayedPost;
+          return content.body.toLowerCase().contains(needle) ||
+              content.authorName.toLowerCase().contains(needle) ||
+              (content.authorHandle?.toLowerCase().contains(needle) ?? false);
+        })
+        .take(limit)
+        .toList(growable: false);
+    final peopleById = <String, FeedSearchPerson>{};
+    for (final post in posts) {
+      final content = post.displayedPost;
+      if (content.userId.isEmpty) continue;
+      final handle = (content.authorHandle ?? '')
+          .replaceFirst(RegExp(r'^@'), '')
+          .trim();
+      if (!content.authorName.toLowerCase().contains(needle) &&
+          !handle.toLowerCase().contains(needle)) {
+        continue;
+      }
+      peopleById.putIfAbsent(
+        content.userId,
+        () => FeedSearchPerson(
+          userId: content.userId,
+          displayName: content.authorName,
+          handle: handle.isEmpty ? 'feedin_user' : handle,
+          avatarUrl: content.avatarUrl,
+        ),
+      );
+      if (peopleById.length >= limit) break;
+    }
+    return FeedSearchResults(
+      posts: matches,
+      people: peopleById.values.toList(growable: false),
+      hashtags: _hashtagsFromPosts(posts, needle: needle, limit: limit),
+    );
+  }
+
+  @override
   Future<List<LiveFeedItem>> loadLiveItems() {
     return _remoteDataSource.fetchLiveItems();
   }
@@ -175,13 +242,36 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
-  Future<FeedComment> addComment(String postId, String body) {
-    return _remoteDataSource.addComment(postId, body);
+  Future<FeedComment> addComment(
+    String postId,
+    String body, {
+    String? parentCommentId,
+  }) {
+    return _remoteDataSource.addComment(
+      postId,
+      body,
+      parentCommentId: parentCommentId,
+    );
+  }
+
+  @override
+  Future<bool> toggleCommentLike(String commentId, {required bool liked}) {
+    return _remoteDataSource.toggleCommentLike(commentId, liked: liked);
+  }
+
+  @override
+  Future<void> deleteComment(String commentId) {
+    return _remoteDataSource.deleteComment(commentId);
   }
 
   @override
   Future<bool> toggleRefeed(String postId, {required bool refeeded}) {
     return _remoteDataSource.toggleRefeed(postId, refeeded: refeeded);
+  }
+
+  @override
+  Future<FeedPost> createQuoteRefeed(String postId, String quote) {
+    return _remoteDataSource.createQuoteRefeed(postId, quote);
   }
 
   @override
@@ -254,6 +344,33 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
     for (final key in demoKeys) {
       await _box.delete(key);
     }
+  }
+
+  List<FeedSearchHashtag> _hashtagsFromPosts(
+    List<FeedPost> posts, {
+    required String needle,
+    required int limit,
+  }) {
+    final counts = <String, int>{};
+    final pattern = RegExp(r'#[A-Za-z0-9_]+');
+    for (final post in posts) {
+      for (final match in pattern.allMatches(post.displayedPost.body)) {
+        final tag = match.group(0)!.substring(1).toLowerCase();
+        if (needle.isNotEmpty && !tag.contains(needle)) continue;
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+    }
+    final entries = counts.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        return byCount != 0 ? byCount : a.key.compareTo(b.key);
+      });
+    return entries
+        .take(limit)
+        .map(
+          (entry) => FeedSearchHashtag(tag: entry.key, postCount: entry.value),
+        )
+        .toList(growable: false);
   }
 
   String _friendlyError(Object error) {

@@ -172,6 +172,9 @@ class FeedComment {
     required this.content,
     required this.createdAtMillis,
     this.avatarUrl,
+    this.parentCommentId,
+    this.likesCount = 0,
+    this.viewerHasLiked = false,
   });
 
   final String id;
@@ -181,6 +184,24 @@ class FeedComment {
   final String content;
   final int createdAtMillis;
   final String? avatarUrl;
+  final String? parentCommentId;
+  final int likesCount;
+  final bool viewerHasLiked;
+
+  FeedComment copyWith({int? likesCount, bool? viewerHasLiked}) {
+    return FeedComment(
+      id: id,
+      userId: userId,
+      authorName: authorName,
+      authorHandle: authorHandle,
+      content: content,
+      createdAtMillis: createdAtMillis,
+      avatarUrl: avatarUrl,
+      parentCommentId: parentCommentId,
+      likesCount: likesCount ?? this.likesCount,
+      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
+    );
+  }
 }
 
 class LiveFeedItem {

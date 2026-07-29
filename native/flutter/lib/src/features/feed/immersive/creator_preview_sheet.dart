@@ -3,21 +3,21 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../profile/parity/widgets/image_viewer.dart';
 import 'feed_immersive_theme.dart';
 import 'hero_transition_layer.dart';
 
-/// Presents a glassy creator preview card that flies open from the tapped
-/// avatar (shared [heroTag]) over a blurred, dimmed barrier.
-///
-/// Presentation-only: [onFollow] is an optional callback the host wires to its
-/// own logic — this sheet never talks to a repository directly.
+typedef CreatorFollowCallback = Future<bool> Function();
+
 Future<void> showCreatorPreview(
   BuildContext context, {
   required Object heroTag,
   required String name,
   String handle = '',
   String? avatarUrl,
-  VoidCallback? onFollow,
+  bool initiallyFollowing = false,
+  CreatorFollowCallback? onToggleFollow,
+  VoidCallback? onViewProfile,
 }) {
   return showGeneralDialog<void>(
     context: context,
@@ -30,7 +30,9 @@ Future<void> showCreatorPreview(
       name: name,
       handle: handle,
       avatarUrl: avatarUrl,
-      onFollow: onFollow,
+      initiallyFollowing: initiallyFollowing,
+      onToggleFollow: onToggleFollow,
+      onViewProfile: onViewProfile,
     ),
     transitionBuilder: (context, animation, _, child) {
       final curved = CurvedAnimation(
@@ -55,26 +57,70 @@ Future<void> showCreatorPreview(
   );
 }
 
-class _CreatorPreviewCard extends StatelessWidget {
+class _CreatorPreviewCard extends StatefulWidget {
   const _CreatorPreviewCard({
     required this.heroTag,
     required this.name,
     required this.handle,
     required this.avatarUrl,
-    required this.onFollow,
+    required this.initiallyFollowing,
+    required this.onToggleFollow,
+    required this.onViewProfile,
   });
 
   final Object heroTag;
   final String name;
   final String handle;
   final String? avatarUrl;
-  final VoidCallback? onFollow;
+  final bool initiallyFollowing;
+  final CreatorFollowCallback? onToggleFollow;
+  final VoidCallback? onViewProfile;
+
+  @override
+  State<_CreatorPreviewCard> createState() => _CreatorPreviewCardState();
+}
+
+class _CreatorPreviewCardState extends State<_CreatorPreviewCard> {
+  late bool _following = widget.initiallyFollowing;
+  bool _followLoading = false;
+  String? _followError;
+
+  String get _initial {
+    final name = widget.name.trim();
+    return name.isEmpty ? '?' : name.characters.first.toUpperCase();
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_followLoading || widget.onToggleFollow == null) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _followLoading = true;
+      _followError = null;
+    });
+    try {
+      final following = await widget.onToggleFollow!();
+      if (!mounted) return;
+      setState(() => _following = following);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _followError = 'Could not update follow state.');
+    } finally {
+      if (mounted) setState(() => _followLoading = false);
+    }
+  }
+
+  void _viewProfile() {
+    Navigator.of(context).maybePop();
+    widget.onViewProfile?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: FeedImmersiveTheme.spacingXl),
+        padding: const EdgeInsets.symmetric(
+          horizontal: FeedImmersiveTheme.spacingXl,
+        ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(FeedImmersiveTheme.sheetRadius),
           child: BackdropFilter(
@@ -86,7 +132,9 @@ class _CreatorPreviewCard extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 360),
               decoration: BoxDecoration(
                 color: FeedImmersiveTheme.glassSurfaceStrong,
-                borderRadius: BorderRadius.circular(FeedImmersiveTheme.sheetRadius),
+                borderRadius: BorderRadius.circular(
+                  FeedImmersiveTheme.sheetRadius,
+                ),
                 border: Border.all(color: FeedImmersiveTheme.glassBorder),
                 boxShadow: FeedImmersiveTheme.floatingShadow,
               ),
@@ -97,25 +145,42 @@ class _CreatorPreviewCard extends StatelessWidget {
                   children: [
                     Align(
                       alignment: Alignment.centerRight,
-                      child: _CloseButton(
-                        onTap: () => Navigator.of(context).maybePop(),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        iconSize: FeedImmersiveTheme.iconSm,
+                        color: FeedImmersiveTheme.inkMuted,
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Close',
                       ),
                     ),
-                    CreatorAvatarHero(
-                      tag: heroTag,
-                      child: _PreviewAvatar(url: avatarUrl, fallback: name),
+                    GestureDetector(
+                      onTap: () => ProfileImageViewer.show(
+                        context,
+                        imageUrl: widget.avatarUrl,
+                        initial: _initial,
+                        isCircle: true,
+                      ),
+                      child: CreatorAvatarHero(
+                        tag: widget.heroTag,
+                        child: _PreviewAvatar(
+                          url: widget.avatarUrl,
+                          fallback: widget.name,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      name,
+                      widget.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: FeedImmersiveTheme.authorName.copyWith(fontSize: 20),
+                      style: FeedImmersiveTheme.authorName.copyWith(
+                        fontSize: 20,
+                      ),
                     ),
-                    if (handle.trim().isNotEmpty) ...[
+                    if (widget.handle.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        handle.trim(),
+                        widget.handle.trim(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: FeedImmersiveTheme.handle.copyWith(
@@ -123,11 +188,34 @@ class _CreatorPreviewCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (_followError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _followError!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
-                    _FollowButton(
-                      name: name,
-                      onFollow: onFollow,
-                    ),
+                    if (widget.onToggleFollow != null)
+                      _FollowButton(
+                        isFollowing: _following,
+                        isLoading: _followLoading,
+                        onTap: _toggleFollow,
+                      ),
+                    if (widget.onViewProfile != null) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _viewProfile,
+                          icon: const Icon(Icons.person_outline),
+                          label: const Text('View Profile'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -201,27 +289,16 @@ class _Initial extends StatelessWidget {
   }
 }
 
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      iconSize: FeedImmersiveTheme.iconSm,
-      color: FeedImmersiveTheme.inkMuted,
-      icon: const Icon(Icons.close_rounded),
-      tooltip: 'Close',
-    );
-  }
-}
-
 class _FollowButton extends StatelessWidget {
-  const _FollowButton({required this.name, required this.onFollow});
+  const _FollowButton({
+    required this.isFollowing,
+    required this.isLoading,
+    required this.onTap,
+  });
 
-  final String name;
-  final VoidCallback? onFollow;
+  final bool isFollowing;
+  final bool isLoading;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -229,30 +306,39 @@ class _FollowButton extends StatelessWidget {
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: FeedImmersiveTheme.brandGradient,
+          gradient: isFollowing ? null : FeedImmersiveTheme.brandGradient,
+          color: isFollowing ? FeedImmersiveTheme.glassSurface : null,
           borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusMd),
-          boxShadow: FeedImmersiveTheme.brandGlow,
+          border: isFollowing
+              ? Border.all(color: FeedImmersiveTheme.glassBorder)
+              : null,
+          boxShadow: isFollowing ? null : FeedImmersiveTheme.brandGlow,
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(FeedImmersiveTheme.radiusMd),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onFollow?.call();
-              Navigator.of(context).maybePop();
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+            onTap: isLoading ? null : onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Center(
-                child: Text(
-                  'Follow Creator',
-                  style: TextStyle(
-                    color: FeedImmersiveTheme.onMedia,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: FeedImmersiveTheme.onMedia,
+                        ),
+                      )
+                    : Text(
+                        isFollowing ? 'Following' : 'Follow Creator',
+                        style: const TextStyle(
+                          color: FeedImmersiveTheme.onMedia,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
               ),
             ),
           ),

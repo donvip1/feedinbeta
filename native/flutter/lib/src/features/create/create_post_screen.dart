@@ -20,6 +20,25 @@ import 'parity/widgets/upload_queue_panel.dart';
 import 'post_draft.dart';
 import 'story_publisher.dart';
 
+/// Presents the four source choices before any camera or gallery API starts.
+void showCreateMediaSourceSheet(
+  BuildContext context, {
+  required ValueChanged<CaptureMethod> onMethod,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: CreateColors.barrier,
+    isScrollControlled: true,
+    builder: (sheetContext) => _CaptureMethodSheet(
+      onMethod: (method) {
+        Navigator.of(sheetContext).pop();
+        onMethod(method);
+      },
+    ),
+  );
+}
+
 /// Native Create surface, wired to the parity composer widgets.
 ///
 /// The public constructor is unchanged (see `feed_shell.dart`); only the body
@@ -41,19 +60,24 @@ class CreatePostScreen extends StatefulWidget {
     required this.onPostUploaded,
     this.initialMediaPath,
     this.initialMediaKind,
+    this.initialCaptureMethod,
   });
 
   final PostDraftRepository draftRepository;
   final UploadQueueRepository uploadQueueRepository;
   final UploadQueueService uploadQueueService;
   final ConnectivityService connectivityService;
-  final VoidCallback onPostUploaded;
+  final ValueChanged<String> onPostUploaded;
 
   /// Optional media captured upstream (e.g. by the camera studio) that seeds the
   /// composer so the user lands straight on caption/publish. Purely additive:
   /// when null the screen behaves exactly as before.
   final String? initialMediaPath;
   final CreateMediaKind? initialMediaKind;
+
+  /// Optional source selected before this route opened. It is handled after the
+  /// first frame so the composer is visible before Android presents a picker.
+  final CaptureMethod? initialCaptureMethod;
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -102,6 +126,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.initState();
     _refreshDrafts();
     _seedInitialMedia();
+    final captureMethod = widget.initialCaptureMethod;
+    if (captureMethod != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleCaptureMethod(captureMethod);
+      });
+    }
   }
 
   /// Seeds [_media] with media captured upstream (camera studio) using the same
@@ -194,18 +224,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _showSnack('You can add up to $_maxMedia items.');
       return;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: CreateColors.barrier,
-      isScrollControlled: true,
-      builder: (sheetContext) => _CaptureMethodSheet(
-        onMethod: (method) {
-          Navigator.of(sheetContext).pop();
-          _handleCaptureMethod(method);
-        },
-      ),
-    );
+    showCreateMediaSourceSheet(context, onMethod: _handleCaptureMethod);
   }
 
   bool get _isAtMediaLimit => _media.length >= _maxMedia;
@@ -219,7 +238,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
         break;
       case CaptureMethod.photoLibrary:
-        await _pickMediaLibrary();
+        await _pickPhotoLibrary();
         break;
       case CaptureMethod.recordVideo:
         await _pickSingle(
@@ -236,8 +255,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  /// Mixed photo/video picker. Honors the remaining capacity.
-  Future<void> _pickMediaLibrary() async {
+  /// Image-only library picker. Honors the remaining media capacity.
+  Future<void> _pickPhotoLibrary() async {
     final remaining = _maxMedia - _media.length;
     if (remaining <= 0) {
       _showSnack('You can add up to $_maxMedia items.');
@@ -245,38 +264,40 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
 
     if (remaining == 1) {
-      final picked = await _picker.pickMedia();
+      final picked = await _picker.pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final stored = await _persistPickedMedia(picked);
+      if (!mounted) return;
       setState(() {
         _media = [
           ..._media,
           ComposerMediaItem(
             id: _uuid.v4(),
             path: stored,
-            kind: _kindFor(picked),
+            kind: CreateMediaKind.image,
           ),
         ];
       });
       return;
     }
 
-    final picked = await _picker.pickMultipleMedia(limit: remaining);
+    final picked = await _picker.pickMultiImage(limit: remaining);
     if (picked.isEmpty) return;
     final accepted = picked.take(remaining).toList();
-    final persisted = <({XFile file, String path})>[];
+    final persisted = <String>[];
     for (final file in accepted) {
-      persisted.add((file: file, path: await _persistPickedMedia(file)));
+      persisted.add(await _persistPickedMedia(file));
     }
+    if (!mounted) return;
     final overflow = picked.length - accepted.length;
     setState(() {
       _media = [
         ..._media,
-        for (final item in persisted)
+        for (final path in persisted)
           ComposerMediaItem(
             id: _uuid.v4(),
-            path: item.path,
-            kind: _kindFor(item.file),
+            path: path,
+            kind: CreateMediaKind.image,
           ),
       ];
     });
@@ -406,8 +427,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         uploadState: DraftUploadState.queued,
       );
       summary = await widget.uploadQueueService.processQueue();
-      if (summary.uploaded > 0) {
-        widget.onPostUploaded();
+      for (final postId in summary.publishedPostIds) {
+        widget.onPostUploaded(postId);
       }
     }
 
@@ -1062,7 +1083,7 @@ class _CaptureMethodSheet extends StatelessWidget {
             _CaptureRow(
               icon: Icons.photo_library_outlined,
               label: 'Photo Library',
-              description: 'Pick photos and videos',
+              description: 'Pick photos from your library',
               onTap: () => onMethod(CaptureMethod.photoLibrary),
             ),
             _CaptureRow(

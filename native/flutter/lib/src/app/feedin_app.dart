@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/config/feedin_config.dart';
+import '../core/feedin_route_observer.dart';
 import '../features/auth/auth_gate.dart';
 import '../features/auth/data/google_auth_service.dart';
 import 'feedin_services.dart';
@@ -28,6 +29,7 @@ class FeedinApp extends StatelessWidget {
     return MaterialApp(
       title: 'feedIn',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [feedinRouteObserver],
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         useMaterial3: true,

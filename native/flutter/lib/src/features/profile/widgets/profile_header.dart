@@ -28,24 +28,34 @@ class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
     required this.profile,
-    required this.onEditProfile,
-    required this.onOpenSettings,
     required this.onOpenLink,
+    this.onEditProfile,
+    this.onOpenSettings,
     this.onChangeAvatar,
     this.onChangeCover,
+    this.primaryActionLabel,
+    this.primaryActionIcon,
+    this.primaryActionLoading = false,
+    this.onPrimaryAction,
     this.isOnline = true,
   });
 
   final UserProfile profile;
 
-  /// Opens the existing profile editor.
-  final VoidCallback onEditProfile;
+  /// Opens the existing profile editor on the viewer's own profile.
+  final VoidCallback? onEditProfile;
 
-  /// Opens app settings (wired by the coordinator).
-  final VoidCallback onOpenSettings;
+  /// Opens app settings (wired by the coordinator) on the viewer's profile.
+  final VoidCallback? onOpenSettings;
 
   /// Opens (or copies) an external URL — used by the website meta pill.
   final ValueChanged<String> onOpenLink;
+
+  /// Optional alternate primary action used by another user's profile.
+  final String? primaryActionLabel;
+  final IconData? primaryActionIcon;
+  final bool primaryActionLoading;
+  final VoidCallback? onPrimaryAction;
 
   /// Upload/change actions for the viewer's own profile images.
   final VoidCallback? onChangeAvatar;
@@ -88,32 +98,33 @@ class ProfileHeader extends StatelessWidget {
                 coverUrl: hasCover ? coverUrl : null,
                 onTap: hasCover
                     ? () => ProfileImageViewer.show(
-                          context,
-                          imageUrl: coverUrl,
-                          initial: _initial,
-                          isCircle: false,
-                        )
+                        context,
+                        imageUrl: coverUrl,
+                        initial: _initial,
+                        isCircle: false,
+                      )
                     : null,
               ),
-              Positioned(
-                right: ProfileSpacing.sm,
-                bottom: ProfileSpacing.avatarOverlap + ProfileSpacing.sm,
-                child: _CircleIconButton(
-                  icon: Icons.photo_camera_outlined,
-                  tooltip: 'Change cover photo',
-                  onTap: onChangeCover,
+              if (onChangeCover != null)
+                Positioned(
+                  right: ProfileSpacing.sm,
+                  bottom: ProfileSpacing.avatarOverlap + ProfileSpacing.sm,
+                  child: _CircleIconButton(
+                    icon: Icons.photo_camera_outlined,
+                    tooltip: 'Change cover photo',
+                    onTap: onChangeCover,
+                  ),
                 ),
-              ),
-              // Settings gear floated top-right over the cover.
-              Positioned(
-                top: ProfileSpacing.sm,
-                right: ProfileSpacing.sm,
-                child: _CircleIconButton(
-                  icon: Icons.settings_outlined,
-                  tooltip: 'Settings',
-                  onTap: onOpenSettings,
+              if (onOpenSettings != null)
+                Positioned(
+                  top: ProfileSpacing.sm,
+                  right: ProfileSpacing.sm,
+                  child: _CircleIconButton(
+                    icon: Icons.settings_outlined,
+                    tooltip: 'Settings',
+                    onTap: onOpenSettings,
+                  ),
                 ),
-              ),
               Positioned(
                 top: avatarTop,
                 child: _AvatarWithStatus(
@@ -184,11 +195,17 @@ class ProfileHeader extends StatelessWidget {
                   onOpenLink: onOpenLink,
                 ),
               ],
-              const SizedBox(height: ProfileSpacing.lg),
-              _ActionRow(
-                onEditProfile: onEditProfile,
-                onOpenSettings: onOpenSettings,
-              ),
+              if (onEditProfile != null || primaryActionLabel != null) ...[
+                const SizedBox(height: ProfileSpacing.lg),
+                _ActionRow(
+                  onEditProfile: onEditProfile,
+                  onOpenSettings: onOpenSettings,
+                  primaryActionLabel: primaryActionLabel,
+                  primaryActionIcon: primaryActionIcon,
+                  primaryActionLoading: primaryActionLoading,
+                  onPrimaryAction: onPrimaryAction,
+                ),
+              ],
             ],
           ),
         ),
@@ -291,11 +308,12 @@ class _AvatarWithStatus extends StatelessWidget {
               bottom: 6,
               child: ProfileStatusDot(online: isOnline),
             ),
-            Positioned(
-              left: -2,
-              bottom: -2,
-              child: _MiniCameraButton(onTap: onChangeImage),
-            ),
+            if (onChangeImage != null)
+              Positioned(
+                left: -2,
+                bottom: -2,
+                child: _MiniCameraButton(onTap: onChangeImage),
+              ),
           ],
         ),
       ),
@@ -413,13 +431,27 @@ class _MetaRow extends StatelessWidget {
 
 /// Primary actions: a wide gradient "Edit Profile" button plus a settings gear.
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.onEditProfile, required this.onOpenSettings});
+  const _ActionRow({
+    required this.onEditProfile,
+    required this.onOpenSettings,
+    required this.primaryActionLabel,
+    required this.primaryActionIcon,
+    required this.primaryActionLoading,
+    required this.onPrimaryAction,
+  });
 
-  final VoidCallback onEditProfile;
-  final VoidCallback onOpenSettings;
+  final VoidCallback? onEditProfile;
+  final VoidCallback? onOpenSettings;
+  final String? primaryActionLabel;
+  final IconData? primaryActionIcon;
+  final bool primaryActionLoading;
+  final VoidCallback? onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final label = primaryActionLabel ?? 'Edit Profile';
+    final icon = primaryActionIcon ?? Icons.edit_outlined;
+    final action = primaryActionLabel == null ? onEditProfile : onPrimaryAction;
     return Row(
       children: [
         Expanded(
@@ -427,27 +459,37 @@ class _ActionRow extends StatelessWidget {
             color: Colors.transparent,
             borderRadius: ProfileRadii.tile,
             child: InkWell(
-              onTap: onEditProfile,
+              onTap: primaryActionLoading ? null : action,
               borderRadius: ProfileRadii.tile,
               child: DecoratedBox(
                 decoration: const BoxDecoration(
                   gradient: ProfileGradients.action,
                   borderRadius: ProfileRadii.tile,
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: ProfileColors.primaryForeground,
-                      ),
-                      SizedBox(width: ProfileSpacing.sm),
+                      if (primaryActionLoading)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: ProfileColors.primaryForeground,
+                          ),
+                        )
+                      else
+                        Icon(
+                          icon,
+                          size: 18,
+                          color: ProfileColors.primaryForeground,
+                        ),
+                      const SizedBox(width: ProfileSpacing.sm),
                       Text(
-                        'Edit Profile',
-                        style: TextStyle(
+                        label,
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: ProfileColors.primaryForeground,
@@ -460,13 +502,15 @@ class _ActionRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: ProfileSpacing.md),
-        _CircleIconButton(
-          icon: Icons.settings_outlined,
-          tooltip: 'Settings',
-          onTap: onOpenSettings,
-          filled: true,
-        ),
+        if (onOpenSettings != null) ...[
+          const SizedBox(width: ProfileSpacing.md),
+          _CircleIconButton(
+            icon: Icons.settings_outlined,
+            tooltip: 'Settings',
+            onTap: onOpenSettings,
+            filled: true,
+          ),
+        ],
       ],
     );
   }
@@ -493,9 +537,7 @@ class _CircleIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: filled ? ProfileColors.secondary : ProfileColors.tileBadgeScrim,
-      shape: const CircleBorder(
-        side: BorderSide(color: ProfileColors.border),
-      ),
+      shape: const CircleBorder(side: BorderSide(color: ProfileColors.border)),
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),

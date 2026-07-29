@@ -69,6 +69,14 @@ class SocialGraphRemoteDataSource {
 
   String? get _currentUserId => _client?.auth.currentUser?.id;
 
+  String? get currentUserId => _currentUserId;
+
+  Future<bool> isCurrentUserFollowing(String followingId) async {
+    final followerId = _currentUserId;
+    if (followerId == null || followerId == followingId) return false;
+    return isFollowing(followerId: followerId, followingId: followingId);
+  }
+
   /// Whether [followerId] follows [followingId] right now.
   Future<bool> isFollowing({
     required String followerId,
@@ -94,10 +102,13 @@ class SocialGraphRemoteDataSource {
     if (client == null || followerId == null) return;
     if (followerId == followingId) return;
 
-    await client.from(_followsTable).upsert({
-      'follower_id': followerId,
-      'following_id': followingId,
-    }, onConflict: 'follower_id,following_id', ignoreDuplicates: true);
+    await client
+        .from(_followsTable)
+        .upsert(
+          {'follower_id': followerId, 'following_id': followingId},
+          onConflict: 'follower_id,following_id',
+          ignoreDuplicates: true,
+        );
   }
 
   /// Unfollow [followingId] as the current user.

@@ -278,7 +278,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
 
   Widget _buildVideo(VideoPlayerController controller) {
     return FittedBox(
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       child: SizedBox(
         width: controller.value.size.width,
         height: controller.value.size.height,

@@ -30,6 +30,7 @@ class ImmersivePostCard extends StatefulWidget {
     required this.onSave,
     required this.onShare,
     this.onAvatar,
+    this.onCreatorName,
   });
 
   /// The post to render.
@@ -47,8 +48,10 @@ class ImmersivePostCard extends StatefulWidget {
   final VoidCallback onSave;
   final VoidCallback onShare;
 
-  /// Tapping the avatar in the action rail (or the creator header).
+  /// Tapping the avatar opens the creator preview; tapping the name can route
+  /// directly to the creator's full profile.
   final VoidCallback? onAvatar;
+  final VoidCallback? onCreatorName;
 
   @override
   State<ImmersivePostCard> createState() => _ImmersivePostCardState();
@@ -106,7 +109,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
               active: widget.isActive,
               child: CaptionLayer(
                 post: widget.post,
-                onCreatorTap: widget.onAvatar,
+                onCreatorTap: widget.onCreatorName ?? widget.onAvatar,
               ),
             ),
           ),

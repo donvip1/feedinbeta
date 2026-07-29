@@ -29,13 +29,15 @@ class CameraStudioScreen extends StatefulWidget {
     required this.uploadQueueService,
     required this.connectivityService,
     required this.onPostUploaded,
+    this.initialMode = StudioCaptureMode.photo,
   });
 
   final PostDraftRepository draftRepository;
   final UploadQueueRepository uploadQueueRepository;
   final UploadQueueService uploadQueueService;
   final ConnectivityService connectivityService;
-  final VoidCallback onPostUploaded;
+  final ValueChanged<String> onPostUploaded;
+  final StudioCaptureMode initialMode;
 
   @override
   State<CameraStudioScreen> createState() => _CameraStudioScreenState();
@@ -51,7 +53,7 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
 
   bool _isFront = false;
   bool _flashOn = false;
-  StudioCaptureMode _mode = StudioCaptureMode.photo;
+  late StudioCaptureMode _mode;
   StudioFilter _filter = kStudioFilters.first;
   bool _filtersOpen = false;
   bool _beauty = false;
@@ -64,6 +66,7 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
   @override
   void initState() {
     super.initState();
+    _mode = widget.initialMode;
     WidgetsBinding.instance.addObserver(this);
     _setupCameras();
   }
@@ -141,7 +144,9 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
     try {
       await controller.setFlashMode(next ? FlashMode.torch : FlashMode.off);
       if (mounted) setState(() => _flashOn = next);
-    } catch (_) {/* front cameras often lack a torch; ignore */}
+    } catch (_) {
+      /* front cameras often lack a torch; ignore */
+    }
   }
 
   Future<void> _flip() async {
@@ -153,7 +158,13 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
   }
 
   void _cycleTimer() {
-    setState(() => _timer = switch (_timer) { 0 => 3, 3 => 10, _ => 0 });
+    setState(
+      () => _timer = switch (_timer) {
+        0 => 3,
+        3 => 10,
+        _ => 0,
+      },
+    );
   }
 
   void _onShutter() {
@@ -272,8 +283,9 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
             connectivityService: widget.connectivityService,
             onPostUploaded: widget.onPostUploaded,
             initialMediaPath: file.path,
-            initialMediaKind:
-                isVideo ? CreateMediaKind.video : CreateMediaKind.image,
+            initialMediaKind: isVideo
+                ? CreateMediaKind.video
+                : CreateMediaKind.image,
           ),
         ),
       ),
@@ -282,7 +294,9 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -290,7 +304,10 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: _error != null
-          ? _StudioError(message: _error!, onClose: () => Navigator.of(context).maybePop())
+          ? _StudioError(
+              message: _error!,
+              onClose: () => Navigator.of(context).maybePop(),
+            )
           : Stack(
               fit: StackFit.expand,
               children: [
@@ -356,7 +373,6 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
                     onModeChanged: (m) => setState(() => _mode = m),
                     onShutter: _onShutter,
                     onGallery: _openGallery,
-                    onEffects: () => setState(() => _filtersOpen = !_filtersOpen),
                   ),
                 ),
 
@@ -427,13 +443,19 @@ class _StudioError extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.videocam_off_rounded,
-                color: FeedImmersiveTheme.inkMuted, size: 56),
+            const Icon(
+              Icons.videocam_off_rounded,
+              color: FeedImmersiveTheme.inkMuted,
+              size: 56,
+            ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: FeedImmersiveTheme.ink, fontSize: 15),
+              style: const TextStyle(
+                color: FeedImmersiveTheme.ink,
+                fontSize: 15,
+              ),
             ),
             const SizedBox(height: 20),
             FilledButton(onPressed: onClose, child: const Text('Close')),

@@ -123,7 +123,7 @@ class _CarouselImage extends StatelessWidget {
     if (hasLocalFile) {
       return Image.file(
         File(path),
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (context, error, stackTrace) => _networkImage(),

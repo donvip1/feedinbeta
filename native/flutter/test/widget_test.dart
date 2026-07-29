@@ -469,6 +469,33 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<List<FeedPost>> loadSavedPosts() async {
+    final posts = await loadPosts();
+    return posts.where((post) => post.viewerHasSaved).toList();
+  }
+
+  @override
+  Future<void> deletePost(String postId) async {
+    _pendingActions++;
+  }
+
+  @override
+  Future<FeedSearchResults> search(String query, {int limit = 30}) async {
+    final normalized = query.trim().toLowerCase();
+    final posts = await loadPosts();
+    return FeedSearchResults(
+      posts: posts
+          .where(
+            (post) =>
+                post.body.toLowerCase().contains(normalized) ||
+                post.authorName.toLowerCase().contains(normalized),
+          )
+          .take(limit)
+          .toList(),
+    );
+  }
+
+  @override
   Future<List<LiveFeedItem>> loadLiveItems() async => const [];
 
   @override
@@ -490,7 +517,11 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   Future<List<FeedComment>> loadComments(String postId) async => const [];
 
   @override
-  Future<FeedComment> addComment(String postId, String body) async {
+  Future<FeedComment> addComment(
+    String postId,
+    String body, {
+    String? parentCommentId,
+  }) async {
     return FeedComment(
       id: 'comment-${_pendingActions++}',
       userId: 'test-user',
@@ -498,6 +529,36 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
       authorHandle: '@tester',
       content: body,
       createdAtMillis: DateTime.now().millisecondsSinceEpoch,
+      parentCommentId: parentCommentId,
+    );
+  }
+
+  @override
+  Future<bool> toggleCommentLike(
+    String commentId, {
+    required bool liked,
+  }) async {
+    _pendingActions++;
+    return !liked;
+  }
+
+  @override
+  Future<void> deleteComment(String commentId) async {
+    _pendingActions++;
+  }
+
+  @override
+  Future<FeedPost> createQuoteRefeed(String postId, String quote) async {
+    _pendingActions++;
+    return FeedPost(
+      id: 'quote-$_pendingActions',
+      userId: 'test-user',
+      authorName: 'Tester',
+      body: quote,
+      meta: '@tester',
+      createdAtMillis: DateTime.now().millisecondsSinceEpoch,
+      postType: 'refeed',
+      originalPostId: postId,
     );
   }
 

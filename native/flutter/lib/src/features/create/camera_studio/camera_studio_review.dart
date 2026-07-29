@@ -100,7 +100,10 @@ class CameraStudioReview extends StatelessWidget {
         ),
       );
     }
-    final image = Image.file(File(file.path), fit: BoxFit.cover);
+    final image = ColoredBox(
+      color: Colors.black,
+      child: Image.file(File(file.path), fit: BoxFit.contain),
+    );
     return filter == null
         ? image
         : ColorFiltered(colorFilter: filter!, child: image);

@@ -198,10 +198,13 @@ class _MediaPage extends StatelessWidget {
     if (item.isVideo) {
       return _VideoPreviewTile(item: item);
     }
-    return Image.file(
-      File(item.previewPath),
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => const _MediaFallback(),
+    return ColoredBox(
+      color: CreateColors.blackTile,
+      child: Image.file(
+        File(item.previewPath),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => const _MediaFallback(),
+      ),
     );
   }
 }
@@ -307,12 +310,15 @@ class _VideoPreviewTileState extends State<_VideoPreviewTile> {
       fit: StackFit.expand,
       children: [
         if (ready)
-          FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
+          ColoredBox(
+            color: CreateColors.blackTile,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
             ),
           )
         else
