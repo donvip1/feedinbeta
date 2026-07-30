@@ -9,11 +9,11 @@ import '../../../core/sync/upload_queue_service.dart';
 import '../../../data/local/post_draft_repository.dart';
 import '../../../data/local/upload_queue_repository.dart';
 import '../../feed/immersive/feed_immersive_theme.dart';
+import '../create_outcome.dart';
 import '../create_post_screen.dart';
 import '../parity/create_view_models.dart';
 import 'camera_studio_review.dart';
 import 'studio_capture_controls.dart';
-import 'studio_filter_tray.dart';
 import 'studio_filters.dart';
 import 'studio_tool_rail.dart';
 import 'studio_top_bar.dart';
@@ -30,6 +30,7 @@ class CameraStudioScreen extends StatefulWidget {
     required this.connectivityService,
     required this.onPostUploaded,
     this.initialMode = StudioCaptureMode.photo,
+    this.initialSource,
   });
 
   final PostDraftRepository draftRepository;
@@ -38,6 +39,7 @@ class CameraStudioScreen extends StatefulWidget {
   final ConnectivityService connectivityService;
   final ValueChanged<String?> onPostUploaded;
   final StudioCaptureMode initialMode;
+  final CaptureMethod? initialSource;
 
   @override
   State<CameraStudioScreen> createState() => _CameraStudioScreenState();
@@ -54,8 +56,6 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
   bool _isFront = false;
   bool _flashOn = false;
   late StudioCaptureMode _mode;
-  StudioFilter _filter = kStudioFilters.first;
-  bool _filtersOpen = false;
   bool _beauty = false;
   int _timer = 0; // 0 / 3 / 10 seconds
   bool _isRecording = false;
@@ -68,7 +68,13 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
     super.initState();
     _mode = widget.initialMode;
     WidgetsBinding.instance.addObserver(this);
-    _setupCameras();
+    final source = widget.initialSource;
+    if (source == CaptureMethod.photoLibrary ||
+        source == CaptureMethod.videoLibrary) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openGallery());
+    } else {
+      _setupCameras();
+    }
   }
 
   @override
@@ -250,8 +256,17 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
       final file = _mode.isVideo
           ? await _picker.pickVideo(source: ImageSource.gallery)
           : await _picker.pickImage(source: ImageSource.gallery);
-      if (file != null && mounted) {
+      if (!mounted) return;
+      if (file != null) {
         _openReview(file, isVideo: _mode.isVideo);
+        return;
+      }
+      // The source-first gallery route intentionally skips camera startup.
+      // Cancelling that initial picker should close Create rather than leave a
+      // permanent loading surface with no camera controller.
+      if (widget.initialSource == CaptureMethod.photoLibrary ||
+          widget.initialSource == CaptureMethod.videoLibrary) {
+        Navigator.of(context).maybePop();
       }
     } catch (_) {
       _showError('Could not open the gallery.');
@@ -264,16 +279,21 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
         builder: (_) => CameraStudioReview(
           file: file,
           isVideo: isVideo,
-          filter: _beauty ? null : _filter.filter,
-          onNext: () => _handoffToComposer(file, isVideo: isVideo),
+          initialFilter: kStudioFilters.first,
+          onNext: (filter) =>
+              _handoffToComposer(file, isVideo: isVideo, filterId: filter.id),
         ),
       ),
     );
   }
 
-  Future<void> _handoffToComposer(XFile file, {required bool isVideo}) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+  Future<void> _handoffToComposer(
+    XFile file, {
+    required bool isVideo,
+    required String filterId,
+  }) async {
+    final outcome = await Navigator.of(context).push<CreateOutcome>(
+      MaterialPageRoute<CreateOutcome>(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Complete Post')),
           body: CreatePostScreen(
@@ -286,10 +306,13 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
             initialMediaKind: isVideo
                 ? CreateMediaKind.video
                 : CreateMediaKind.image,
+            initialMediaFilterId: filterId == 'original' ? null : filterId,
           ),
         ),
       ),
     );
+    if (!mounted || outcome == null) return;
+    Navigator.of(context).pop(outcome);
   }
 
   void _showError(String message) {
@@ -314,7 +337,7 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
                 if (_controller != null && _controller!.value.isInitialized)
                   _LivePreview(
                     controller: _controller!,
-                    filter: _filter.filter,
+                    filter: null,
                     beauty: _beauty,
                   )
                 else
@@ -330,25 +353,9 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
                   top: MediaQuery.of(context).padding.top + 84,
                   child: StudioToolRail(
                     beautyOn: _beauty,
-                    filtersOpen: _filtersOpen,
                     timerSeconds: _timer,
                     onToggleBeauty: () => setState(() => _beauty = !_beauty),
-                    onToggleFilters: () =>
-                        setState(() => _filtersOpen = !_filtersOpen),
                     onCycleTimer: _cycleTimer,
-                  ),
-                ),
-
-                // Filter tray (above the capture controls).
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 168,
-                  child: StudioFilterTray(
-                    visible: _filtersOpen,
-                    selectedId: _filter.id,
-                    onSelected: (f) => setState(() => _filter = f),
-                    onClose: () => setState(() => _filtersOpen = false),
                   ),
                 ),
 

@@ -1,4 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 /// One recently-viewed post resolved from the `get_view_history` RPC, joined to
 /// its author profile. Decoupled from the UI view-models so the profile
@@ -64,7 +69,10 @@ class ViewedPost {
 /// All methods degrade gracefully when Supabase is not configured or there is
 /// no authenticated user: writes become no-ops and reads return empty lists.
 class PostViewsRemoteDataSource {
-  const PostViewsRemoteDataSource({required this.isConfigured});
+  PostViewsRemoteDataSource({
+    required this.isConfigured,
+    FlutterSecureStorage secureStorage = const FlutterSecureStorage(),
+  }) : _secureStorage = secureStorage;
 
   /// Convenience factory used by hosts that cannot see the app config: detects
   /// configuration from whether the Supabase singleton was initialised.
@@ -73,8 +81,11 @@ class PostViewsRemoteDataSource {
   }
 
   final bool isConfigured;
+  final FlutterSecureStorage _secureStorage;
 
   static const _viewHistoryTable = 'post_view_history';
+  static const _anonymousDeviceIdKey = 'feedin.anonymous_view_device_id.v1';
+  static const _uuid = Uuid();
 
   static bool _supabaseAvailable() {
     try {
@@ -97,20 +108,40 @@ class PostViewsRemoteDataSource {
 
   String? get _currentUserId => _client?.auth.currentUser?.id;
 
-  /// Record that the current user viewed [postId]. Best-effort: the RPC upserts
-  /// into `post_view_history` and bumps the post's `views_count`, but a failure
-  /// must never disrupt the feed, so errors are swallowed.
+  /// Record one unique view for the current identity. Signed-in viewers use the
+  /// server-enforced `(user_id, post_id)` contract. Signed-out viewers send only
+  /// a SHA-256 digest of a random installation UUID stored in secure storage;
+  /// the raw UUID never leaves this device.
   Future<void> recordView(String postId) async {
     final client = _client;
-    if (client == null || _currentUserId == null || postId.isEmpty) return;
+    if (client == null || postId.isEmpty) return;
     try {
-      await client.rpc<void>(
-        'record_post_view',
-        params: {'p_post_id': postId},
+      if (_currentUserId != null) {
+        await client.rpc<void>(
+          'record_post_view',
+          params: {'p_post_id': postId},
+        );
+        return;
+      }
+
+      final deviceHash = await _anonymousDeviceHash();
+      await client.rpc<bool>(
+        'record_anonymous_post_view',
+        params: {'p_post_id': postId, 'p_device_hash': deviceHash},
       );
     } catch (_) {
-      // View recording is non-critical telemetry; ignore RLS / network errors.
+      // View recording is non-critical telemetry; ignore storage/RLS/network
+      // errors so Feed playback is never interrupted.
     }
+  }
+
+  Future<String> _anonymousDeviceHash() async {
+    var deviceId = await _secureStorage.read(key: _anonymousDeviceIdKey);
+    if (deviceId == null || deviceId.isEmpty) {
+      deviceId = _uuid.v4();
+      await _secureStorage.write(key: _anonymousDeviceIdKey, value: deviceId);
+    }
+    return sha256.convert(utf8.encode(deviceId)).toString();
   }
 
   /// The current user's posts viewed in the last 48 hours, newest first. Throws

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../create/camera_studio/studio_filters.dart';
 import '../feed_post.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_video_player.dart';
@@ -33,6 +34,15 @@ class MediaLayer extends StatelessWidget {
 
   bool get _isVideo => _primaryMediaType == 'video';
 
+  StudioFilter? get _mediaFilter {
+    final id = post.mediaFilterId?.trim();
+    if (id == null || id.isEmpty || id == 'original') return null;
+    for (final filter in kStudioFilters) {
+      if (filter.id == id) return filter;
+    }
+    return null;
+  }
+
   /// Non-empty image urls from [FeedPost.mediaUrl] + [FeedPost.mediaUrls],
   /// de-duplicated while preserving order.
   List<String> get _imageUrls {
@@ -54,41 +64,53 @@ class MediaLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget media;
     if (_isVideo) {
       final url =
           post.mediaUrl ??
           (post.mediaUrls.isNotEmpty ? post.mediaUrls.first : null);
-      return ImmersiveVideoPlayer(
+      media = ImmersiveVideoPlayer(
         url: url,
         localPath: post.localMediaPath,
         isActive: isActive,
         onDoubleTapLike: onDoubleTapLike,
       );
+    } else {
+      final imageUrls = _imageUrls;
+      if (imageUrls.isNotEmpty) {
+        // The post carries a single local media path, so attach it to the first
+        // image and pad the rest with nulls.
+        final localPaths = <String?>[
+          for (var i = 0; i < imageUrls.length; i++)
+            i == 0 ? post.localMediaPath : null,
+        ];
+        media = PhotoCarousel(
+          urls: imageUrls,
+          localPaths: localPaths,
+          onDoubleTapLike: onDoubleTapLike,
+        );
+      } else {
+        return _TextCardBackground(
+          post: post,
+          onDoubleTapLike: onDoubleTapLike,
+        );
+      }
     }
 
-    final imageUrls = _imageUrls;
-    if (imageUrls.isNotEmpty) {
-      // The post carries a single local media path, so attach it to the first
-      // image and pad the rest with nulls.
-      final localPaths = <String?>[
-        for (var i = 0; i < imageUrls.length; i++)
-          i == 0 ? post.localMediaPath : null,
-      ];
-      return PhotoCarousel(
-        urls: imageUrls,
-        localPaths: localPaths,
-        onDoubleTapLike: onDoubleTapLike,
-      );
-    }
-
-    return _TextCardBackground(post: post, onDoubleTapLike: onDoubleTapLike);
+    final colorFilter = _mediaFilter?.filter;
+    return colorFilter == null
+        ? media
+        : ColorFiltered(colorFilter: colorFilter, child: media);
   }
 }
 
 /// Full-bleed branded gradient card used when a post has no media, showing the
 /// post body centered over the brand gradient.
 class _TextCardBackground extends StatelessWidget {
-  const _TextCardBackground({required this.post, required this.onDoubleTapLike});
+  const _TextCardBackground({
+    required this.post,
+    required this.onDoubleTapLike,
+  });
 
   final FeedPost post;
   final VoidCallback onDoubleTapLike;

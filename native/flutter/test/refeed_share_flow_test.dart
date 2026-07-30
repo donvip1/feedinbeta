@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:feedin/src/features/feed/feed_post.dart';
 import 'package:feedin/src/features/feed/feed_share_service.dart';
+import 'package:feedin/src/features/feed/immersive/caption_layer.dart';
+import 'package:feedin/src/features/feed/immersive/caption_text.dart';
 import 'package:feedin/src/features/feed/immersive/refeed_sheet.dart';
 
 void main() {
@@ -36,6 +38,48 @@ void main() {
       service.shareText(post),
       contains('https://feedinn.com/feed/post/original-42'),
     );
+  });
+
+  testWidgets('Quote Refeed renders wrapper quote and embedded original', (
+    tester,
+  ) async {
+    const quote = FeedPost(
+      id: 'quote-1',
+      userId: 'quoter',
+      authorName: 'Grace Hopper',
+      body: 'This context matters.',
+      meta: '@grace',
+      createdAtMillis: 3,
+      postType: 'refeed',
+      originalPostId: 'original-42',
+      originalPost: FeedPost(
+        id: 'original-42',
+        userId: 'author-1',
+        authorName: 'Ada Lovelace',
+        body: 'A thoughtful post.',
+        meta: '@ada',
+        createdAtMillis: 1,
+      ),
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomLeft,
+            child: CaptionLayer(post: quote),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Grace Hopper'), findsOneWidget);
+    final quoteCaption = tester.widget<ExpandableCaption>(
+      find.byKey(const Key('post-caption-quote-1')),
+    );
+    expect(quoteCaption.text, 'This context matters.');
+    expect(find.byKey(const Key('quote-refeed-original')), findsOneWidget);
+    expect(find.text('A thoughtful post.'), findsOneWidget);
   });
 
   testWidgets('Refeed opens choices without immediately mutating', (

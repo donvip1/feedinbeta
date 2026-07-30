@@ -12,6 +12,19 @@ typedef CommentLikeCallback =
     Future<bool> Function(FeedComment comment, bool liked);
 typedef CommentDeleteCallback = Future<void> Function(FeedComment comment);
 
+class FeedCommentSheetRoute<T> extends ModalBottomSheetRoute<T> {
+  FeedCommentSheetRoute({
+    required super.builder,
+    required super.isScrollControlled,
+    required super.backgroundColor,
+    required super.barrierLabel,
+    required super.capturedThemes,
+    required super.useSafeArea,
+    super.modalBarrierColor,
+    super.sheetAnimationStyle,
+  });
+}
+
 Future<void> showCommentSheet(
   BuildContext context, {
   required FeedPost post,
@@ -22,26 +35,34 @@ Future<void> showCommentSheet(
   required ValueChanged<String> onOpenUserProfile,
   required String currentUserId,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: FeedImmersiveTheme.sheetBarrier,
-    sheetAnimationStyle: const AnimationStyle(
-      duration: FeedImmersiveTheme.motionSheet,
-      reverseDuration: FeedImmersiveTheme.motionSheetReverse,
-      curve: FeedImmersiveTheme.sheetCurve,
-      reverseCurve: FeedImmersiveTheme.sheetReverseCurve,
-    ),
-    builder: (context) => CommentSheet(
-      post: post,
-      comments: comments,
-      onSubmit: onSubmit,
-      onToggleLike: onToggleLike,
-      onDelete: onDelete,
-      onOpenUserProfile: onOpenUserProfile,
-      currentUserId: currentUserId,
+  final navigator = Navigator.of(context);
+  final materialLocalizations = MaterialLocalizations.of(context);
+  return navigator.push<void>(
+    FeedCommentSheetRoute<void>(
+      builder: (context) => CommentSheet(
+        post: post,
+        comments: comments,
+        onSubmit: onSubmit,
+        onToggleLike: onToggleLike,
+        onDelete: onDelete,
+        onOpenUserProfile: onOpenUserProfile,
+        currentUserId: currentUserId,
+      ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      modalBarrierColor: FeedImmersiveTheme.sheetBarrier,
+      barrierLabel: materialLocalizations.modalBarrierDismissLabel,
+      capturedThemes: InheritedTheme.capture(
+        from: context,
+        to: navigator.context,
+      ),
+      sheetAnimationStyle: const AnimationStyle(
+        duration: FeedImmersiveTheme.motionSheet,
+        reverseDuration: FeedImmersiveTheme.motionSheetReverse,
+        curve: FeedImmersiveTheme.sheetCurve,
+        reverseCurve: FeedImmersiveTheme.sheetReverseCurve,
+      ),
     ),
   );
 }
@@ -72,24 +93,38 @@ class CommentSheet extends StatefulWidget {
 
 class _CommentSheetState extends State<CommentSheet> {
   final _controller = TextEditingController();
+  final _composerFocusNode = FocusNode();
   late final List<FeedComment> _comments = [...widget.comments];
   final Set<String> _processingLikes = <String>{};
   bool _sending = false;
+  bool _emojiPickerVisible = false;
   FeedComment? _replyingTo;
 
   @override
   void dispose() {
     _controller.dispose();
+    _composerFocusNode.dispose();
     super.dispose();
   }
 
-  List<FeedComment> get _rootComments => _comments
-      .where((comment) => comment.parentCommentId == null)
-      .toList(growable: false);
+  List<FeedComment> get _rootComments =>
+      _comments
+          .where((comment) => comment.parentCommentId == null)
+          .toList(growable: false)
+        ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
 
-  List<FeedComment> _repliesFor(String commentId) => _comments
-      .where((comment) => comment.parentCommentId == commentId)
-      .toList(growable: false);
+  Map<String, List<FeedComment>> get _repliesByParent {
+    final result = <String, List<FeedComment>>{};
+    for (final comment in _comments) {
+      final parentId = comment.parentCommentId;
+      if (parentId == null) continue;
+      result.putIfAbsent(parentId, () => <FeedComment>[]).add(comment);
+    }
+    for (final replies in result.values) {
+      replies.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
+    }
+    return result;
+  }
 
   String get _countLabel {
     final n = _rootComments.isEmpty
@@ -99,8 +134,61 @@ class _CommentSheetState extends State<CommentSheet> {
   }
 
   void _beginReply(FeedComment comment) {
-    setState(() => _replyingTo = comment);
-    FocusScope.of(context).requestFocus(FocusNode());
+    setState(() {
+      _replyingTo = comment;
+      _emojiPickerVisible = false;
+    });
+    _composerFocusNode.requestFocus();
+  }
+
+  void _insertEmoji(String emoji) {
+    final value = _controller.value;
+    final selection = value.selection.isValid
+        ? value.selection
+        : TextSelection.collapsed(offset: value.text.length);
+    final nextText = value.text.replaceRange(
+      selection.start,
+      selection.end,
+      emoji,
+    );
+    final nextOffset = selection.start + emoji.length;
+    _controller.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextOffset),
+    );
+    _composerFocusNode.requestFocus();
+  }
+
+  Set<String> _descendantIds(String commentId) {
+    final descendants = <String>{commentId};
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final comment in _comments) {
+        final parentId = comment.parentCommentId;
+        if (parentId != null && descendants.contains(parentId)) {
+          changed = descendants.add(comment.id) || changed;
+        }
+      }
+    }
+    return descendants;
+  }
+
+  String _safeCommentError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('sign in') || message.contains('jwt')) {
+      return 'Sign in again to post a comment.';
+    }
+    if (message.contains('reply parent')) {
+      return 'That reply target is no longer available.';
+    }
+    if (message.contains('permission') || message.contains('row-level')) {
+      return 'You do not have permission to post this comment.';
+    }
+    if (message.contains('network') || message.contains('socket')) {
+      return 'Check your connection and try again.';
+    }
+    return 'Could not post comment. Please try again.';
   }
 
   Future<void> _submit() async {
@@ -115,11 +203,11 @@ class _CommentSheetState extends State<CommentSheet> {
         _controller.clear();
         _replyingTo = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not post comment.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_safeCommentError(error))));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -180,11 +268,12 @@ class _CommentSheetState extends State<CommentSheet> {
     try {
       await widget.onDelete(comment);
       if (!mounted) return;
+      final removedIds = _descendantIds(comment.id);
       setState(() {
-        _comments.removeWhere(
-          (item) => item.id == comment.id || item.parentCommentId == comment.id,
-        );
-        if (_replyingTo?.id == comment.id) _replyingTo = null;
+        _comments.removeWhere((item) => removedIds.contains(item.id));
+        if (_replyingTo case final reply?) {
+          if (removedIds.contains(reply.id)) _replyingTo = null;
+        }
       });
     } catch (_) {
       if (mounted) {
@@ -238,7 +327,7 @@ class _CommentSheetState extends State<CommentSheet> {
                               final comment = _rootComments[index];
                               return _CommentThread(
                                 comment: comment,
-                                replies: _repliesFor(comment.id),
+                                repliesByParent: _repliesByParent,
                                 currentUserId: widget.currentUserId,
                                 processingLikes: _processingLikes,
                                 onOpenUser: widget.onOpenUserProfile,
@@ -254,12 +343,23 @@ class _CommentSheetState extends State<CommentSheet> {
                       comment: reply,
                       onCancel: () => setState(() => _replyingTo = null),
                     ),
+                  if (_emojiPickerVisible)
+                    _EmojiPicker(
+                      onSelected: _insertEmoji,
+                      onClose: () =>
+                          setState(() => _emojiPickerVisible = false),
+                    ),
                   _Composer(
                     controller: _controller,
+                    focusNode: _composerFocusNode,
                     sending: _sending,
+                    emojiPickerVisible: _emojiPickerVisible,
                     hintText: _replyingTo == null
                         ? 'Add a comment…'
                         : 'Reply to ${_replyingTo!.authorName}…',
+                    onToggleEmoji: () => setState(
+                      () => _emojiPickerVisible = !_emojiPickerVisible,
+                    ),
                     onSend: _submit,
                   ),
                 ],
@@ -336,51 +436,60 @@ class _EmptyComments extends StatelessWidget {
 class _CommentThread extends StatelessWidget {
   const _CommentThread({
     required this.comment,
-    required this.replies,
+    required this.repliesByParent,
     required this.currentUserId,
     required this.processingLikes,
     required this.onOpenUser,
     required this.onReply,
     required this.onLike,
     required this.onDelete,
+    this.depth = 0,
   });
 
   final FeedComment comment;
-  final List<FeedComment> replies;
+  final Map<String, List<FeedComment>> repliesByParent;
   final String currentUserId;
   final Set<String> processingLikes;
   final ValueChanged<String> onOpenUser;
   final ValueChanged<FeedComment> onReply;
   final ValueChanged<FeedComment> onLike;
   final ValueChanged<FeedComment> onDelete;
+  final int depth;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _CommentRow(
-        comment: comment,
-        currentUserId: currentUserId,
-        processingLike: processingLikes.contains(comment.id),
-        onOpenUser: onOpenUser,
-        onReply: onReply,
-        onLike: onLike,
-        onDelete: onDelete,
-      ),
-      for (final reply in replies)
-        Padding(
-          padding: const EdgeInsets.only(left: 42),
-          child: _CommentRow(
-            comment: reply,
+  Widget build(BuildContext context) {
+    final replies = repliesByParent[comment.id] ?? const <FeedComment>[];
+    final indentation = (depth * 26.0).clamp(0.0, 78.0);
+    return Padding(
+      key: Key('comment-thread-${comment.id}'),
+      padding: EdgeInsets.only(left: indentation),
+      child: Column(
+        children: [
+          _CommentRow(
+            comment: comment,
             currentUserId: currentUserId,
-            processingLike: processingLikes.contains(reply.id),
+            processingLike: processingLikes.contains(comment.id),
             onOpenUser: onOpenUser,
-            onReply: (_) => onReply(comment),
+            onReply: onReply,
             onLike: onLike,
             onDelete: onDelete,
           ),
-        ),
-    ],
-  );
+          for (final reply in replies)
+            _CommentThread(
+              comment: reply,
+              repliesByParent: repliesByParent,
+              currentUserId: currentUserId,
+              processingLikes: processingLikes,
+              onOpenUser: onOpenUser,
+              onReply: onReply,
+              onLike: onLike,
+              onDelete: onDelete,
+              depth: depth + 1,
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CommentRow extends StatelessWidget {
@@ -470,6 +579,8 @@ class _CommentRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 14),
                     GestureDetector(
+                      key: Key('comment-reply-${comment.id}'),
+                      behavior: HitTestBehavior.opaque,
                       onTap: () => onReply(comment),
                       child: const Text(
                         'Reply',
@@ -586,17 +697,86 @@ class _Initial extends StatelessWidget {
   );
 }
 
+class _EmojiPicker extends StatelessWidget {
+  const _EmojiPicker({required this.onSelected, required this.onClose});
+
+  static const emojis = <String>[
+    '😀',
+    '😂',
+    '😍',
+    '🥰',
+    '😎',
+    '😭',
+    '😡',
+    '🤔',
+    '👍',
+    '👏',
+    '🙏',
+    '🔥',
+    '❤️',
+    '🎉',
+    '💯',
+    '✨',
+  ];
+
+  final ValueChanged<String> onSelected;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('comment-emoji-picker'),
+    padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+    color: FeedImmersiveTheme.surfaceElevated,
+    child: Row(
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final emoji in emojis)
+                InkWell(
+                  key: Key('comment-emoji-$emoji'),
+                  onTap: () => onSelected(emoji),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Text(emoji, style: const TextStyle(fontSize: 21)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Close emoji picker',
+          onPressed: onClose,
+          icon: const Icon(
+            Icons.close_rounded,
+            color: FeedImmersiveTheme.inkMuted,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
+    required this.focusNode,
     required this.sending,
+    required this.emojiPickerVisible,
     required this.hintText,
+    required this.onToggleEmoji,
     required this.onSend,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool sending;
+  final bool emojiPickerVisible;
   final String hintText;
+  final VoidCallback onToggleEmoji;
   final VoidCallback onSend;
 
   @override
@@ -604,6 +784,15 @@ class _Composer extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
     child: Row(
       children: [
+        IconButton(
+          key: const Key('comment-emoji-button'),
+          tooltip: 'Add emoji',
+          onPressed: onToggleEmoji,
+          color: emojiPickerVisible
+              ? FeedImmersiveTheme.brandPink
+              : FeedImmersiveTheme.inkMuted,
+          icon: const Icon(Icons.emoji_emotions_outlined),
+        ),
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -616,6 +805,7 @@ class _Composer extends StatelessWidget {
             child: TextField(
               key: const Key('comment-composer'),
               controller: controller,
+              focusNode: focusNode,
               minLines: 1,
               maxLines: 3,
               textInputAction: TextInputAction.send,

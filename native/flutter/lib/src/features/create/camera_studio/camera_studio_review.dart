@@ -5,24 +5,32 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../feed/immersive/feed_immersive_theme.dart';
+import 'studio_filter_tray.dart';
+import 'studio_filters.dart';
 import 'studio_glass_button.dart';
 
-/// Post-capture review: shows the captured shot (photo with the active filter
-/// baked into the preview, or a video placeholder) with Retake and a gradient
-/// Next that continues into the existing composer.
-class CameraStudioReview extends StatelessWidget {
+/// Post-capture review. This is the one canonical Filter surface for Create.
+class CameraStudioReview extends StatefulWidget {
   const CameraStudioReview({
     super.key,
     required this.file,
     required this.isVideo,
-    required this.filter,
+    required this.initialFilter,
     required this.onNext,
   });
 
   final XFile file;
   final bool isVideo;
-  final ColorFilter? filter;
-  final VoidCallback onNext;
+  final StudioFilter initialFilter;
+  final ValueChanged<StudioFilter> onNext;
+
+  @override
+  State<CameraStudioReview> createState() => _CameraStudioReviewState();
+}
+
+class _CameraStudioReviewState extends State<CameraStudioReview> {
+  late StudioFilter _filter = widget.initialFilter;
+  bool _filtersOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +56,33 @@ class CameraStudioReview extends StatelessWidget {
             ),
           ),
           Align(
+            alignment: Alignment.topRight,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: StudioGlassButton(
+                  key: const Key('review-filter-button'),
+                  icon: Icons.filter_vintage_rounded,
+                  semanticLabel: 'Filter',
+                  caption: 'Filter',
+                  active: _filtersOpen,
+                  onTap: () => setState(() => _filtersOpen = !_filtersOpen),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 92,
+            child: StudioFilterTray(
+              visible: _filtersOpen,
+              selectedId: _filter.id,
+              onSelected: (filter) => setState(() => _filter = filter),
+              onClose: () => setState(() => _filtersOpen = false),
+            ),
+          ),
+          Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
               child: Padding(
@@ -66,10 +101,12 @@ class CameraStudioReview extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _NextButton(onTap: () {
-                      HapticFeedback.selectionClick();
-                      onNext();
-                    }),
+                    _NextButton(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        widget.onNext(_filter);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -81,15 +118,18 @@ class CameraStudioReview extends StatelessWidget {
   }
 
   Widget _preview() {
-    if (isVideo) {
+    if (widget.isVideo) {
       return const ColoredBox(
         color: Colors.black,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.movie_creation_rounded,
-                  color: FeedImmersiveTheme.inkMuted, size: 64),
+              Icon(
+                Icons.movie_creation_rounded,
+                color: FeedImmersiveTheme.inkMuted,
+                size: 64,
+              ),
               SizedBox(height: 12),
               Text(
                 'Video captured',
@@ -102,11 +142,11 @@ class CameraStudioReview extends StatelessWidget {
     }
     final image = ColoredBox(
       color: Colors.black,
-      child: Image.file(File(file.path), fit: BoxFit.contain),
+      child: Image.file(File(widget.file.path), fit: BoxFit.contain),
     );
-    return filter == null
+    return _filter.filter == null
         ? image
-        : ColorFiltered(colorFilter: filter!, child: image);
+        : ColorFiltered(colorFilter: _filter.filter!, child: image);
   }
 }
 
@@ -166,8 +206,11 @@ class _NextButton extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 6),
-                Icon(Icons.arrow_forward_rounded,
-                    color: FeedImmersiveTheme.onMedia, size: 18),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: FeedImmersiveTheme.onMedia,
+                  size: 18,
+                ),
               ],
             ),
           ),

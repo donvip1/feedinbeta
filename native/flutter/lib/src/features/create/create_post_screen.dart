@@ -17,6 +17,7 @@ import 'parity/story_extras_models.dart';
 import 'parity/widgets/post_composer_panel.dart';
 import 'parity/widgets/story_composer_sheet.dart';
 import 'parity/widgets/upload_queue_panel.dart';
+import 'create_outcome.dart';
 import 'post_draft.dart';
 import 'story_publisher.dart';
 
@@ -60,7 +61,7 @@ class CreatePostScreen extends StatefulWidget {
     required this.onPostUploaded,
     this.initialMediaPath,
     this.initialMediaKind,
-    this.initialCaptureMethod,
+    this.initialMediaFilterId,
   });
 
   final PostDraftRepository draftRepository;
@@ -75,9 +76,9 @@ class CreatePostScreen extends StatefulWidget {
   final String? initialMediaPath;
   final CreateMediaKind? initialMediaKind;
 
-  /// Optional source selected before this route opened. It is handled after the
-  /// first frame so the composer is visible before Android presents a picker.
-  final CaptureMethod? initialCaptureMethod;
+  /// Optional Camera Studio filter preset persisted with the post. The Feed
+  /// reapplies this deterministic GPU color matrix when rendering the media.
+  final String? initialMediaFilterId;
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -126,12 +127,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.initState();
     _refreshDrafts();
     _seedInitialMedia();
-    final captureMethod = widget.initialCaptureMethod;
-    if (captureMethod != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _handleCaptureMethod(captureMethod);
-      });
-    }
   }
 
   /// Seeds [_media] with media captured upstream (camera studio) using the same
@@ -417,6 +412,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       mediaTypes: mediaTypes,
       privacy: _privacy.wireValue,
       draftKind: _mode == _CreateMode.story ? 'story' : 'post',
+      mediaFilterId: widget.initialMediaFilterId,
     );
 
     UploadQueueSummary? summary;
@@ -430,9 +426,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       for (final postId in summary.publishedPostIds) {
         widget.onPostUploaded(postId);
       }
+      if (summary.publishedPostIds case [final postId, ...]) {
+        if (mounted) Navigator.of(context).pop(CreatePublished(postId));
+        return;
+      }
     }
 
     if (!mounted) return;
+    if (!queueForUpload) {
+      Navigator.of(context).pop(const CreateDraftSaved());
+      return;
+    }
     setState(() {
       _caption = '';
       _hashtagsRaw = '';

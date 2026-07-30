@@ -136,7 +136,7 @@ class _CarouselImage extends StatelessWidget {
   Widget _networkImage() {
     return Image.network(
       url,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
       loadingBuilder: (context, child, progress) {

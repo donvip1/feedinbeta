@@ -19,24 +19,26 @@ class CaptionLayer extends StatelessWidget {
   final FeedPost post;
   final VoidCallback? onCreatorTap;
 
-  bool get _isVerified =>
-      post.displayedPost.postType?.toLowerCase().contains('verified') ?? false;
+  bool _isVerified(FeedPost content) =>
+      content.postType?.toLowerCase().contains('verified') ?? false;
 
   @override
   Widget build(BuildContext context) {
-    final content = post.displayedPost;
-    final handle = content.meta.trim();
-    final hasLocation = content.location?.trim().isNotEmpty ?? false;
-    final hasCaption = content.body.trim().isNotEmpty;
+    final original = post.displayedPost;
+    final visibleAuthor = post.isQuoteRefeed ? post : original;
+    final handle = visibleAuthor.meta.trim();
+    final hasLocation = original.location?.trim().isNotEmpty ?? false;
+    final visibleCaption = post.isQuoteRefeed ? post.body : original.body;
+    final hasCaption = visibleCaption.trim().isNotEmpty;
 
     return Semantics(
       container: true,
-      label: 'Post by ${content.authorName}',
+      label: 'Post by ${visibleAuthor.authorName}',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (post.originalPost != null) ...[
+          if (post.isRefeed && !post.isQuoteRefeed) ...[
             OverlayBadge(
               icon: Icons.repeat_rounded,
               label: '${post.authorName} re-shared',
@@ -44,29 +46,87 @@ class CaptionLayer extends StatelessWidget {
             const SizedBox(height: 10),
           ],
           CreatorHeader(
-            authorName: content.authorName,
+            authorName: visibleAuthor.authorName,
             handle: handle,
-            isVerified: _isVerified,
+            isVerified: _isVerified(visibleAuthor),
             onTap: onCreatorTap,
           ),
           if (hasCaption) ...[
             const SizedBox(height: 9),
             ExpandableCaption(
-              text: content.body,
+              key: Key('post-caption-${post.id}'),
+              text: visibleCaption,
               collapsedLines: 2,
               linkColor: FeedImmersiveTheme.brandPink,
             ),
+          ],
+          if (post.isQuoteRefeed) ...[
+            const SizedBox(height: 10),
+            _QuotedOriginal(post: original),
           ],
           if (hasLocation) ...[
             const SizedBox(height: 11),
             OverlayBadge(
               icon: Icons.place_rounded,
-              label: content.location!.trim(),
+              label: original.location!.trim(),
             ),
           ],
           const SizedBox(height: 8),
-          AudioChip(label: 'Original audio · ${content.authorName}'),
+          AudioChip(label: 'Original audio · ${original.authorName}'),
         ],
+      ),
+    );
+  }
+}
+
+class _QuotedOriginal extends StatelessWidget {
+  const _QuotedOriginal({required this.post});
+
+  final FeedPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    final handle = (post.authorHandle ?? post.meta).trim();
+    return Semantics(
+      label: 'Quoted post by ${post.authorName}',
+      child: Container(
+        key: const Key('quote-refeed-original'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: FeedImmersiveTheme.glassSurfaceStrong,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: FeedImmersiveTheme.glassBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              handle.isEmpty ? post.authorName : '${post.authorName} · $handle',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FeedImmersiveTheme.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (post.body.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                post.body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FeedImmersiveTheme.inkMuted,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

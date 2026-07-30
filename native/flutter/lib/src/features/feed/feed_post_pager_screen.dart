@@ -85,6 +85,8 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
 
   @override
   void didPushNext() {
+    final coveringRoute = feedinRouteObserver.routeAbove(_subscribedRoute);
+    if (coveringRoute is FeedCommentSheetRoute<void>) return;
     if (_routeVisible) setState(() => _routeVisible = false);
   }
 
@@ -118,9 +120,22 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       final quote = await showQuoteRefeedComposer(context, post: post);
       if (!mounted || quote == null) return;
       try {
-        await widget.feedRepository.createQuoteRefeed(post.id, quote);
+        final created = await widget.feedRepository.createQuoteRefeed(
+          post.displayedPost.id,
+          quote,
+        );
         controller.recordQuoteRefeed();
-        if (mounted) setState(() => _message = 'Quote shared to your feed.');
+        if (!mounted) return;
+        setState(() {
+          _posts
+            ..removeWhere((item) => item.id == created.id)
+            ..insert(0, created);
+          _activePage = 0;
+          _message = 'Quote shared to your feed.';
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _controller.hasClients) _controller.jumpToPage(0);
+        });
       } catch (_) {
         if (!mounted) return;
         setState(() => _message = 'Could not share this quote.');
@@ -154,7 +169,10 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       },
       onToggleLike: (comment, liked) =>
           widget.feedRepository.toggleCommentLike(comment.id, liked: liked),
-      onDelete: (comment) => widget.feedRepository.deleteComment(comment.id),
+      onDelete: (comment) async {
+        await widget.feedRepository.deleteComment(comment.id);
+        if (comment.parentCommentId == null) controller.decrementCommentCount();
+      },
       onOpenUserProfile: widget.onOpenUserProfile,
       currentUserId: widget.currentUserId,
     );

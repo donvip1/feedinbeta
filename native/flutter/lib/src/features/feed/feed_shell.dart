@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/connectivity/connectivity_service.dart';
 import '../../core/connectivity/offline_notice.dart';
@@ -40,7 +41,9 @@ import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../create/camera_studio/camera_studio_screen.dart';
 import '../create/camera_studio/studio_capture_controls.dart';
-import '../create/create_post_screen.dart';
+import '../create/create_outcome.dart';
+import '../create/create_post_screen.dart' show showCreateMediaSourceSheet;
+import '../create/drafts_uploads_screen.dart';
 import '../create/parity/create_view_models.dart';
 import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
@@ -403,44 +406,46 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   }
 
   Future<void> _openSelectedCreateMethod(CaptureMethod method) async {
-    final isCamera =
-        method == CaptureMethod.takePhoto ||
-        method == CaptureMethod.recordVideo;
-    if (isCamera) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => CameraStudioScreen(
-            draftRepository: widget.postDraftRepository,
-            uploadQueueRepository: widget.uploadQueueRepository,
-            uploadQueueService: widget.uploadQueueService,
-            connectivityService: widget.connectivityService,
-            initialMode: method == CaptureMethod.recordVideo
-                ? StudioCaptureMode.video60
-                : StudioCaptureMode.photo,
-            onPostUploaded: _handlePostUploaded,
-          ),
-        ),
-      );
-      return;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final outcome = await Navigator.of(context).push<CreateOutcome>(
+      MaterialPageRoute<CreateOutcome>(
         fullscreenDialog: true,
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Create post')),
-          body: CreatePostScreen(
-            draftRepository: widget.postDraftRepository,
-            uploadQueueRepository: widget.uploadQueueRepository,
-            uploadQueueService: widget.uploadQueueService,
-            connectivityService: widget.connectivityService,
-            initialCaptureMethod: method,
-            onPostUploaded: _handlePostUploaded,
-          ),
+        builder: (_) => CameraStudioScreen(
+          draftRepository: widget.postDraftRepository,
+          uploadQueueRepository: widget.uploadQueueRepository,
+          uploadQueueService: widget.uploadQueueService,
+          connectivityService: widget.connectivityService,
+          initialSource: method,
+          initialMode:
+              method == CaptureMethod.recordVideo ||
+                  method == CaptureMethod.videoLibrary
+              ? StudioCaptureMode.video60
+              : StudioCaptureMode.photo,
+          onPostUploaded: _handlePostUploaded,
         ),
       ),
     );
+    if (!mounted || outcome == null) return;
+    switch (outcome) {
+      case CreatePublished(:final postId):
+        _handlePostUploaded(postId);
+        final posts = await widget.feedRepository.refresh();
+        if (!mounted) return;
+        final created = posts.posts
+            .where((post) => post.id == postId)
+            .firstOrNull;
+        if (created != null) _openSearchPost(created);
+      case CreateDraftSaved():
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => DraftsUploadsScreen(
+              draftRepository: widget.postDraftRepository,
+              uploadQueueRepository: widget.uploadQueueRepository,
+              uploadQueueService: widget.uploadQueueService,
+              onPostUploaded: _handlePostUploaded,
+            ),
+          ),
+        );
+    }
   }
 
   /// Settings lives under Profile (web parity), pushed as a full route.
@@ -1104,6 +1109,8 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
 
   @override
   void didPushNext() {
+    final coveringRoute = feedinRouteObserver.routeAbove(_subscribedRoute);
+    if (coveringRoute is FeedCommentSheetRoute<void>) return;
     if (_routeVisible) setState(() => _routeVisible = false);
   }
 
@@ -1371,11 +1378,34 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           body,
           parentCommentId: parentCommentId,
         );
+        if (parentCommentId == null && mounted) {
+          final args = PostControllerArgs(
+            post: post,
+            repository: widget.feedRepository,
+          );
+          ProviderScope.containerOf(
+            context,
+          ).read(postControllerProvider(args).notifier).incrementCommentCount();
+        }
         return created;
       },
       onToggleLike: (comment, liked) =>
           widget.feedRepository.toggleCommentLike(comment.id, liked: liked),
-      onDelete: (comment) => widget.feedRepository.deleteComment(comment.id),
+      onDelete: (comment) async {
+        await widget.feedRepository.deleteComment(comment.id);
+        if (comment.parentCommentId == null) {
+          final args = PostControllerArgs(
+            post: post,
+            repository: widget.feedRepository,
+          );
+          // The card owns this provider; update the same stable family key.
+          if (mounted) {
+            ProviderScope.containerOf(context)
+                .read(postControllerProvider(args).notifier)
+                .decrementCommentCount();
+          }
+        }
+      },
       onOpenUserProfile: widget.onOpenUserProfile,
       currentUserId: widget.currentUserId,
     );
@@ -1393,9 +1423,28 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       final quote = await showQuoteRefeedComposer(context, post: post);
       if (!mounted || quote == null) return;
       try {
-        await widget.feedRepository.createQuoteRefeed(post.id, quote);
+        final created = await widget.feedRepository.createQuoteRefeed(
+          post.displayedPost.id,
+          quote,
+        );
         controller.recordQuoteRefeed();
-        if (mounted) setState(() => _message = 'Quote shared to your feed.');
+        final currentPosts = await _postsFuture;
+        if (!mounted) return;
+        final nextPosts = <FeedPost>[
+          created,
+          ...currentPosts.where((item) => item.id != created.id),
+        ];
+        setState(() {
+          _postsFuture = Future.value(nextPosts);
+          _tabIndex = created.displayedPost.mediaType == 'video' ? 0 : 1;
+          _activePage = 0;
+          _message = 'Quote shared to your feed.';
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pageController.hasClients) {
+            _pageController.jumpToPage(0);
+          }
+        });
       } catch (_) {
         if (mounted) setState(() => _message = 'Could not share this quote.');
       }

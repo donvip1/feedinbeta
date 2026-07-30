@@ -3,27 +3,23 @@ import 'package:flutter/material.dart';
 import '../../feed/immersive/feed_immersive_theme.dart';
 import 'studio_glass_button.dart';
 
-/// Right-side creative tool rail: Beauty, Filters, and Timer — mirroring the
-/// prototype's BeautyPlus-style tool column.
+/// Right-side creative tool rail. Filters intentionally live only on the
+/// post-capture review screen so Create exposes one unambiguous entry point.
 class StudioToolRail extends StatelessWidget {
   const StudioToolRail({
     super.key,
     required this.beautyOn,
-    required this.filtersOpen,
     required this.timerSeconds,
     required this.onToggleBeauty,
-    required this.onToggleFilters,
     required this.onCycleTimer,
   });
 
   final bool beautyOn;
-  final bool filtersOpen;
 
   /// 0 = off, otherwise the countdown length in seconds.
   final int timerSeconds;
 
   final VoidCallback onToggleBeauty;
-  final VoidCallback onToggleFilters;
   final VoidCallback onCycleTimer;
 
   @override
@@ -37,15 +33,6 @@ class StudioToolRail extends StatelessWidget {
           caption: 'Beauty',
           active: beautyOn,
           onTap: onToggleBeauty,
-        ),
-        const SizedBox(height: 16),
-        StudioGlassButton(
-          icon: Icons.filter_vintage_rounded,
-          semanticLabel: 'Filters',
-          caption: 'Filters',
-          active: filtersOpen,
-          accent: FeedImmersiveTheme.brandViolet,
-          onTap: onToggleFilters,
         ),
         const SizedBox(height: 16),
         StudioGlassButton(

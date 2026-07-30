@@ -9,6 +9,7 @@ class PostDraft {
     this.mediaTypes = const [],
     this.privacy = 'everyone',
     this.draftKind = 'post',
+    this.mediaFilterId,
     this.uploadState = DraftUploadState.local,
   });
 
@@ -20,6 +21,7 @@ class PostDraft {
   final List<String> mediaTypes;
   final String privacy;
   final String draftKind;
+  final String? mediaFilterId;
   final int createdAtMillis;
   final DraftUploadState uploadState;
 
@@ -33,6 +35,7 @@ class PostDraft {
       mediaTypes: mediaTypes,
       privacy: privacy,
       draftKind: draftKind,
+      mediaFilterId: mediaFilterId,
       createdAtMillis: createdAtMillis,
       uploadState: uploadState ?? this.uploadState,
     );
@@ -43,10 +46,14 @@ class PostDraft {
     final legacyMediaType = json['mediaType'] as String?;
     final mediaPaths =
         (json['mediaPaths'] as List?)?.whereType<String>().toList() ??
-        (legacyMediaPath == null ? const <String>[] : <String>[legacyMediaPath]);
+        (legacyMediaPath == null
+            ? const <String>[]
+            : <String>[legacyMediaPath]);
     final mediaTypes =
         (json['mediaTypes'] as List?)?.whereType<String>().toList() ??
-        (legacyMediaType == null ? const <String>[] : <String>[legacyMediaType]);
+        (legacyMediaType == null
+            ? const <String>[]
+            : <String>[legacyMediaType]);
 
     return PostDraft(
       id: json['id'] as String,
@@ -57,6 +64,7 @@ class PostDraft {
       mediaTypes: mediaTypes,
       privacy: json['privacy'] as String? ?? 'everyone',
       draftKind: json['draftKind'] as String? ?? 'post',
+      mediaFilterId: json['mediaFilterId'] as String?,
       createdAtMillis: json['createdAtMillis'] as int,
       uploadState: DraftUploadState.values.byName(
         json['uploadState'] as String? ?? DraftUploadState.local.name,
@@ -74,6 +82,7 @@ class PostDraft {
       'mediaTypes': mediaTypes,
       'privacy': privacy,
       'draftKind': draftKind,
+      'mediaFilterId': mediaFilterId,
       'createdAtMillis': createdAtMillis,
       'uploadState': uploadState.name,
     };

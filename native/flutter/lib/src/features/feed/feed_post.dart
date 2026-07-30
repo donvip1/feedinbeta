@@ -10,6 +10,7 @@ class FeedPost {
     this.mediaType,
     this.mediaUrls = const [],
     this.mediaTypes = const [],
+    this.mediaFilterId,
     this.localMediaPath,
     this.likesCount = 0,
     this.commentsCount = 0,
@@ -36,6 +37,7 @@ class FeedPost {
   final String? mediaType;
   final List<String> mediaUrls;
   final List<String> mediaTypes;
+  final String? mediaFilterId;
   final String? localMediaPath;
   final int likesCount;
   final int commentsCount;
@@ -56,7 +58,16 @@ class FeedPost {
   final bool viewerHasSaved;
   final bool viewerHasRefeeded;
 
+  /// Media/original content represented by this Feed row.
+  ///
+  /// Refeed rows are wrappers. Their media comes from [originalPost], while the
+  /// wrapper's author and body remain meaningful for Quote Refeeds.
   FeedPost get displayedPost => originalPost ?? this;
+
+  bool get isRefeed => originalPost != null || originalPostId != null;
+
+  bool get isQuoteRefeed =>
+      isRefeed && body.trim().isNotEmpty && originalPost != null;
 
   FeedPost copyWith({
     String? localMediaPath,
@@ -79,6 +90,7 @@ class FeedPost {
       mediaType: mediaType,
       mediaUrls: mediaUrls,
       mediaTypes: mediaTypes,
+      mediaFilterId: mediaFilterId,
       localMediaPath: localMediaPath ?? this.localMediaPath,
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
@@ -112,6 +124,7 @@ class FeedPost {
       mediaTypes:
           (json['mediaTypes'] as List?)?.whereType<String>().toList() ??
           const [],
+      mediaFilterId: json['mediaFilterId'] as String?,
       localMediaPath: json['localMediaPath'] as String?,
       likesCount: json['likesCount'] as int? ?? 0,
       commentsCount: json['commentsCount'] as int? ?? 0,
@@ -145,6 +158,7 @@ class FeedPost {
       'mediaType': mediaType,
       'mediaUrls': mediaUrls,
       'mediaTypes': mediaTypes,
+      'mediaFilterId': mediaFilterId,
       'localMediaPath': localMediaPath,
       'likesCount': likesCount,
       'commentsCount': commentsCount,

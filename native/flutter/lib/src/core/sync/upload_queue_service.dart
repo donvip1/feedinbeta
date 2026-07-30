@@ -152,6 +152,7 @@ class UploadQueueService {
           'media_type': mediaTypes.firstOrNull,
           'media_urls': mediaUrls,
           'media_types': mediaTypes,
+          'media_filter_id': draft.mediaFilterId,
           'privacy': draft.privacy,
           'post_type': 'post',
           'status': 'active',
@@ -232,7 +233,8 @@ class UploadQueueService {
             file,
             fileOptions: FileOptions(
               contentType:
-                  compressed.contentType ?? _contentTypeFor(extension, mediaKind),
+                  compressed.contentType ??
+                  _contentTypeFor(extension, mediaKind),
               upsert: true,
             ),
           );
