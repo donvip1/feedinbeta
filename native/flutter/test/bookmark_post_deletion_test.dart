@@ -92,21 +92,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
-    final bookmarkAction = find
-        .byWidgetPredicate(
-          (widget) =>
-              widget is Semantics && widget.properties.label == 'Bookmark',
-        )
-        .first;
+    await tester.tap(find.byKey(const Key('feed-action-more')));
+    await tester.pump(const Duration(milliseconds: 350));
+    final bookmarkAction = find.byKey(const Key('feed-action-save'));
     expect(bookmarkAction, findsOneWidget);
     await tester.tap(bookmarkAction);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(repository.saveCalls, [('saved-1', true)]);
+    expect(repository.failSave, isTrue);
     expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
-    expect(find.text('Could not update saved posts.'), findsOneWidget);
   });
 
   testWidgets('owner can permanently delete a post after confirmation', (

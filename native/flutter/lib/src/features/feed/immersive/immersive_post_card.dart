@@ -24,11 +24,14 @@ class ImmersivePostCard extends StatefulWidget {
     required this.isLiked,
     required this.isRefeeded,
     required this.isSaved,
+    this.isMoreExpanded = false,
     required this.onLike,
     required this.onComment,
     required this.onRefeed,
     required this.onSave,
     required this.onShare,
+    required this.onMore,
+    required this.onGift,
     this.onAvatar,
     this.onCreatorName,
   });
@@ -42,11 +45,14 @@ class ImmersivePostCard extends StatefulWidget {
   final bool isLiked;
   final bool isRefeeded;
   final bool isSaved;
+  final bool isMoreExpanded;
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onRefeed;
   final VoidCallback onSave;
   final VoidCallback onShare;
+  final VoidCallback onMore;
+  final VoidCallback onGift;
 
   /// Tapping the avatar opens the creator preview; tapping the name can route
   /// directly to the creator's full profile.
@@ -130,12 +136,15 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
                   isLiked: widget.isLiked,
                   isRefeeded: widget.isRefeeded,
                   isSaved: widget.isSaved,
+                  isMoreExpanded: widget.isMoreExpanded,
                   avatarText: _contentPost.authorName,
                   avatarUrl: _contentPost.avatarUrl,
                   onLike: widget.onLike,
                   onComment: widget.onComment,
                   onRefeed: widget.onRefeed,
+                  onMore: widget.onMore,
                   onSave: widget.onSave,
+                  onGift: widget.onGift,
                   onShare: widget.onShare,
                   onAvatar: widget.onAvatar,
                   avatarHeroTag: 'creator-avatar-${widget.post.id}',

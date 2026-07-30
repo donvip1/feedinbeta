@@ -6,11 +6,10 @@ import 'package:flutter/services.dart';
 import 'feed_immersive_theme.dart';
 import 'hero_transition_layer.dart';
 
-/// Premium vertical actions for an immersive post.
+/// Compact, inline-expandable actions for one immersive post.
 ///
-/// This widget is intentionally presentation-only. The callbacks and state
-/// supplied by [ImmersivePostCard] remain the source of truth for all writes.
-/// The rail owns only touch feedback, motion, semantics, and composition.
+/// Business state is supplied by the post-scoped Riverpod controller. This
+/// widget owns only presentation, semantics, and touch feedback.
 class FeedActionRail extends StatelessWidget {
   const FeedActionRail({
     super.key,
@@ -21,12 +20,15 @@ class FeedActionRail extends StatelessWidget {
     required this.isLiked,
     required this.isRefeeded,
     required this.isSaved,
+    required this.isMoreExpanded,
     required this.avatarText,
     this.avatarUrl,
     required this.onLike,
     required this.onComment,
     required this.onRefeed,
+    required this.onMore,
     required this.onSave,
+    required this.onGift,
     required this.onShare,
     this.onAvatar,
     this.avatarHeroTag,
@@ -39,20 +41,20 @@ class FeedActionRail extends StatelessWidget {
   final bool isLiked;
   final bool isRefeeded;
   final bool isSaved;
+  final bool isMoreExpanded;
   final String avatarText;
   final String? avatarUrl;
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onRefeed;
+  final VoidCallback onMore;
   final VoidCallback onSave;
+  final VoidCallback onGift;
   final VoidCallback onShare;
   final VoidCallback? onAvatar;
-
-  /// Shared Hero tag for the avatar, matching the creator preview it opens.
   final Object? avatarHeroTag;
 
-  static const double _actionSize = FeedImmersiveTheme.touchTargetAction;
-  static const double _verticalGap = FeedImmersiveTheme.railGap;
+  static const double _gap = FeedImmersiveTheme.railGap;
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +75,9 @@ class FeedActionRail extends StatelessWidget {
               onTap: onAvatar,
               heroTag: avatarHeroTag,
             ),
-            const SizedBox(height: _verticalGap + 5),
+            const SizedBox(height: _gap),
             _RailAction(
+              key: const Key('feed-action-like'),
               icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border,
               iconColor: isLiked
                   ? FeedImmersiveTheme.likeActive
@@ -85,15 +88,17 @@ class FeedActionRail extends StatelessWidget {
               value: _compactCount(likesCount),
               onTap: onLike,
             ),
-            const SizedBox(height: _verticalGap),
+            const SizedBox(height: _gap),
             _RailAction(
+              key: const Key('feed-action-comment'),
               icon: Icons.mode_comment_outlined,
               label: 'Comment',
               value: _compactCount(commentsCount),
               onTap: onComment,
             ),
-            const SizedBox(height: _verticalGap),
+            const SizedBox(height: _gap),
             _RailAction(
+              key: const Key('feed-action-refeed'),
               icon: Icons.repeat_rounded,
               iconColor: isRefeeded
                   ? FeedImmersiveTheme.refeedActive
@@ -104,32 +109,76 @@ class FeedActionRail extends StatelessWidget {
               value: _compactCount(refeedsCount),
               onTap: onRefeed,
             ),
-            const SizedBox(height: _verticalGap),
+            const SizedBox(height: _gap),
+            _RailMetric(value: _compactCount(viewsCount)),
+            if (isMoreExpanded)
+              _ExpandedActions(
+                isSaved: isSaved,
+                onSave: onSave,
+                onGift: onGift,
+                onShare: onShare,
+              ),
+            const SizedBox(height: _gap),
             _RailAction(
-              icon: Icons.ios_share_rounded,
-              label: 'Share',
-              onTap: onShare,
+              key: const Key('feed-action-more'),
+              icon: isMoreExpanded
+                  ? Icons.close_rounded
+                  : Icons.more_horiz_rounded,
+              label: isMoreExpanded ? 'Close more actions' : 'More',
+              active: isMoreExpanded,
+              onTap: onMore,
             ),
-            const SizedBox(height: _verticalGap),
-            _RailAction(
-              icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border,
-              iconColor: isSaved
-                  ? FeedImmersiveTheme.saveActive
-                  : FeedImmersiveTheme.onMedia,
-              activeColor: isSaved ? FeedImmersiveTheme.saveChip : null,
-              active: isSaved,
-              label: 'Bookmark',
-              onTap: onSave,
-            ),
-            if (viewsCount > 0) ...[
-              const SizedBox(height: _verticalGap),
-              _RailMetric(label: 'Views', value: _compactCount(viewsCount)),
-            ],
-            const SizedBox(height: _verticalGap),
-            const _AudioDisc(),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ExpandedActions extends StatelessWidget {
+  const _ExpandedActions({
+    required this.isSaved,
+    required this.onSave,
+    required this.onGift,
+    required this.onShare,
+  });
+
+  final bool isSaved;
+  final VoidCallback onSave;
+  final VoidCallback onGift;
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _RailAction(
+          key: const Key('feed-action-save'),
+          icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border,
+          iconColor: isSaved
+              ? FeedImmersiveTheme.saveActive
+              : FeedImmersiveTheme.onMedia,
+          activeColor: isSaved ? FeedImmersiveTheme.saveChip : null,
+          active: isSaved,
+          label: 'Save',
+          onTap: onSave,
+        ),
+        const SizedBox(height: FeedImmersiveTheme.railGap),
+        _RailAction(
+          key: const Key('feed-action-gift'),
+          icon: Icons.card_giftcard_rounded,
+          label: 'Gift',
+          onTap: onGift,
+        ),
+        const SizedBox(height: FeedImmersiveTheme.railGap),
+        _RailAction(
+          key: const Key('feed-action-share'),
+          icon: Icons.ios_share_rounded,
+          label: 'Share',
+          onTap: onShare,
+        ),
+      ],
     );
   }
 }
@@ -153,8 +202,6 @@ class _RailAvatar extends StatefulWidget {
 
 class _RailAvatarState extends State<_RailAvatar> {
   bool _pressed = false;
-  bool _hovered = false;
-  bool _focused = false;
 
   void _activate() {
     if (widget.onTap == null) return;
@@ -164,92 +211,53 @@ class _RailAvatarState extends State<_RailAvatar> {
 
   @override
   Widget build(BuildContext context) {
-    const size = FeedImmersiveTheme.avatarSize;
-    final label = widget.onTap == null
-        ? 'Profile picture of ${widget.avatarText}'
-        : 'Open ${widget.avatarText} profile';
-
+    final name = widget.avatarText.trim();
+    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
+    final hasImage = widget.avatarUrl?.trim().isNotEmpty == true;
+    Widget surface = Container(
+      width: FeedImmersiveTheme.avatarSize,
+      height: FeedImmersiveTheme.avatarSize,
+      padding: const EdgeInsets.all(2),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: FeedImmersiveTheme.brandGradient,
+      ),
+      child: ClipOval(
+        child: hasImage
+            ? Image.network(
+                widget.avatarUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _AvatarFallback(initial),
+              )
+            : _AvatarFallback(initial),
+      ),
+    );
+    if (widget.heroTag != null) {
+      surface = CreatorAvatarHero(tag: widget.heroTag!, child: surface);
+    }
     return Semantics(
       button: widget.onTap != null,
-      label: label,
-      child: FocusableActionDetector(
-        enabled: widget.onTap != null,
-        mouseCursor: widget.onTap == null
-            ? SystemMouseCursors.basic
-            : SystemMouseCursors.click,
-        onShowHoverHighlight: (value) => setState(() => _hovered = value),
-        onShowFocusHighlight: (value) => setState(() => _focused = value),
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-        },
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              _activate();
-              return null;
-            },
-          ),
-        },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap == null ? null : _activate,
-          onTapDown: widget.onTap == null
-              ? null
-              : (_) => setState(() => _pressed = true),
-          onTapUp: widget.onTap == null
-              ? null
-              : (_) => setState(() => _pressed = false),
-          onTapCancel: widget.onTap == null
-              ? null
-              : () => setState(() => _pressed = false),
-          child: AnimatedScale(
-            scale: _pressed ? 0.92 : (_hovered || _focused ? 1.04 : 1),
-            duration: FeedImmersiveTheme.motionFast,
-            curve: FeedImmersiveTheme.premiumSettleCurve,
-            child: SizedBox(
-              width: size,
-              height: size + 12,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.topCenter,
-                children: [
-                  _AvatarSurface(
-                    size: size,
-                    url: widget.avatarUrl,
-                    fallbackText: widget.avatarText,
-                    emphasized: _hovered || _focused,
-                    heroTag: widget.heroTag,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    child: ExcludeSemantics(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: FeedImmersiveTheme.brandGradient,
-                          border: Border.all(
-                            color: FeedImmersiveTheme.onMedia,
-                            width: 1.5,
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: FeedImmersiveTheme.overlayControl,
-                              blurRadius: 6,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: Icon(Icons.add_rounded, size: 14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      label: 'Open ${name.isEmpty ? 'creator' : name} preview',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap == null ? null : _activate,
+        onTapDown: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = true),
+        onTapUp: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = false),
+        onTapCancel: widget.onTap == null
+            ? null
+            : () => setState(() => _pressed = false),
+        child: SizedBox(
+          width: FeedImmersiveTheme.touchTargetMin,
+          height: FeedImmersiveTheme.touchTargetMin,
+          child: Center(
+            child: AnimatedScale(
+              scale: _pressed ? FeedImmersiveTheme.pressScale : 1,
+              duration: FeedImmersiveTheme.motionPress,
+              child: surface,
             ),
           ),
         ),
@@ -258,90 +266,33 @@ class _RailAvatarState extends State<_RailAvatar> {
   }
 }
 
-class _AvatarSurface extends StatelessWidget {
-  const _AvatarSurface({
-    required this.size,
-    required this.url,
-    required this.fallbackText,
-    required this.emphasized,
-    this.heroTag,
-  });
-
-  final double size;
-  final String? url;
-  final String fallbackText;
-  final bool emphasized;
-  final Object? heroTag;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasImage = url?.trim().isNotEmpty == true;
-    final surface = AnimatedContainer(
-      duration: FeedImmersiveTheme.motionFast,
-      curve: FeedImmersiveTheme.premiumSettleCurve,
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(emphasized ? 2.5 : 2),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: FeedImmersiveTheme.brandGradient,
-        boxShadow: [
-          BoxShadow(
-            color: FeedImmersiveTheme.overlayBottomSoft,
-            blurRadius: emphasized ? 16 : 10,
-            offset: const Offset(0, 3),
-          ),
-          if (emphasized) ...FeedImmersiveTheme.brandGlow,
-        ],
-      ),
-      child: ClipOval(
-        child: hasImage
-            ? Image.network(
-                url!,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, _, _) => _AvatarFallback(text: fallbackText),
-              )
-            : _AvatarFallback(text: fallbackText),
-      ),
-    );
-    if (heroTag == null) return surface;
-    return CreatorAvatarHero(tag: heroTag!, child: surface);
-  }
-}
-
 class _AvatarFallback extends StatelessWidget {
-  const _AvatarFallback({required this.text});
+  const _AvatarFallback(this.initial);
 
-  final String text;
+  final String initial;
 
   @override
-  Widget build(BuildContext context) {
-    final trimmed = text.trim();
-    final initial = trimmed.isEmpty
-        ? '?'
-        : trimmed.characters.first.toUpperCase();
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: FeedImmersiveTheme.brandGradient,
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: FeedImmersiveTheme.onMedia,
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-          ),
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: FeedImmersiveTheme.brandGradient,
+    ),
+    child: Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: FeedImmersiveTheme.onMedia,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _RailAction extends StatefulWidget {
   const _RailAction({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -363,130 +314,58 @@ class _RailAction extends StatefulWidget {
   State<_RailAction> createState() => _RailActionState();
 }
 
-class _RailActionState extends State<_RailAction>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _popController;
-  late final Animation<double> _popScale;
+class _RailActionState extends State<_RailAction> {
   bool _pressed = false;
-  bool _hovered = false;
-  bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _popController = AnimationController(
-      vsync: this,
-      duration: FeedImmersiveTheme.motionPop,
-    );
-    _popScale = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(
-          begin: 1.0,
-          end: 1.14,
-        ).chain(CurveTween(curve: FeedImmersiveTheme.popCurve)),
-        weight: 42,
-      ),
-      TweenSequenceItem(
-        tween: Tween(
-          begin: 1.14,
-          end: 1.0,
-        ).chain(CurveTween(curve: FeedImmersiveTheme.premiumSettleCurve)),
-        weight: 58,
-      ),
-    ]).animate(_popController);
-  }
-
-  @override
-  void didUpdateWidget(covariant _RailAction oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.active && !oldWidget.active) _pop();
-  }
-
-  @override
-  void dispose() {
-    _popController.dispose();
-    super.dispose();
-  }
-
-  void _pop() => _popController.forward(from: 0);
 
   void _activate() {
     HapticFeedback.selectionClick();
-    _pop();
     widget.onTap();
   }
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = _hovered || _focused;
-    final background = widget.active && widget.activeColor != null
-        ? widget.activeColor!
-        : FeedImmersiveTheme.railChip;
-    final semanticValue = widget.value == null
-        ? null
-        : '${widget.value} ${widget.label.toLowerCase()}';
-
     return Semantics(
       button: true,
       label: widget.label,
-      value: semanticValue,
+      value: widget.value,
       toggled: widget.active,
-      hint: 'Double tap to activate',
-      child: FocusableActionDetector(
-        mouseCursor: SystemMouseCursors.click,
-        onShowHoverHighlight: (value) => setState(() => _hovered = value),
-        onShowFocusHighlight: (value) => setState(() => _focused = value),
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-        },
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              _activate();
-              return null;
-            },
-          ),
-        },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _activate,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
-          child: SizedBox(
-            width: _RailActionSize.width,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedScale(
-                  scale: _pressed ? 0.91 : (highlighted ? 1.04 : 1),
-                  duration: FeedImmersiveTheme.motionPress,
-                  curve: FeedImmersiveTheme.premiumSettleCurve,
-                  child: ScaleTransition(
-                    scale: _popScale,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _activate,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: SizedBox(
+          width: FeedImmersiveTheme.touchTargetMin,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: FeedImmersiveTheme.touchTargetMin,
+                height: FeedImmersiveTheme.touchTargetMin,
+                child: Center(
+                  child: AnimatedScale(
+                    scale: _pressed ? FeedImmersiveTheme.pressScale : 1,
+                    duration: FeedImmersiveTheme.motionPress,
                     child: _GlassActionSurface(
-                      background: background,
-                      highlighted: highlighted,
+                      background: widget.active && widget.activeColor != null
+                          ? widget.activeColor!
+                          : FeedImmersiveTheme.railChip,
                       icon: widget.icon,
                       iconColor: widget.iconColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 5),
+              ),
+              if (widget.value != null) ...[
+                const SizedBox(height: 1),
                 Text(
-                  widget.value ?? widget.label,
+                  widget.value!,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: FeedImmersiveTheme.countLabel.copyWith(
-                    color: highlighted
-                        ? Colors.white
-                        : FeedImmersiveTheme.onMedia,
-                  ),
+                  style: FeedImmersiveTheme.countLabel,
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ),
@@ -494,22 +373,14 @@ class _RailActionState extends State<_RailAction>
   }
 }
 
-class _RailActionSize {
-  const _RailActionSize._();
-
-  static const double width = FeedImmersiveTheme.railWidth;
-}
-
 class _GlassActionSurface extends StatelessWidget {
   const _GlassActionSurface({
     required this.background,
-    required this.highlighted,
     required this.icon,
     required this.iconColor,
   });
 
   final Color background;
-  final bool highlighted;
   final IconData icon;
   final Color iconColor;
 
@@ -523,42 +394,22 @@ class _GlassActionSurface extends StatelessWidget {
         ),
         child: AnimatedContainer(
           duration: FeedImmersiveTheme.motionFast,
-          curve: FeedImmersiveTheme.premiumSettleCurve,
-          width: _RailActionSize.width,
-          height: FeedActionRail._actionSize,
+          width: FeedImmersiveTheme.railChipSize,
+          height: FeedImmersiveTheme.railChipSize,
           decoration: BoxDecoration(
             color: background,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: highlighted
-                  ? FeedImmersiveTheme.glassFocusBorder
-                  : FeedImmersiveTheme.glassBorder,
-              width: highlighted ? 1.2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: FeedImmersiveTheme.overlayControl,
-                blurRadius: highlighted ? 14 : 9,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            border: Border.all(color: FeedImmersiveTheme.glassBorder),
+            boxShadow: FeedImmersiveTheme.controlShadow,
           ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: FeedImmersiveTheme.motionPress,
-              switchInCurve: FeedImmersiveTheme.popCurve,
-              switchOutCurve: FeedImmersiveTheme.sheetReverseCurve,
-              transitionBuilder: (child, animation) => ScaleTransition(
-                scale: animation,
-                child: FadeTransition(opacity: animation, child: child),
-              ),
-              child: Icon(
-                icon,
-                key: ValueKey<IconData>(icon),
-                size: FeedImmersiveTheme.railIconSize,
-                color: iconColor,
-                shadows: FeedImmersiveTheme.textShadow,
-              ),
+          child: AnimatedSwitcher(
+            duration: FeedImmersiveTheme.motionPress,
+            child: Icon(
+              icon,
+              key: ValueKey<IconData>(icon),
+              size: FeedImmersiveTheme.railIconSize,
+              color: iconColor,
+              shadows: FeedImmersiveTheme.textShadow,
             ),
           ),
         ),
@@ -568,89 +419,36 @@ class _GlassActionSurface extends StatelessWidget {
 }
 
 class _RailMetric extends StatelessWidget {
-  const _RailMetric({required this.label, required this.value});
+  const _RailMetric({required this.value});
 
-  final String label;
   final String value;
 
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: label,
-      value: value,
-      child: SizedBox(
-        width: _RailActionSize.width,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _GlassActionSurface(
-              background: FeedImmersiveTheme.railChip,
-              highlighted: false,
-              icon: Icons.visibility_outlined,
-              iconColor: FeedImmersiveTheme.onMediaMuted,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: FeedImmersiveTheme.countLabel.copyWith(
-                color: FeedImmersiveTheme.onMediaMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A compact non-interactive record that gives the rail a recognizable audio
-/// endpoint without inventing a new business callback.
-class _AudioDisc extends StatelessWidget {
-  const _AudioDisc();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: 'Original audio',
-      child: SizedBox(
-        width: _RailActionSize.width,
-        height: _RailActionSize.width,
-        child: Center(
-          child: Container(
-            width: FeedImmersiveTheme.audioDiscSize,
-            height: FeedImmersiveTheme.audioDiscSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: FeedImmersiveTheme.audioDiscGradient,
-              boxShadow: const [
-                BoxShadow(
-                  color: FeedImmersiveTheme.overlayControl,
-                  blurRadius: 10,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(FeedImmersiveTheme.audioDiscInset),
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: FeedImmersiveTheme.audioDiscSurface,
-              ),
-              child: const Icon(
-                Icons.music_note_rounded,
-                size: FeedImmersiveTheme.iconSm,
-                color: FeedImmersiveTheme.onMedia,
+  Widget build(BuildContext context) => Semantics(
+    label: 'Views',
+    value: value,
+    child: SizedBox(
+      width: FeedImmersiveTheme.touchTargetMin,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: FeedImmersiveTheme.touchTargetMin,
+            height: FeedImmersiveTheme.touchTargetMin,
+            child: Center(
+              child: _GlassActionSurface(
+                background: FeedImmersiveTheme.railChip,
+                icon: Icons.visibility_outlined,
+                iconColor: FeedImmersiveTheme.onMediaMuted,
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 1),
+          Text(value, style: FeedImmersiveTheme.countLabel),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 String _compactCount(int value) {

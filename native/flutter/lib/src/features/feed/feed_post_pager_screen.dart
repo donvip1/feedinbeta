@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/connectivity/connectivity_service.dart';
 import '../../core/connectivity/offline_notice.dart';
@@ -14,8 +15,9 @@ import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
-import 'immersive/immersive_post_card.dart';
 import 'immersive/refeed_sheet.dart';
+import 'presentation/post_controller_card.dart';
+import 'state/post_controller.dart';
 
 typedef OpenFeedUserProfile = void Function(String userId);
 
@@ -56,15 +58,6 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
   late final PageController _controller;
   late int _activePage;
   late final List<FeedPost> _posts = List<FeedPost>.of(widget.posts);
-  final Set<String> _likedPostIds = <String>{};
-  final Set<String> _unlikedPostIds = <String>{};
-  final Set<String> _savedPostIds = <String>{};
-  final Set<String> _unsavedPostIds = <String>{};
-  final Set<String> _refeededPostIds = <String>{};
-  final Set<String> _unrefeededPostIds = <String>{};
-  final Map<String, int> _likeDeltas = <String, int>{};
-  final Map<String, int> _commentDeltas = <String, int>{};
-  final Map<String, int> _refeedDeltas = <String, int>{};
   ModalRoute<void>? _subscribedRoute;
   bool _routeVisible = true;
   String? _message;
@@ -113,87 +106,9 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
     return false;
   }
 
-  bool _isLiked(FeedPost post) {
-    return !_unlikedPostIds.contains(post.id) &&
-        (_likedPostIds.contains(post.id) || post.viewerHasLiked);
-  }
-
-  bool _isSaved(FeedPost post) {
-    return !_unsavedPostIds.contains(post.id) &&
-        (_savedPostIds.contains(post.id) || post.viewerHasSaved);
-  }
-
-  bool _isRefeeded(FeedPost post) {
-    return !_unrefeededPostIds.contains(post.id) &&
-        (_refeededPostIds.contains(post.id) || post.viewerHasRefeeded);
-  }
-
-  Future<void> _likePost(FeedPost post) async {
+  Future<void> _refeedPost(FeedPost post, PostController controller) async {
     if (!_requireOnline()) return;
-    final currentlyLiked = _isLiked(post);
-    setState(() {
-      if (currentlyLiked) {
-        _likedPostIds.remove(post.id);
-        _unlikedPostIds.add(post.id);
-      } else {
-        _likedPostIds.add(post.id);
-        _unlikedPostIds.remove(post.id);
-      }
-      _likeDeltas[post.id] =
-          (_likeDeltas[post.id] ?? 0) + (currentlyLiked ? -1 : 1);
-    });
-    try {
-      await widget.feedRepository.toggleLike(post.id, liked: currentlyLiked);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (currentlyLiked) {
-          _likedPostIds.add(post.id);
-          _unlikedPostIds.remove(post.id);
-        } else {
-          _likedPostIds.remove(post.id);
-          _unlikedPostIds.add(post.id);
-        }
-        _likeDeltas[post.id] =
-            (_likeDeltas[post.id] ?? 0) - (currentlyLiked ? -1 : 1);
-        _message = 'Could not update the like.';
-      });
-    }
-  }
-
-  Future<void> _savePost(FeedPost post) async {
-    if (!_requireOnline()) return;
-    final currentlySaved = _isSaved(post);
-    setState(() {
-      if (currentlySaved) {
-        _savedPostIds.remove(post.id);
-        _unsavedPostIds.add(post.id);
-      } else {
-        _savedPostIds.add(post.id);
-        _unsavedPostIds.remove(post.id);
-      }
-      _message = currentlySaved ? 'Post removed from saved.' : 'Post saved.';
-    });
-    try {
-      await widget.feedRepository.toggleSave(post.id, saved: currentlySaved);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (currentlySaved) {
-          _savedPostIds.add(post.id);
-          _unsavedPostIds.remove(post.id);
-        } else {
-          _savedPostIds.remove(post.id);
-          _unsavedPostIds.add(post.id);
-        }
-        _message = 'Could not update saved posts.';
-      });
-    }
-  }
-
-  Future<void> _refeedPost(FeedPost post) async {
-    if (!_requireOnline()) return;
-    final currentlyRefeeded = _isRefeeded(post);
+    final currentlyRefeeded = controller.isRefeeded;
     final action = await showRefeedActionSheet(
       context,
       isRefeeded: currentlyRefeeded,
@@ -204,11 +119,8 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       if (!mounted || quote == null) return;
       try {
         await widget.feedRepository.createQuoteRefeed(post.id, quote);
-        if (!mounted) return;
-        setState(() {
-          _refeedDeltas[post.id] = (_refeedDeltas[post.id] ?? 0) + 1;
-          _message = 'Quote shared to your feed.';
-        });
+        controller.recordQuoteRefeed();
+        if (mounted) setState(() => _message = 'Quote shared to your feed.');
       } catch (_) {
         if (!mounted) return;
         setState(() => _message = 'Could not share this quote.');
@@ -216,46 +128,10 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       return;
     }
 
-    setState(() {
-      if (currentlyRefeeded) {
-        _refeededPostIds.remove(post.id);
-        _unrefeededPostIds.add(post.id);
-      } else {
-        _refeededPostIds.add(post.id);
-        _unrefeededPostIds.remove(post.id);
-      }
-      _refeedDeltas[post.id] =
-          (_refeedDeltas[post.id] ?? 0) + (currentlyRefeeded ? -1 : 1);
-    });
-    try {
-      await widget.feedRepository.toggleRefeed(
-        post.id,
-        refeeded: currentlyRefeeded,
-      );
-      if (!mounted) return;
-      setState(() {
-        _message = currentlyRefeeded
-            ? 'Refeed removed.'
-            : 'Refeeded to your feed.';
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (currentlyRefeeded) {
-          _refeededPostIds.add(post.id);
-          _unrefeededPostIds.remove(post.id);
-        } else {
-          _refeededPostIds.remove(post.id);
-          _unrefeededPostIds.add(post.id);
-        }
-        _refeedDeltas[post.id] =
-            (_refeedDeltas[post.id] ?? 0) - (currentlyRefeeded ? -1 : 1);
-        _message = 'Could not update this Refeed.';
-      });
-    }
+    await controller.toggleRefeed();
   }
 
-  Future<void> _openComments(FeedPost post) async {
+  Future<void> _openComments(FeedPost post, PostController controller) async {
     List<FeedComment> comments = const [];
     try {
       comments = await widget.feedRepository.loadComments(post.id);
@@ -273,11 +149,7 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
           body,
           parentCommentId: parentCommentId,
         );
-        if (mounted && parentCommentId == null) {
-          setState(() {
-            _commentDeltas[post.id] = (_commentDeltas[post.id] ?? 0) + 1;
-          });
-        }
+        if (parentCommentId == null) controller.incrementCommentCount();
         return created;
       },
       onToggleLike: (comment, liked) =>
@@ -391,35 +263,32 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          PageView.builder(
-            controller: _controller,
-            scrollDirection: Axis.vertical,
-            itemCount: _posts.length,
-            onPageChanged: (index) => setState(() => _activePage = index),
-            itemBuilder: (context, index) {
-              final post = _posts[index];
-              final rendered = post.copyWith(
-                likesCount: post.likesCount + (_likeDeltas[post.id] ?? 0),
-                commentsCount:
-                    post.commentsCount + (_commentDeltas[post.id] ?? 0),
-                refeedsCount: post.refeedsCount + (_refeedDeltas[post.id] ?? 0),
-              );
-              return ImmersivePostCard(
-                post: rendered,
-                isActive: _routeVisible && index == _activePage,
-                isLiked: _isLiked(post),
-                isRefeeded: _isRefeeded(post),
-                isSaved: _isSaved(post),
-                onLike: () => unawaited(_likePost(post)),
-                onComment: () => unawaited(_openComments(post)),
-                onRefeed: () => unawaited(_refeedPost(post)),
-                onSave: () => unawaited(_savePost(post)),
-                onShare: () => unawaited(_sharePost(post)),
-                onAvatar: () => unawaited(_openCreatorPreview(post)),
-                onCreatorName: () =>
-                    widget.onOpenUserProfile(post.displayedPost.userId),
-              );
-            },
+          ProviderScope(
+            child: PageView.builder(
+              controller: _controller,
+              scrollDirection: Axis.vertical,
+              itemCount: _posts.length,
+              onPageChanged: (index) => setState(() => _activePage = index),
+              itemBuilder: (context, index) {
+                final post = _posts[index];
+                return PostControllerCard(
+                  key: ValueKey<String>('post-pager-${post.id}'),
+                  post: post,
+                  repository: widget.feedRepository,
+                  isActive: _routeVisible && index == _activePage,
+                  onCommentRequested: (controller) =>
+                      _openComments(post, controller),
+                  onRefeedRequested: (controller) =>
+                      _refeedPost(post, controller),
+                  onShare: () => unawaited(_sharePost(post)),
+                  onGift: () =>
+                      setState(() => _message = 'Open Wallet to send a gift.'),
+                  onAvatar: () => unawaited(_openCreatorPreview(post)),
+                  onCreatorName: () =>
+                      widget.onOpenUserProfile(post.displayedPost.userId),
+                );
+              },
+            ),
           ),
           Positioned(
             top: 0,
