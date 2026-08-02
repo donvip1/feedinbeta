@@ -58,12 +58,18 @@ void main() {
 
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.socialOnly);
-      // No auto-hide restart on reveal.
+      clock.advance(const Duration(seconds: 5));
+      expect(machine.state, FeedChromeVisibility.socialOnly);
+
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.full);
-      // Should not auto-hide immediately on entering full.
-      clock.advance(const Duration(milliseconds: 500));
+
+      // Full remains visible for the complete inactivity delay, then returns
+      // to immersive mode while playback is still active.
+      clock.advance(const Duration(milliseconds: 1999));
       expect(machine.state, FeedChromeVisibility.full);
+      clock.advance(const Duration(milliseconds: 1));
+      expect(machine.state, FeedChromeVisibility.hidden);
     });
 
     test('video playback tap cancels any pending timer', () {
@@ -95,12 +101,44 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(milliseconds: 500));
+      clock.advance(const Duration(seconds: 2));
+      expect(machine.state, FeedChromeVisibility.hidden);
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.socialOnly);
 
       machine.resetToFull();
       expect(machine.state, FeedChromeVisibility.full);
+      clock.advance(const Duration(seconds: 5));
+      expect(machine.state, FeedChromeVisibility.full);
+    });
+
+    test('socialOnly persists until the second reveal tap', () {
+      final clock = FakeFeedChromeClock();
+      final machine = FeedChromeStateMachine(clock: clock)
+        ..reportImmersiveSurface(isActive: true)
+        ..reportVideoPlayback(isPlaying: true);
+      clock.advance(const Duration(seconds: 2));
+      machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
+      expect(machine.state, FeedChromeVisibility.socialOnly);
+
+      // No inactivity countdown in the intermediate stage: the social
+      // rail stays available until the user taps again.
+      clock.advance(const Duration(seconds: 10));
+      expect(machine.state, FeedChromeVisibility.socialOnly);
+    });
+
+    test('paused video never auto-hides revealed chrome', () {
+      final clock = FakeFeedChromeClock();
+      final machine = FeedChromeStateMachine(clock: clock)
+        ..reportImmersiveSurface(isActive: true)
+        ..reportVideoPlayback(isPlaying: true);
+      clock.advance(const Duration(seconds: 2));
+      machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
+      machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
+      expect(machine.state, FeedChromeVisibility.full);
+
+      // The video pauses: the pending re-hide countdown is cancelled.
+      machine.reportVideoPlayback(isPlaying: false);
       clock.advance(const Duration(seconds: 5));
       expect(machine.state, FeedChromeVisibility.full);
     });

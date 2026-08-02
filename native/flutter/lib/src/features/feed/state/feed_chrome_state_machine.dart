@@ -15,6 +15,11 @@ import 'package:flutter/foundation.dart';
 ///    branding, Videos/Photos/Live tabs, Search, notification bell, the
 ///    owner More action, the Create FAB, and the bottom navigation bar.
 ///
+/// After the user reaches [full] while a video keeps playing, the
+/// inactivity countdown restarts; after `autoHideDelay` without further
+/// interaction the chrome drops back to [hidden]. The intermediate
+/// [socialOnly] stage remains visible until the second reveal tap.
+///
 /// The state machine itself only owns transitions and timer bookkeeping;
 /// it never reads or writes the video controller. Callers wire video
 /// readiness/playback into the helper via the [isVideoPlaying] gate, and
@@ -137,10 +142,10 @@ class FeedChromeStateMachine {
       case FeedSurfaceTapIntent.chromeReveal:
         return _advanceChrome();
       case FeedSurfaceTapIntent.videoPlayback:
-        // Reveal taps don't restart the auto-hide timer; explicit playback
-        // taps also clear any pending timer because the user is engaging
-        // with the video and we want the chrome to stay visible long
-        // enough to react.
+        // Explicit playback taps clear any pending timer because the
+        // user is engaging with the video and we want the chrome to
+        // stay visible long enough to react. Reveal taps restart the
+        // timer inside [_advanceChrome] instead.
         _cancelAutoHide();
         return _state;
     }
@@ -150,12 +155,16 @@ class FeedChromeStateMachine {
     switch (_state) {
       case FeedChromeVisibility.hidden:
         setState(FeedChromeVisibility.socialOnly);
+        // First reveal stage stays visible until the second tap; the
+        // inactivity countdown begins only after full chrome is shown.
+        _cancelAutoHide();
         return _state;
       case FeedChromeVisibility.socialOnly:
         setState(FeedChromeVisibility.full);
-        // Full chrome is a stable resting state; the auto-hide timer is
-        // not started here. It will start when the user stops interacting
-        // and the video is still playing.
+        // The user explicitly revealed full chrome. If the video is still
+        // playing, restart the 2-second inactivity countdown so the Feed
+        // returns to immersive mode without requiring a playback change.
+        _scheduleAutoHide();
         return _state;
       case FeedChromeVisibility.full:
         // Already full: a chrome tap in this state should not restart

@@ -82,6 +82,15 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
 
   bool _lastReportedPlaying = false;
 
+  /// Last observed playback position. Used to derive active playback when
+  /// Android's controller flag momentarily lags behind rendered frames.
+  Duration _lastObservedPosition = Duration.zero;
+
+  /// Defers a "stopped" report long enough for the next position update to
+  /// prove playback is still advancing. This avoids cancelling the Feed's
+  /// auto-hide timer on same-position metadata/buffering notifications.
+  Timer? _playbackStopDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -113,12 +122,15 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   void dispose() {
     immersiveFeedMuted.removeListener(_onMuteChanged);
     _tapIconTimer?.cancel();
+    _playbackStopDebounce?.cancel();
     _disposeController();
     _reportPlayback(false);
     super.dispose();
   }
 
   void _disposeController() {
+    _playbackStopDebounce?.cancel();
+    _playbackStopDebounce = null;
     final controller = _controller;
     if (controller != null) {
       controller.removeListener(_onControllerUpdate);
@@ -217,10 +229,37 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
 
     final controller = _controller;
     if (controller == null || !_isInitialized) return;
-    final playing = controller.value.isPlaying;
-    if (playing != _lastReportedPlaying) {
-      _reportPlayback(playing);
+    _syncReportedPlayback(controller);
+  }
+
+  /// Keeps the host's playback gate stable even when Android briefly reports
+  /// `isPlaying=false` while frames are still advancing. Positive evidence is
+  /// reported immediately; negative evidence is debounced and cancelled by
+  /// the next advancing frame.
+  void _syncReportedPlayback(VideoPlayerController controller) {
+    final value = controller.value;
+    final position = value.position;
+    final positionAdvanced = position > _lastObservedPosition;
+    _lastObservedPosition = position;
+    final activelyPlaying =
+        widget.isActive && (value.isPlaying || positionAdvanced);
+
+    if (activelyPlaying) {
+      _playbackStopDebounce?.cancel();
+      _playbackStopDebounce = null;
+      if (!_lastReportedPlaying) _reportPlayback(true);
+      return;
     }
+
+    if (!_lastReportedPlaying || _playbackStopDebounce != null) return;
+    _playbackStopDebounce = Timer(const Duration(milliseconds: 350), () {
+      _playbackStopDebounce = null;
+      if (!mounted || !_lastReportedPlaying) return;
+      final current = _controller;
+      if (current == null || !widget.isActive || !current.value.isPlaying) {
+        _reportPlayback(false);
+      }
+    });
   }
 
   /// Aligns playback and volume with [widget.isActive].
@@ -234,11 +273,15 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
 
     if (widget.isActive) {
       controller.play();
+      _syncReportedPlayback(controller);
     } else {
+      _playbackStopDebounce?.cancel();
+      _playbackStopDebounce = null;
       controller.pause();
       controller.seekTo(Duration.zero);
+      _lastObservedPosition = Duration.zero;
+      _reportPlayback(false);
     }
-    _reportPlayback(controller.value.isPlaying);
   }
 
   /// Push the current playback state to the host so it can arm/disarm
