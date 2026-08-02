@@ -25,8 +25,10 @@ class FeedinRealtimeService {
           callback: (payload) {
             _eventsController.add(
               FeedinRealtimeEvent(
+                kind: _kindFromPostgres(payload.eventType),
                 type: FeedinRealtimeEventType.postChanged,
                 recordId: _recordId(payload),
+                messageRecord: payload.newRecord,
               ),
             );
           },
@@ -38,8 +40,10 @@ class FeedinRealtimeService {
           callback: (payload) {
             _eventsController.add(
               FeedinRealtimeEvent(
+                kind: _kindFromPostgres(payload.eventType),
                 type: FeedinRealtimeEventType.messageChanged,
                 recordId: _recordId(payload),
+                messageRecord: payload.newRecord,
               ),
             );
           },
@@ -51,8 +55,10 @@ class FeedinRealtimeService {
           callback: (payload) {
             _eventsController.add(
               FeedinRealtimeEvent(
+                kind: _kindFromPostgres(payload.eventType),
                 type: FeedinRealtimeEventType.postChanged,
                 recordId: _postId(payload),
+                messageRecord: payload.newRecord,
               ),
             );
           },
@@ -64,8 +70,10 @@ class FeedinRealtimeService {
           callback: (payload) {
             _eventsController.add(
               FeedinRealtimeEvent(
+                kind: _kindFromPostgres(payload.eventType),
                 type: FeedinRealtimeEventType.postChanged,
                 recordId: _postId(payload),
+                messageRecord: payload.newRecord,
               ),
             );
           },
@@ -77,14 +85,29 @@ class FeedinRealtimeService {
           callback: (payload) {
             _eventsController.add(
               FeedinRealtimeEvent(
+                kind: _kindFromPostgres(payload.eventType),
                 type: FeedinRealtimeEventType.notificationChanged,
                 recordId: _recordId(payload),
+                messageRecord: payload.newRecord,
               ),
             );
           },
         );
 
     _channel!.subscribe();
+  }
+
+  static FeedinRealtimeEventKind _kindFromPostgres(PostgresChangeEvent event) {
+    switch (event) {
+      case PostgresChangeEvent.insert:
+        return FeedinRealtimeEventKind.insert;
+      case PostgresChangeEvent.update:
+        return FeedinRealtimeEventKind.update;
+      case PostgresChangeEvent.delete:
+        return FeedinRealtimeEventKind.delete;
+      case PostgresChangeEvent.all:
+        return FeedinRealtimeEventKind.unknown;
+    }
   }
 
   String? _recordId(PostgresChangePayload payload) {
@@ -114,11 +137,36 @@ class FeedinRealtimeService {
   }
 }
 
+/// A single realtime change event. Existing callers continue to use
+/// [type] / [recordId]; the newer fields ([kind], [messageRecord]) let
+/// the in-app message overlay resolve a tappable banner without an
+/// extra round trip.
 class FeedinRealtimeEvent {
-  const FeedinRealtimeEvent({required this.type, this.recordId});
+  const FeedinRealtimeEvent({
+    required this.type,
+    this.recordId,
+    this.kind = FeedinRealtimeEventKind.unknown,
+    this.messageRecord,
+  });
 
   final FeedinRealtimeEventType type;
   final String? recordId;
+  final FeedinRealtimeEventKind kind;
+
+  /// The full row from the change payload. Only `messages` events are
+  /// guaranteed to carry the fields the [IncomingMessageResolver]
+  /// needs; for other tables this is mostly `null`/empty.
+  final Map<String, dynamic>? messageRecord;
+
+  /// Convenience for callers that need to know which conversation a
+  /// message belongs to without inspecting the full record.
+  String? get messageConversationId {
+    final record = messageRecord;
+    if (record == null) return null;
+    final direct = record['conversation_id']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+    return null;
+  }
 }
 
 enum FeedinRealtimeEventType {
@@ -126,3 +174,8 @@ enum FeedinRealtimeEventType {
   messageChanged,
   notificationChanged,
 }
+
+/// Postgres change kind for `messages`. Lets the in-app overlay
+/// distinguish a new incoming message from an update/delete on an
+/// existing one.
+enum FeedinRealtimeEventKind { insert, update, delete, unknown }

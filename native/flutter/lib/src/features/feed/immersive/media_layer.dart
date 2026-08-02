@@ -2,28 +2,50 @@ import 'package:flutter/material.dart';
 
 import '../../create/camera_studio/studio_filters.dart';
 import '../feed_post.dart';
+import '../state/feed_chrome_state_machine.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_video_player.dart';
 import 'photo_carousel.dart';
 
-/// Resolves and renders a post's background media: the immersive video player,
-/// a photo carousel, or a branded gradient text card when there is no media.
+/// Resolves and renders a post's background media: the immersive video
+/// player, a photo carousel, or a branded gradient text card when there
+/// is no media.
 ///
-/// Presentation-only. [post] is the already-resolved content post (i.e. the
-/// re-shared original when applicable); [onDoubleTapLike] is forwarded to the
-/// underlying media so a double-tap anywhere on the media triggers the like
-/// burst, exactly as before.
+/// Presentation-only. [post] is the already-resolved content post
+/// (i.e. the re-shared original when applicable); [onDoubleTapLike] is
+/// forwarded to the underlying media so a double-tap anywhere on the
+/// media triggers the like burst, exactly as before.
+///
+/// Surface taps on video posts are forwarded via [onSurfaceTap] so the
+/// host pager can drive the chrome reveal state machine. Non-video
+/// posts ignore [onSurfaceTap] because they don't participate in the
+/// immersive timer.
 class MediaLayer extends StatelessWidget {
   const MediaLayer({
     super.key,
     required this.post,
     required this.isActive,
     required this.onDoubleTapLike,
+    this.onSurfaceTap,
+    this.onPlaybackChange,
+    this.chromeState = FeedChromeVisibility.full,
   });
 
   final FeedPost post;
   final bool isActive;
   final VoidCallback onDoubleTapLike;
+
+  /// Forwarded to [ImmersiveVideoPlayer] so the host pager can decide
+  /// whether a tap reveals chrome or toggles playback.
+  final void Function(FeedSurfaceTapIntent intent)? onSurfaceTap;
+
+  /// Forwarded to [ImmersiveVideoPlayer] so the host knows when the
+  /// video actually starts/stops playing.
+  final void Function(bool isPlaying)? onPlaybackChange;
+
+  /// Current chrome visibility — passed through to the video player
+  /// so its gesture behavior matches the host's reveal state.
+  final FeedChromeVisibility chromeState;
 
   String? get _primaryMediaType {
     final type = post.mediaType;
@@ -74,6 +96,9 @@ class MediaLayer extends StatelessWidget {
         localPath: post.localMediaPath,
         isActive: isActive,
         onDoubleTapLike: onDoubleTapLike,
+        onSurfaceTap: onSurfaceTap,
+        onPlaybackChange: onPlaybackChange,
+        chromeState: chromeState,
       );
     } else {
       final imageUrls = _imageUrls;

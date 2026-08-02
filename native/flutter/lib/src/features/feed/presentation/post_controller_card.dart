@@ -6,12 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/local/local_feed_repository_contract.dart';
 import '../feed_post.dart';
 import '../immersive/immersive_post_card.dart';
+import '../state/feed_chrome_state_machine.dart';
 import '../state/post_controller.dart';
 
 /// Riverpod boundary for a single immersive Feed card.
 ///
 /// The pager supplies stable content and navigation callbacks. Engagement and
 /// More-menu changes are watched here, so they never rebuild the parent pager.
+/// The Feed chrome visibility state (hidden / socialOnly / full) is passed
+/// down from the pager and forwarded to the card so each layer can decide
+/// whether it's currently interactive.
 class PostControllerCard extends ConsumerStatefulWidget {
   const PostControllerCard({
     super.key,
@@ -24,6 +28,9 @@ class PostControllerCard extends ConsumerStatefulWidget {
     required this.onGift,
     this.onAvatar,
     this.onCreatorName,
+    this.chromeState = FeedChromeVisibility.full,
+    this.onSurfaceTap,
+    this.onPlaybackChange,
   });
 
   final FeedPost post;
@@ -35,6 +42,17 @@ class PostControllerCard extends ConsumerStatefulWidget {
   final VoidCallback onGift;
   final VoidCallback? onAvatar;
   final VoidCallback? onCreatorName;
+
+  /// Visibility stage for the Feed chrome around this card.
+  final FeedChromeVisibility chromeState;
+
+  /// Tap-forwarding callback so the pager can drive the chrome state
+  /// machine from a single tap on the immersive surface.
+  final void Function(FeedSurfaceTapIntent intent)? onSurfaceTap;
+
+  /// Playback-state callback so the pager can arm/disarm the auto-hide
+  /// timer when the video actually starts/stops playing.
+  final void Function(bool isPlaying)? onPlaybackChange;
 
   @override
   ConsumerState<PostControllerCard> createState() => _PostControllerCardState();
@@ -102,6 +120,7 @@ class _PostControllerCardState extends ConsumerState<PostControllerCard> {
       },
       onAvatar: widget.onAvatar,
       onCreatorName: widget.onCreatorName,
+      chromeState: widget.chromeState,
     );
   }
 }

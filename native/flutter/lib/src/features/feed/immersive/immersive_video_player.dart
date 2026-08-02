@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/media/reel_preloader.dart';
+import '../state/feed_chrome_state_machine.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_audio.dart';
 
@@ -20,6 +21,12 @@ import 'immersive_audio.dart';
 /// ([immersiveFeedMuted]) so toggling it on one reel carries to every reel you
 /// swipe to. Off-screen reels are always paused *and* have their volume zeroed,
 /// so only the single active page ever produces audio — no bleed between pages.
+///
+/// Gesture behaviour while the host chrome is `hidden`/`socialOnly`:
+/// single taps on the video surface are forwarded to the host as a
+/// reveal gesture ([onSurfaceTap]) and do NOT toggle play/pause. When
+/// the chrome reaches `full`, single taps toggle play/pause as before.
+/// Double-tap Like is always forwarded via [onDoubleTapLike].
 class ImmersiveVideoPlayer extends StatefulWidget {
   const ImmersiveVideoPlayer({
     super.key,
@@ -27,6 +34,9 @@ class ImmersiveVideoPlayer extends StatefulWidget {
     required this.localPath,
     required this.isActive,
     this.onDoubleTapLike,
+    this.onSurfaceTap,
+    this.chromeState = FeedChromeVisibility.full,
+    this.onPlaybackChange,
   });
 
   /// Remote media URL. Used when [localPath] is null or missing on disk.
@@ -42,6 +52,20 @@ class ImmersiveVideoPlayer extends StatefulWidget {
   /// Invoked when the user double-taps the video (e.g. to "like").
   final VoidCallback? onDoubleTapLike;
 
+  /// Invoked for single-taps that should advance the chrome reveal. The
+  /// host decides whether the tap reveals chrome or toggles playback
+  /// based on its current chrome state.
+  final void Function(FeedSurfaceTapIntent intent)? onSurfaceTap;
+
+  /// Current chrome visibility. Tells the player whether single-tap
+  /// should be treated as a reveal gesture (hidden / socialOnly) or as
+  /// a normal play/pause toggle (full).
+  final FeedChromeVisibility chromeState;
+
+  /// Notified when playback state changes (e.g. so the host can arm the
+  /// auto-hide timer once the video actually starts playing).
+  final void Function(bool isPlaying)? onPlaybackChange;
+
   @override
   State<ImmersiveVideoPlayer> createState() => _ImmersiveVideoPlayerState();
 }
@@ -55,6 +79,8 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   /// Icon shown briefly in the center after a single tap (play/pause feedback).
   IconData? _tapIcon;
   Timer? _tapIconTimer;
+
+  bool _lastReportedPlaying = false;
 
   @override
   void initState() {
@@ -88,6 +114,7 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     immersiveFeedMuted.removeListener(_onMuteChanged);
     _tapIconTimer?.cancel();
     _disposeController();
+    _reportPlayback(false);
     super.dispose();
   }
 
@@ -187,6 +214,13 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
   void _onControllerUpdate() {
     // Drive the progress bar, buffering spinner, and play/pause state.
     if (mounted) setState(() {});
+
+    final controller = _controller;
+    if (controller == null || !_isInitialized) return;
+    final playing = controller.value.isPlaying;
+    if (playing != _lastReportedPlaying) {
+      _reportPlayback(playing);
+    }
   }
 
   /// Aligns playback and volume with [widget.isActive].
@@ -204,20 +238,52 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
       controller.pause();
       controller.seekTo(Duration.zero);
     }
+    _reportPlayback(controller.value.isPlaying);
   }
 
+  /// Push the current playback state to the host so it can arm/disarm
+  /// the auto-hide timer. Debounced to "fire only on a real change" via
+  /// [_lastReportedPlaying].
+  void _reportPlayback(bool isPlaying) {
+    _lastReportedPlaying = isPlaying;
+    final callback = widget.onPlaybackChange;
+    if (callback != null) callback(isPlaying);
+  }
+
+  /// Decide what a single tap on the video means.
+  ///
+  /// The chrome state machine is owned by the host pager; this widget
+  /// just forwards a strongly-typed intent. When chrome is hidden or
+  /// socialOnly, taps are reveal gestures (do not toggle play/pause).
+  /// When chrome is full, taps toggle play/pause as before.
   void _handleTap() {
     final controller = _controller;
-    if (controller == null || !_isInitialized) return;
+    final host = widget.onSurfaceTap;
+    final canToggle = controller != null && _isInitialized;
 
-    final wasPlaying = controller.value.isPlaying;
-    if (wasPlaying) {
-      controller.pause();
-    } else {
-      controller.play();
+    final intent = widget.chromeState == FeedChromeVisibility.full
+        ? FeedSurfaceTapIntent.videoPlayback
+        : FeedSurfaceTapIntent.chromeReveal;
+
+    if (host != null) {
+      host(intent);
     }
-    HapticFeedback.selectionClick();
-    _flashTapIcon(wasPlaying ? Icons.pause : Icons.play_arrow);
+
+    // Only toggle playback when the chrome is already full AND the
+    // controller is ready. Hidden / socialOnly taps are pure reveal
+    // gestures.
+    if (intent == FeedSurfaceTapIntent.videoPlayback && canToggle) {
+      final wasPlaying = controller.value.isPlaying;
+      if (wasPlaying) {
+        controller.pause();
+      } else {
+        controller.play();
+      }
+      HapticFeedback.selectionClick();
+      _flashTapIcon(wasPlaying ? Icons.pause : Icons.play_arrow);
+    } else if (intent == FeedSurfaceTapIntent.chromeReveal) {
+      HapticFeedback.selectionClick();
+    }
   }
 
   void _flashTapIcon(IconData icon) {
@@ -262,8 +328,15 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
             else
               _buildPlaceholder(loading: _hasSource),
             if (ready && _isBuffering(controller)) _buildBufferingSpinner(),
-            if (ready) ...[_buildTapFeedback(), _buildProgressBar(controller)],
-            _buildMuteButton(enabled: ready),
+            if (ready && widget.chromeState == FeedChromeVisibility.full) ...[
+              _buildTapFeedback(),
+              _buildProgressBar(controller),
+            ],
+            // The mute control is part of the full chrome stage only — it
+            // is hidden alongside caption/progress when chrome is hidden
+            // or socialOnly.
+            if (widget.chromeState == FeedChromeVisibility.full)
+              _buildMuteButton(enabled: ready),
           ],
         ),
       ),

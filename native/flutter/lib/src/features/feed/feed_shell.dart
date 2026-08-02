@@ -60,8 +60,12 @@ import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
+import 'immersive/incoming_feed_message_banner.dart';
 import 'immersive/refeed_sheet.dart';
+import '../../core/realtime/incoming_message_resolver.dart';
 import 'presentation/post_controller_card.dart';
+import 'state/feed_chrome_state_machine.dart';
+import 'state/feed_gesture_resolver.dart';
 import 'state/post_controller.dart';
 
 class FeedShell extends StatefulWidget {
@@ -142,6 +146,18 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   late UserProfile _profile;
   late Future<int> _notificationUnreadCountFuture;
   late final SocialGraphRemoteDataSource _socialGraph;
+
+  /// Most recent Feed chrome visibility. The shell uses this to decide
+  /// whether the shared `_FeedBottomNavigation` (and the immersive
+  /// background color) should be visible. Defaults to full so a brand
+  /// new Feed renders the standard bottom navigation before the first
+  /// chrome callback fires.
+  FeedChromeVisibility _feedChromeVisibility = FeedChromeVisibility.full;
+
+  /// The newest incoming-message banner the Feed wants to display above
+  /// the immersive pager. The shell is responsible only for the
+  /// conversation tap routing; the Feed owns dedup/expiry/visibility.
+  IncomingFeedMessageBanner? _incomingMessageBanner;
 
   /// Shared, long-lived call controller: drives both outgoing calls placed from
   /// a chat header and the app-wide incoming-call presenter below.
@@ -330,6 +346,26 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
       case FeedinRealtimeEventType.notificationChanged:
         _refreshNotificationBadge();
     }
+  }
+
+  void _handleChromeVisibilityChanged(FeedChromeVisibility visibility) {
+    if (!mounted || _feedChromeVisibility == visibility) return;
+    setState(() => _feedChromeVisibility = visibility);
+  }
+
+  void _handleIncomingMessageBannerChanged(
+      IncomingFeedMessageBanner? banner) {
+    if (!mounted) return;
+    if (banner?.id == _incomingMessageBanner?.id) return;
+    setState(() => _incomingMessageBanner = banner);
+  }
+
+  void _openConversationFromBanner(String conversationId) {
+    if (conversationId.isEmpty) return;
+    setState(() {
+      _incomingMessageBanner = null;
+    });
+    _openNotificationRoute('conversation:$conversationId');
   }
 
   Future<void> _refreshMessagesAfterRealtimeEvent() async {
@@ -701,6 +737,10 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         onOpenWallet: () => _selectTab(2),
         socialGraphDataSource: _socialGraph,
         currentUserId: _profile.userId,
+        onChromeVisibilityChanged: _handleChromeVisibilityChanged,
+        onIncomingMessageBannerChanged: _handleIncomingMessageBannerChanged,
+        onOpenConversation: _openConversationFromBanner,
+        realtimeService: widget.realtimeService,
       ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
@@ -806,13 +846,68 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
             : pages[_index],
         // Chats own the whole viewport. Navigation returns only after the
         // inbox/thread back flow lands on Feed/Reels again.
-        bottomNavigationBar: _index == 1
-            ? null
-            : _FeedBottomNavigation(
+        bottomNavigationBar: _shouldShowFeedBottomNavigation()
+            ? _FeedBottomNavigation(
                 selectedIndex: _index,
                 onSelected: _selectTab,
                 onCreate: _openCreate,
-              ),
+              )
+            : null,
+        // The incoming-message banner sits above the immersive pager but
+        // below pushed routes. It is only relevant while the immersive
+        // Feed is on screen and the chrome is auto-hidden (or revealed),
+        // so we gate it to the Feed tab. The widget itself is a no-op
+        // when [IncomingFeedMessageBanner] is null.
+        floatingActionButtonLocation:
+            FloatingActionButtonLocation.endTop,
+        floatingActionButton: _index == 0 && !_showNotifications
+            ? _IncomingBannerHost(
+                banner: _incomingMessageBanner,
+                onOpen: _openConversationFromBanner,
+              )
+            : null,
+      ),
+    );
+  }
+
+  /// Whether the shared bottom navigation should be on screen for the
+  /// current shell index + Feed chrome visibility.
+  ///
+  /// Chats (_index == 1) always owns the full viewport (existing
+  /// behaviour). Other indices follow the immersive chrome rules:
+  /// bottom navigation is only visible when the Feed chrome is in its
+  /// `full` stage. While the user is watching a video with auto-hidden
+  /// chrome, the bottom navigation is hidden too, so the experience is
+  /// fully immersive.
+  bool _shouldShowFeedBottomNavigation() {
+    if (_index == 1) return false;
+    return _index == 0
+        ? _feedChromeVisibility == FeedChromeVisibility.full
+        : true;
+  }
+}
+
+/// Tiny wrapper that mounts the banner above the immersive pager. Uses
+/// `Stack` + `Positioned` so it does not interfere with the Scaffold's
+/// layout. Returns `SizedBox.shrink()` when no banner is provided.
+class _IncomingBannerHost extends StatelessWidget {
+  const _IncomingBannerHost({
+    required this.banner,
+    required this.onOpen,
+  });
+
+  final IncomingFeedMessageBanner? banner;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final banner = this.banner;
+    if (banner == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 88),
+      child: IncomingFeedMessageBannerView(
+        banner: banner,
+        onTap: () => onOpen(banner.conversationId),
       ),
     );
   }
@@ -1050,6 +1145,10 @@ class FeedScreen extends StatefulWidget {
     required this.onOpenWallet,
     required this.socialGraphDataSource,
     required this.currentUserId,
+    required this.onChromeVisibilityChanged,
+    required this.onIncomingMessageBannerChanged,
+    required this.onOpenConversation,
+    required this.realtimeService,
     this.shareService = const FeedShareService(),
   });
 
@@ -1066,6 +1165,23 @@ class FeedScreen extends StatefulWidget {
   final SocialGraphRemoteDataSource socialGraphDataSource;
   final String currentUserId;
   final FeedShareService shareService;
+
+  /// Called whenever the chrome state machine transitions. The shell
+  /// uses this to decide whether the shared `_FeedBottomNavigation`
+  /// should be on screen.
+  final ValueChanged<FeedChromeVisibility> onChromeVisibilityChanged;
+
+  /// Called whenever the newest incoming-message banner should be
+  /// shown/hidden above the immersive pager.
+  final ValueChanged<IncomingFeedMessageBanner?> onIncomingMessageBannerChanged;
+
+  /// Called when the user taps the incoming-message banner; the shell
+  /// handles the actual conversation routing.
+  final ValueChanged<String> onOpenConversation;
+
+  /// Used to listen for incoming-message Realtime events. We only need
+  /// the stream surface; the shell already owns connect/disconnect.
+  final FeedinRealtimeService realtimeService;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -1084,15 +1200,72 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   Timer? _realtimeRefreshDebounce;
   ModalRoute<void>? _subscribedRoute;
   bool _routeVisible = true;
-  // Posts whose view has been recorded this session, so a post is counted once
-  // even if it scrolls in and out of focus.
+
+  /// Staged immersive chrome state machine. Owned by the Feed (not the
+  /// shell) because the chrome is a property of the immersive pager
+  /// itself. The current visibility value is reported up to the shell
+  /// via [widget.onChromeVisibilityChanged].
+  final FeedChromeStateMachine _chrome = FeedChromeStateMachine();
+  FeedChromeVisibility _chromeState = FeedChromeVisibility.full;
+
+  /// Last reported video-playback state (used to suppress duplicate
+  /// timer resets while the controller is mid-initialize).
+  bool _lastVideoPlaying = false;
+
+  /// Most recent banner to display above the immersive pager.
+  IncomingFeedMessageBanner? _incomingBanner;
+
+  /// Subscriptions owned by this state and cancelled in [dispose].
+  StreamSubscription<FeedinRealtimeEvent>? _messagesRealtimeSub;
+  Timer? _bannerExpiryTimer;
+
+  /// Posts whose view has been recorded this session, so a post is counted once
+  /// even if it scrolls in and out of focus.
   final Set<String> _recordedViewIds = {};
+
+  /// IDs of message banners we've already shown, so the same Realtime
+  /// event never produces two banners if the shell replays it.
+  final Set<String> _displayedBannerIds = {};
 
   @override
   void initState() {
     super.initState();
     _postsFuture = _initialLoad();
     _syncBackController();
+    _chrome.attachListener(_onChromeStateChanged);
+    _messagesRealtimeSub = widget.realtimeService.events
+        .where((event) => event.type == FeedinRealtimeEventType.messageChanged)
+        .listen(_handleMessagesRealtimeEvent);
+  }
+
+  void _onChromeStateChanged(FeedChromeVisibility visibility) {
+    if (!mounted) return;
+    setState(() => _chromeState = visibility);
+    widget.onChromeVisibilityChanged(visibility);
+  }
+
+  void _handleMessagesRealtimeEvent(FeedinRealtimeEvent event) {
+    if (!mounted || !_routeVisible) return;
+    final banner = IncomingMessageResolver(
+      currentUserId: widget.currentUserId,
+      event: event,
+    ).buildBanner();
+    if (banner == null) return;
+    if (_displayedBannerIds.contains(banner.id)) return;
+    _displayedBannerIds.add(banner.id);
+    setState(() => _incomingBanner = banner);
+    widget.onIncomingMessageBannerChanged(banner);
+    _scheduleBannerExpiry(banner);
+  }
+
+  void _scheduleBannerExpiry(IncomingFeedMessageBanner banner) {
+    _bannerExpiryTimer?.cancel();
+    _bannerExpiryTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      if (_incomingBanner?.id != banner.id) return;
+      setState(() => _incomingBanner = null);
+      widget.onIncomingMessageBannerChanged(null);
+    });
   }
 
   @override
@@ -1112,11 +1285,18 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     final coveringRoute = feedinRouteObserver.routeAbove(_subscribedRoute);
     if (coveringRoute is FeedCommentSheetRoute<void>) return;
     if (_routeVisible) setState(() => _routeVisible = false);
+    // The Feed is now hidden under a pushed route (notifications,
+    // search, creator preview, etc). Stop the auto-hide timer so it
+    // doesn't fire while the user is interacting elsewhere.
+    _chrome.reportImmersiveSurface(isActive: false);
   }
 
   @override
   void didPopNext() {
     if (!_routeVisible) setState(() => _routeVisible = true);
+    if (_routeVisible) {
+      _reapplyImmersiveSurfaceState();
+    }
   }
 
   @override
@@ -1124,6 +1304,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     feedinRouteObserver.unsubscribe(this);
     widget.backController.setActiveBackHandler(null);
     _realtimeRefreshDebounce?.cancel();
+    _bannerExpiryTimer?.cancel();
+    _messagesRealtimeSub?.cancel();
+    _chrome.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -1259,7 +1442,35 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       }
     });
     _syncBackController();
+    // Photos / Live do not own the immersive video timer; full chrome
+    // is the right resting state for those tabs.
+    if (mounted) _reapplyImmersiveSurfaceState();
   }
+
+  /// Decide whether the immersive surface qualifies for the auto-hide
+  /// timer. Only the primary Video tab while the route is visible
+  /// qualifies; Photos, Live, comment sheets, and any pushed route do
+  /// not. Calling this reapplies the current playback state to the
+  /// chrome machine so it can arm/disarm the timer correctly.
+  void _reapplyImmersiveSurfaceState() {
+    final isImmersiveVideoTab =
+        _tabIndex == 0 && _routeVisible && _isActivePostVideo;
+    _chrome.reportImmersiveSurface(isActive: isImmersiveVideoTab);
+    if (isImmersiveVideoTab) {
+      _chrome.reportVideoPlayback(isPlaying: _lastVideoPlaying);
+    } else {
+      _chrome.reportVideoPlayback(isPlaying: false);
+    }
+  }
+
+  bool get _isActivePostVideo {
+    final cached = _lastPosts;
+    if (cached == null || cached.isEmpty) return false;
+    final active = cached[_activePage.clamp(0, cached.length - 1)];
+    return active.mediaType == 'video';
+  }
+
+  List<FeedPost>? _lastPosts;
 
   Future<void> _deletePost(FeedPost post) async {
     if (post.userId != widget.currentUserId || !_requireOnline()) return;
@@ -1459,6 +1670,16 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       future: _postsFuture,
       builder: (context, snapshot) {
         final posts = snapshot.data;
+        _lastPosts = posts;
+        // After every future result (initial load or refresh), decide
+        // whether the active surface still qualifies for the immersive
+        // timer. The first posts may be images, in which case chrome
+        // should stay full.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _reapplyImmersiveSurfaceState();
+        });
+
         final topInset = MediaQuery.of(context).padding.top;
         final overlayHeight = topInset + 104;
 
@@ -1540,6 +1761,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       onPageChanged: (index) {
         setState(() => _activePage = index);
         _maybeLoadMore(index, posts.length);
+        // The active post may have changed media type; re-evaluate the
+        // immersive eligibility so non-video pages don't get the
+        // auto-hide timer.
+        _reapplyImmersiveSurfaceState();
         // Warm the next few reels so swiping to them starts playback instantly.
         ReelPreloader.instance.preloadAround([
           for (final p in posts)
@@ -1560,6 +1785,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           onAvatar: () => _openCreatorPreview(post),
           onCreatorName: () =>
               widget.onOpenUserProfile(post.displayedPost.userId),
+          chromeState: _chromeState,
+          onSurfaceTap: _handleSurfaceTapForPost(post, index),
+          onPlaybackChange: _handlePlaybackChangeForPost(post),
         );
         return _PageTransition(
           controller: _pageController,
@@ -1570,77 +1798,137 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     );
   }
 
+  /// Single-tap from the immersive video surface. Decides via the
+  /// gesture resolver whether the tap reveals chrome or toggles
+  /// playback. Non-video posts return an `absorb` decision so the
+  /// pager's surface tap never fights the existing double-tap Like.
+  void Function(FeedSurfaceTapIntent intent) _handleSurfaceTapForPost(
+      FeedPost post, int postIndex) {
+    return (intent) {
+      if (!_routeVisible) return;
+      final isVideo = post.mediaType == 'video';
+      final decision = FeedGestureResolver.decideSurfaceTap(
+        chromeState: _chromeState,
+        isActiveVideoPage: isVideo && postIndex == _activePage,
+      );
+      _chrome.handleSurfaceTap(decision.chromeIntent);
+    };
+  }
+
+  /// Video playback callback. We only treat the active post's playback
+  /// as authoritative; we ignore playback reports from off-screen pages
+  /// because the ImmersiveVideoPlayer already pauses off-screen reels.
+  void Function(bool isPlaying) _handlePlaybackChangeForPost(FeedPost post) {
+    return (isPlaying) {
+      if (!_routeVisible) return;
+      final activeIndex = _activePage;
+      final posts = _lastPosts;
+      if (posts == null) return;
+      final active = posts[activeIndex.clamp(0, posts.length - 1)];
+      if (active.id != post.id) return;
+      _lastVideoPlaying = isPlaying;
+      _chrome.reportVideoPlayback(isPlaying: isPlaying);
+    };
+  }
+
   Widget _buildTopOverlay(
     BuildContext context, {
     required List<FeedPost>? posts,
   }) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(gradient: FeedImmersiveTheme.topScrim),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Text.rich(
-                    TextSpan(
+    // The top chrome is part of the full chrome stage. Hidden and
+    // socialOnly must not eat taps — wrap with IgnorePointer so the
+    // reveal sequence still works while a fade-out animation is in
+    // progress.
+    final showTopChrome = _chromeState == FeedChromeVisibility.full;
+
+    return IgnorePointer(
+      ignoring: !showTopChrome,
+      child: AnimatedSlide(
+        offset: showTopChrome ? Offset.zero : const Offset(0, -0.1),
+        duration: FeedImmersiveTheme.motionMedium,
+        curve: FeedImmersiveTheme.premiumSettleCurve,
+        child: AnimatedOpacity(
+          opacity: showTopChrome
+              ? FeedImmersiveTheme.opacityVisible
+              : FeedImmersiveTheme.opacityHidden,
+          duration: FeedImmersiveTheme.motionMedium,
+          curve: FeedImmersiveTheme.premiumSettleCurve,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: FeedImmersiveTheme.topScrim,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        TextSpan(text: 'feed'),
-                        TextSpan(
-                          text: 'In',
-                          style: TextStyle(color: FeedImmersiveTheme.brandPink),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: 'feed'),
+                              TextSpan(
+                                text: 'In',
+                                style: TextStyle(
+                                  color: FeedImmersiveTheme.brandPink,
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                            shadows: FeedImmersiveTheme.textShadow,
+                          ),
                         ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Search',
+                          onPressed: widget.onOpenSearch,
+                          icon: const Icon(Icons.search, color: Colors.white),
+                        ),
+                        _NotificationBellAction(
+                          unreadCountFuture: widget.notificationUnreadCountFuture,
+                          onTap: widget.onOpenNotifications,
+                          foregroundColor: Colors.white,
+                        ),
+                        if (posts != null && posts.isNotEmpty && _tabIndex != 2)
+                          Builder(
+                            builder: (context) {
+                              final filtered = _filterPosts(posts);
+                              if (filtered.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              final active = filtered[
+                                  _activePage.clamp(0, filtered.length - 1)];
+                              if (active.userId != widget.currentUserId) {
+                                return const SizedBox.shrink();
+                              }
+                              return IconButton(
+                                key: const Key('feed-post-more-actions'),
+                                tooltip: 'Post actions',
+                                onPressed: () => unawaited(_deletePost(active)),
+                                icon: const Icon(
+                                  Icons.more_vert_rounded,
+                                  color: Colors.white,
+                                ),
+                              );
+                            },
+                          ),
                       ],
                     ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                      shadows: FeedImmersiveTheme.textShadow,
+                    _ImmersiveFeedTabs(
+                      selectedIndex: _tabIndex,
+                      onChanged: _onTabChanged,
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Search',
-                    onPressed: widget.onOpenSearch,
-                    icon: const Icon(Icons.search, color: Colors.white),
-                  ),
-                  _NotificationBellAction(
-                    unreadCountFuture: widget.notificationUnreadCountFuture,
-                    onTap: widget.onOpenNotifications,
-                    foregroundColor: Colors.white,
-                  ),
-                  if (posts != null && posts.isNotEmpty && _tabIndex != 2)
-                    Builder(
-                      builder: (context) {
-                        final filtered = _filterPosts(posts);
-                        if (filtered.isEmpty) return const SizedBox.shrink();
-                        final active =
-                            filtered[_activePage.clamp(0, filtered.length - 1)];
-                        if (active.userId != widget.currentUserId) {
-                          return const SizedBox.shrink();
-                        }
-                        return IconButton(
-                          key: const Key('feed-post-more-actions'),
-                          tooltip: 'Post actions',
-                          onPressed: () => unawaited(_deletePost(active)),
-                          icon: const Icon(
-                            Icons.more_vert_rounded,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
-                ],
+                  ],
+                ),
               ),
-              _ImmersiveFeedTabs(
-                selectedIndex: _tabIndex,
-                onChanged: _onTabChanged,
-              ),
-            ],
+            ),
           ),
         ),
       ),
