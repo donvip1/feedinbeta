@@ -1501,15 +1501,42 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _toast('Message deleted.');
   }
 
-  /// Forward [message]'s text into another conversation the user picks. Purely
-  /// client-side: it queues the content into the target thread through the
-  /// existing outbound message pipeline.
+  /// Forward [message] into another conversation the user picks.
+  ///
+  /// Text re-queues the body. Media is **re-sent as a fresh upload** into the
+  /// target conversation rather than re-pointing at the original storage object:
+  /// `message-media` is a private bucket whose read policy grants access only to
+  /// participants of the conversation named in the object's first path segment
+  /// (see migration 20260627143100). Copying the URL would therefore 403 for the
+  /// recipient — and signed URLs expire after an hour besides. Re-sending places
+  /// a new object under the target conversation's prefix, which the existing
+  /// upload pipeline and RLS already handle correctly.
+  ///
+  /// Expiry follows the *target* conversation's disappearing-message setting, not
+  /// this one's.
   Future<void> _forwardMessage(ChatMessageView message) async {
-    final text = message.hasText ? message.body : null;
-    if (text == null || text.trim().isEmpty) {
-      _toast('Only text messages can be forwarded for now.');
+    final text = message.hasText ? message.body.trim() : '';
+    final media = message.media;
+    final forwardableMedia =
+        media != null &&
+        media.kind != ChatMediaKind.none &&
+        media.kind != ChatMediaKind.callLog;
+
+    // View-once content is forwarded nowhere by design, and a message deleted
+    // for everyone has no content left to carry.
+    if (message.viewOnce) {
+      _toast("View-once media can't be forwarded.");
       return;
     }
+    if (message.isDeletedForEveryone) {
+      _toast('That message was deleted.');
+      return;
+    }
+    if (text.isEmpty && !forwardableMedia) {
+      _toast('There is nothing in this message to forward.');
+      return;
+    }
+
     final conversations = await widget.messagesRepository.loadConversations();
     if (!mounted) return;
     final targets = conversations
@@ -1527,14 +1554,126 @@ class _ConversationScreenState extends State<ConversationScreen> {
       builder: (sheetContext) => _ForwardTargetSheet(conversations: targets),
     );
     if (target == null || !mounted) return;
-    await widget.messagesRepository.queueMessage(
-      conversationId: target.id,
-      senderName: widget.profile.displayName,
-      body: text,
-      senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
-    );
+
+    // The target thread's own TTL governs the forwarded copy.
+    final expiresAtMillis = target.disappearingSeconds > 0
+        ? DateTime.now().millisecondsSinceEpoch +
+              target.disappearingSeconds * 1000
+        : null;
+
+    // Null-check `media` directly (not just via [forwardableMedia]) so the
+    // compiler promotes it to non-null for the attachment path below.
+    if (media == null || !forwardableMedia) {
+      await widget.messagesRepository.queueMessage(
+        conversationId: target.id,
+        senderName: widget.profile.displayName,
+        body: text,
+        senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+        senderAvatarUrl: widget.profile.avatarUrl,
+        expiresAtMillis: expiresAtMillis,
+      );
+      if (!mounted) return;
+      _toast('Forwarded to ${target.title}.');
+      return;
+    }
+
+    final file = await _resolveForwardableMediaFile(message, media);
+    if (!mounted) return;
+    if (file == null) return; // helper already explained why
+
+    try {
+      await widget.messagesRepository.queueAttachment(
+        conversationId: target.id,
+        senderName: widget.profile.displayName,
+        senderId: widget.profile.userId.isEmpty ? null : widget.profile.userId,
+        senderAvatarUrl: widget.profile.avatarUrl,
+        localPath: file.path,
+        mediaType: _mediaTypeForKind(media.kind),
+        mimeType: media.mimeType,
+        fileName: media.fileName,
+        fileSizeBytes: await file.length(),
+        // A media message's text rides along as the attachment caption.
+        caption: text.isEmpty ? null : text,
+        expiresAtMillis: expiresAtMillis,
+      );
+    } catch (_) {
+      if (mounted) _toast('Could not forward this attachment.');
+      return;
+    }
     if (!mounted) return;
     _toast('Forwarded to ${target.title}.');
+    // Push the queued upload out now so the copy actually lands.
+    await _syncMessages();
+  }
+
+  /// The `messageType` wire string for [kind], matching the reverse mapping in
+  /// `chat_mappers.dart`.
+  static String _mediaTypeForKind(ChatMediaKind kind) {
+    return switch (kind) {
+      ChatMediaKind.image => 'image',
+      ChatMediaKind.video => 'video',
+      ChatMediaKind.audio => 'audio',
+      ChatMediaKind.music => 'music',
+      ChatMediaKind.file ||
+      ChatMediaKind.none ||
+      ChatMediaKind.callLog => 'file',
+    };
+  }
+
+  /// A local file for [media] suitable for re-upload, or null (having toasted a
+  /// reason). Prefers the cached copy; otherwise fetches the remote object into
+  /// the cache directory, which requires being online.
+  Future<File?> _resolveForwardableMediaFile(
+    ChatMessageView message,
+    MessageMedia media,
+  ) async {
+    final cached = media.localPath;
+    if (cached != null && cached.isNotEmpty) {
+      final file = File(cached);
+      if (file.existsSync()) return file;
+    }
+
+    final remoteUrl = media.remoteUrl;
+    if (remoteUrl == null || remoteUrl.isEmpty) {
+      _toast('This attachment has not finished uploading yet.');
+      return null;
+    }
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(context);
+      return null;
+    }
+
+    _toast('Preparing attachment…');
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse(remoteUrl);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'Download failed with status ${response.statusCode}',
+          uri: uri,
+        );
+      }
+      final directory = await getApplicationCacheDirectory();
+      final forwardDirectory = Directory(
+        '${directory.path}/feedin_message_forwards',
+      );
+      if (!forwardDirectory.existsSync()) {
+        forwardDirectory.createSync(recursive: true);
+      }
+      final file = File(
+        '${forwardDirectory.path}/${message.id}'
+        '.${_downloadExtension(message, uri)}',
+      );
+      await response.pipe(file.openWrite());
+      return file;
+    } catch (_) {
+      if (mounted) _toast('Could not fetch this attachment to forward it.');
+      return null;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   /// Place a 1:1 [type] call to the other participant from the chat header.
