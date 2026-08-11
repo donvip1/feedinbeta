@@ -37,6 +37,7 @@ class ProfileEditorScreen extends StatefulWidget {
     this.socialGraphDataSource,
     this.postViewsDataSource,
     this.profileSectionsDataSource,
+    this.onOpenPost,
   });
 
   final UserProfile profile;
@@ -57,6 +58,15 @@ class ProfileEditorScreen extends StatefulWidget {
   /// aggregate for the Likes stat). Optional; falls back to an auto-detecting
   /// instance like the other two data sources.
   final ProfileSectionsRemoteDataSource? profileSectionsDataSource;
+
+  /// Opens a post from the grid in the full post viewer. Receives the resolved
+  /// post list (so the viewer can page through siblings) plus the tapped tile.
+  ///
+  /// Optional because the viewer needs sync/connectivity services the editor
+  /// does not itself hold. Hosts that have them — `ProfileScreen` — pass their
+  /// existing pager navigator straight in; when null the View action is inert
+  /// rather than misleading.
+  final void Function(List<FeedPost> posts, PostTileView tile)? onOpenPost;
 
   @override
   State<ProfileEditorScreen> createState() => _ProfileEditorScreenState();
@@ -268,6 +278,57 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     await postsFuture.catchError((_) => <FeedPost>[]);
   }
 
+  /// Permanently delete one of the user's own posts from the grid.
+  ///
+  /// Mirrors `FeedShell._deletePost`: confirm, delete through the repository,
+  /// then drop the row locally rather than re-reading the whole list. Guarded on
+  /// ownership even though `PostsGrid` only offers Delete on an own profile.
+  Future<void> _deletePost(PostTileView tile) async {
+    final posts = await _postsFuture.catchError((_) => <FeedPost>[]);
+    if (!mounted) return;
+
+    final index = posts.indexWhere((item) => item.id == tile.id);
+    if (index < 0) return;
+    final post = posts[index];
+    if (post.userId != widget.profile.userId) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This permanently deletes the post.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.feedRepository.deletePost(post.id);
+      if (!mounted) return;
+      final remaining = posts
+          .where((item) => item.id != post.id)
+          .toList(growable: false);
+      setState(() => _postsFuture = Future.value(remaining));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post deleted.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete this post.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -381,7 +442,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                 onOpen: _openLink,
               ),
               const SizedBox(height: 24),
-              _ProfilePostsGrid(postsFuture: _postsFuture, isOwnProfile: true),
+              _ProfilePostsGrid(
+                postsFuture: _postsFuture,
+                isOwnProfile: true,
+                onDelete: (tile) => unawaited(_deletePost(tile)),
+                onOpen: widget.onOpenPost,
+              ),
               _PastSpacesSection(
                 key: ValueKey('spaces-$_refreshTick'),
                 profileSections: _profileSections,
@@ -621,10 +687,19 @@ class _ProfilePostsGrid extends StatelessWidget {
   const _ProfilePostsGrid({
     required this.postsFuture,
     required this.isOwnProfile,
+    required this.onDelete,
+    this.onOpen,
   });
 
   final Future<List<FeedPost>> postsFuture;
   final bool isOwnProfile;
+
+  /// Invoked for [PostTileAction.delete]; owns its own confirmation prompt.
+  final void Function(PostTileView tile) onDelete;
+
+  /// Invoked for [PostTileAction.view] with the resolved sibling posts. Null
+  /// when the host cannot open the viewer, in which case View does nothing.
+  final void Function(List<FeedPost> posts, PostTileView tile)? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -662,15 +737,12 @@ class _ProfilePostsGrid extends StatelessWidget {
             PostsGrid(
               view: view,
               onAction: (tile, action) {
-                if (action == PostTileAction.delete) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Post deletion is coming soon.'),
-                    ),
-                  );
+                switch (action) {
+                  case PostTileAction.delete:
+                    onDelete(tile);
+                  case PostTileAction.view:
+                    onOpen?.call(snapshot.data ?? const <FeedPost>[], tile);
                 }
-                // View Post navigation is wired upstream once a post-detail
-                // route is exposed to the profile tab.
               },
             ),
           ],

@@ -200,6 +200,9 @@ class _ProfileScreenState extends State<ProfileScreen>
             profileRepository: widget.profileRepository,
             feedRepository: widget.feedRepository,
             socialGraphDataSource: widget.socialGraphDataSource,
+            // Reuse the tab's own pager navigation so a post opened from the
+            // editor's grid behaves exactly like one opened from the tab.
+            onOpenPost: _openTileFrom,
             onSaved: (updated) {
               setState(() => _profile = updated);
               widget.onEditSaved(updated);
