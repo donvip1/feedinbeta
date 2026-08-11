@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// The account-editable slice of the current user's `profiles` row plus the
@@ -68,6 +70,9 @@ class AccountProfileDataSource {
 
   static const _table = 'profiles';
 
+  /// Storage bucket for profile imagery. Matches `ProfileRemoteDataSource`.
+  static const _avatarBucket = 'post-media';
+
   static bool _supabaseAvailable() {
     try {
       Supabase.instance.client;
@@ -133,5 +138,77 @@ class AccountProfileDataSource {
 
     await client.from(_table).update(update).eq('id', user.id);
     return true;
+  }
+
+  /// Upload [file] as the signed-in user's avatar and persist the resulting
+  /// public URL to `profiles.avatar_url`. Returns the new URL.
+  ///
+  /// Deliberately mirrors `ProfileRemoteDataSource.uploadProfileImage` — same
+  /// `post-media` bucket and same `<uid>/profile/avatar-<ts>.<ext>` key — so a
+  /// photo changed here is byte-for-byte equivalent to one changed from the
+  /// profile tab or the web app. Keep the two in sync if either moves.
+  ///
+  /// Throws [StateError] when Supabase is unconfigured, nobody is signed in, or
+  /// the picked file vanished, so the caller can surface an honest failure
+  /// rather than a silent no-op.
+  Future<String> uploadAvatar(File file) async {
+    final client = _client;
+    final user = _authUser;
+    if (client == null || user == null) {
+      throw StateError('Sign in before changing your profile photo.');
+    }
+    if (!file.existsSync()) {
+      throw StateError('Selected image file is no longer available.');
+    }
+
+    final extension = _extensionFor(file.path);
+    final storagePath =
+        '${user.id}/profile/avatar-${DateTime.now().millisecondsSinceEpoch}'
+        '.$extension';
+
+    await client.storage
+        .from(_avatarBucket)
+        .upload(
+          storagePath,
+          file,
+          fileOptions: FileOptions(
+            contentType: _contentTypeFor(extension),
+            upsert: true,
+          ),
+        );
+
+    final publicUrl = client.storage
+        .from(_avatarBucket)
+        .getPublicUrl(storagePath);
+
+    await client
+        .from(_table)
+        .update({
+          'avatar_url': publicUrl,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', user.id);
+
+    return publicUrl;
+  }
+
+  /// Normalizes a picked file's extension to the small set the storage bucket
+  /// serves, defaulting to `jpg` for anything unrecognized.
+  static String _extensionFor(String path) {
+    final raw = path.split('.').last.toLowerCase();
+    return switch (raw) {
+      'jpeg' => 'jpg',
+      'jpg' || 'png' || 'webp' || 'gif' => raw,
+      _ => 'jpg',
+    };
+  }
+
+  static String _contentTypeFor(String extension) {
+    return switch (extension.toLowerCase()) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
   }
 }

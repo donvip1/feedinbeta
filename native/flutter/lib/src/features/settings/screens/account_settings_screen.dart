@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/media/cached_image.dart';
 import '../data/account_profile_data_source.dart';
@@ -9,8 +11,13 @@ import '../settings_theme.dart';
 import '../settings_widgets.dart';
 import 'settings_sub_scaffold.dart';
 
-/// Account settings: edit profile (display name / username / bio), read-only
-/// email + FeedIn id. Ports src/pages/AccountSettings.tsx (basic-info slice).
+/// Account settings: profile photo, editable display name / username / bio, and
+/// read-only email + FeedIn id. Ports src/pages/AccountSettings.tsx (basic-info
+/// slice).
+///
+/// The photo uploads through [AccountProfileDataSource.uploadAvatar], which uses
+/// the same bucket and key layout as the profile tab's uploader — the two are
+/// interchangeable.
 ///
 /// Location / phone / gender / occupation from the web editor are intentionally
 /// omitted because those columns are not in the native `profiles` schema yet
@@ -39,8 +46,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   AccountProfile? _profile;
   bool _loading = true;
   bool _saving = false;
+  bool _uploadingAvatar = false;
   String? _statusMessage;
   SettingsBannerTone _statusTone = SettingsBannerTone.info;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -107,6 +117,76 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     }
   }
 
+  /// Pick a new profile photo from the gallery and upload it.
+  ///
+  /// Mirrors `ProfileScreen._pickProfileImage` (same 88% quality / 900px cap)
+  /// so an avatar set here is indistinguishable from one set on the profile tab.
+  /// Guarded against re-entry while a previous upload is still in flight.
+  Future<void> _changeAvatar() async {
+    if (_uploadingAvatar) return;
+    if (_profile == null) {
+      _showStatus(
+        'Sign in to change your profile photo.',
+        SettingsBannerTone.offline,
+      );
+      return;
+    }
+
+    final XFile? picked;
+    try {
+      picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 900,
+      );
+    } on PlatformException catch (error) {
+      // Typically a denied gallery permission.
+      _showStatus(
+        'Could not open your gallery: ${error.message ?? error.code}',
+        SettingsBannerTone.offline,
+      );
+      return;
+    }
+    if (picked == null) return; // user backed out — not an error
+
+    setState(() {
+      _uploadingAvatar = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final url = await _source.uploadAvatar(File(picked.path));
+      if (!mounted) return;
+      setState(() {
+        _uploadingAvatar = false;
+        _profile = _profile?.copyWith(avatarUrl: url);
+        _statusTone = SettingsBannerTone.online;
+        _statusMessage = 'Profile photo updated.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingAvatar = false;
+        _statusTone = SettingsBannerTone.offline;
+        _statusMessage = 'Photo upload failed: ${_shortError(error)}';
+      });
+    }
+  }
+
+  void _showStatus(String message, SettingsBannerTone tone) {
+    setState(() {
+      _statusMessage = message;
+      _statusTone = tone;
+    });
+  }
+
+  /// Keeps a raw Supabase/storage exception from overflowing the status banner.
+  static String _shortError(Object error) {
+    final message = error is StateError ? error.message : error.toString();
+    if (message.length <= 140) return message;
+    return '${message.substring(0, 140)}...';
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsSubScaffold(
@@ -147,6 +227,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       displayName: _displayNameController.text.isNotEmpty
                           ? _displayNameController.text
                           : (_profile?.displayName ?? ''),
+                      uploading: _uploadingAvatar,
+                      onChange: _profile == null ? null : _changeAvatar,
                     ),
                     const SizedBox(height: SettingsSpacing.lg),
                     SettingsTextField(
@@ -246,14 +328,24 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 }
 
-/// A read-only avatar preview for the account Identity card. Shows the profile
-/// photo (with a gradient-initials fallback) plus a note that photo changes
-/// happen on the web — native has no image picker/cropper wired yet.
+/// The avatar control on the account Identity card. Shows the profile photo
+/// (with a gradient-initials fallback) and, when [onChange] is non-null, makes
+/// the whole row tap-to-replace with a camera badge and a busy spinner.
+///
+/// [onChange] is null only when nobody is signed in, in which case the row stays
+/// inert rather than offering an action that cannot succeed.
 class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({required this.avatarUrl, required this.displayName});
+  const _AccountAvatar({
+    required this.avatarUrl,
+    required this.displayName,
+    this.uploading = false,
+    this.onChange,
+  });
 
   final String? avatarUrl;
   final String displayName;
+  final bool uploading;
+  final Future<void> Function()? onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -261,43 +353,109 @@ class _AccountAvatar extends StatelessWidget {
         ? displayName.trim()[0].toUpperCase()
         : 'U';
     final hasImage = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
-    return Row(
+    final enabled = onChange != null && !uploading;
+
+    final row = Row(
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          clipBehavior: Clip.antiAlias,
-          decoration: const BoxDecoration(
-            gradient: SettingsGradients.primary,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: hasImage
-              ? CachedImage(
-                  url: avatarUrl!,
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.cover,
-                  errorWidget: _Initial(initial),
-                )
-              : _Initial(initial),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(
+                gradient: SettingsGradients.primary,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: hasImage
+                  ? CachedImage(
+                      // Cache-bust on URL change: the storage key already ends
+                      // in a timestamp, so a new upload yields a new URL.
+                      url: avatarUrl!,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorWidget: _Initial(initial),
+                    )
+                  : _Initial(initial),
+            ),
+            if (uploading)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: SettingsColors.scrim,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: SettingsColors.primaryForeground,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else if (onChange != null)
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: SettingsColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    size: 14,
+                    color: SettingsColors.primaryForeground,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: SettingsSpacing.md),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Profile photo', style: SettingsTextStyles.rowTitle),
-              SizedBox(height: SettingsSpacing.xs),
+              const Text('Profile photo', style: SettingsTextStyles.rowTitle),
+              const SizedBox(height: SettingsSpacing.xs),
               Text(
-                'Update your photo from the web app for now.',
+                uploading
+                    ? 'Uploading your new photo...'
+                    : onChange == null
+                        ? 'Sign in to change your photo.'
+                        : 'Tap to choose a new photo from your gallery.',
                 style: SettingsTextStyles.rowDescription,
               ),
             ],
           ),
         ),
       ],
+    );
+
+    if (!enabled) return row;
+
+    return Semantics(
+      button: true,
+      label: 'Change profile photo',
+      child: InkWell(
+        borderRadius: SettingsRadii.card,
+        onTap: () => unawaited(onChange!()),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: SettingsSpacing.xs),
+          child: row,
+        ),
+      ),
     );
   }
 }

@@ -49,6 +49,10 @@ class SettingsColors {
   static const Color destructiveSoft = Color(0x1AEF4343); // destructive @ 10%
   static const Color onlineSoft = Color(0x1A10B981); // online @ 10%
   static const Color amberSoft = Color(0x1AF59E0B); // amber @ 10%
+
+  /// Dim overlay painted over a thumbnail while an upload is in flight, so the
+  /// spinner stays legible against arbitrary image content. background @ 60%.
+  static const Color scrim = Color(0x99080C16);
 }
 
 /// Per-status accents for storage/maintenance banners.
