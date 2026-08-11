@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local build artifacts, screenshots, and release binaries
+outputs/
+
+# Machine-specific dev helper (hardcoded local SDK paths)
+fix_flutter_sdk_path.sh
