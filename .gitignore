@@ -36,3 +36,7 @@ outputs/
 
 # Machine-specific dev helper (hardcoded local SDK paths)
 fix_flutter_sdk_path.sh
+
+# Generated diagnostics and local backups
+analyze_output.txt
+*.bak
