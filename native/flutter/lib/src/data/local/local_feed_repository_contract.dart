@@ -1,9 +1,22 @@
+import '../../features/feed/feed_item.dart';
 import '../../features/feed/feed_post.dart';
 
 abstract interface class LocalFeedRepositoryContract {
   Future<List<FeedPost>> loadPosts();
   Future<FeedRefreshResult> refresh();
   Future<FeedPaginationResult> loadMorePosts();
+
+  /// Ranked, de-duplicated, ad-injected feed page from the server engine.
+  /// Falls back to the reverse-chron [refresh]/[loadMorePosts] path (wrapped as
+  /// [FeedPostItem]s) whenever the engine is unavailable, so the feed never
+  /// breaks. [isNewSession] should be true only for the first page of a session.
+  Future<FeedRankedResult> fetchRankedFeed({
+    int limit = 20,
+    int offset = 0,
+    required String sessionId,
+    required bool isNewSession,
+  });
+
   Future<List<FeedPost>> loadPostsByUser(String userId);
   Future<List<FeedPost>> loadSavedPosts();
   Future<void> deletePost(String postId);
@@ -75,6 +88,23 @@ class FeedRefreshResult {
 
   final List<FeedPost> posts;
   final bool usedRemote;
+  final String? message;
+}
+
+/// A page of ranked feed items (posts + injected ads). [usedEngine] is false
+/// when the server engine was unavailable and the reverse-chron fallback was
+/// used, so callers can decide whether to keep paginating via the engine.
+class FeedRankedResult {
+  const FeedRankedResult({
+    required this.items,
+    required this.hasMore,
+    required this.usedEngine,
+    this.message,
+  });
+
+  final List<FeedItem> items;
+  final bool hasMore;
+  final bool usedEngine;
   final String? message;
 }
 

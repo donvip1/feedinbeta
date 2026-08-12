@@ -144,6 +144,23 @@ class PostViewsRemoteDataSource {
     return sha256.convert(utf8.encode(deviceId)).toString();
   }
 
+  /// Record a click on a sponsored ad (`record_ad_impression` with
+  /// `p_clicked=true`), matching the web feed engine's ad tracking. Best-effort
+  /// telemetry — never disrupts the feed.
+  Future<void> recordAdClick(String adId) async {
+    final client = _client;
+    final userId = _currentUserId;
+    if (client == null || adId.isEmpty || userId == null) return;
+    try {
+      await client.rpc<void>(
+        'record_ad_impression',
+        params: {'p_user_id': userId, 'p_ad_id': adId, 'p_clicked': true},
+      );
+    } catch (_) {
+      // Ad-click telemetry is non-critical.
+    }
+  }
+
   /// The current user's posts viewed in the last 48 hours, newest first. Throws
   /// on failure so the caller can render an explicit unavailable state.
   Future<List<ViewedPost>> fetchViewHistory({int limit = 50}) async {

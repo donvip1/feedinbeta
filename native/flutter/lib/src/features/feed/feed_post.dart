@@ -25,6 +25,9 @@ class FeedPost {
     this.viewerHasLiked = false,
     this.viewerHasSaved = false,
     this.viewerHasRefeeded = false,
+    this.isPromoted = false,
+    this.isTrending = false,
+    this.isNewPost = false,
   });
 
   final String id;
@@ -57,6 +60,13 @@ class FeedPost {
   final bool viewerHasLiked;
   final bool viewerHasSaved;
   final bool viewerHasRefeeded;
+
+  /// Ranking flags supplied by the server feed engine (`feed-engine`). Default
+  /// false for locally-cached / reverse-chron posts. Used only for badging
+  /// ("Promoted" / "Trending"); ordering is decided server-side.
+  final bool isPromoted;
+  final bool isTrending;
+  final bool isNewPost;
 
   /// Media/original content represented by this Feed row.
   ///
@@ -105,6 +115,9 @@ class FeedPost {
       viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
       viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
       viewerHasRefeeded: viewerHasRefeeded ?? this.viewerHasRefeeded,
+      isPromoted: isPromoted,
+      isTrending: isTrending,
+      isNewPost: isNewPost,
     );
   }
 
@@ -143,6 +156,9 @@ class FeedPost {
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       viewerHasSaved: json['viewerHasSaved'] as bool? ?? false,
       viewerHasRefeeded: json['viewerHasRefeeded'] as bool? ?? false,
+      isPromoted: json['isPromoted'] as bool? ?? false,
+      isTrending: json['isTrending'] as bool? ?? false,
+      isNewPost: json['isNewPost'] as bool? ?? false,
     );
   }
 
@@ -173,6 +189,9 @@ class FeedPost {
       'viewerHasLiked': viewerHasLiked,
       'viewerHasSaved': viewerHasSaved,
       'viewerHasRefeeded': viewerHasRefeeded,
+      'isPromoted': isPromoted,
+      'isTrending': isTrending,
+      'isNewPost': isNewPost,
     };
   }
 }

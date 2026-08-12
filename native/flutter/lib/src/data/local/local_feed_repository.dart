@@ -1,7 +1,9 @@
 import 'package:hive_ce/hive.dart';
 
 import '../../core/storage/media_cache_service.dart';
+import '../remote/feed_engine_remote_data_source.dart';
 import '../remote/feed_remote_data_source.dart';
+import '../../features/feed/feed_item.dart';
 import '../../features/feed/feed_post.dart';
 import 'demo_posts.dart';
 import 'local_record_decoder.dart';
@@ -16,17 +18,25 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
     required MediaCacheService mediaCacheService,
     required PendingActionRepository pendingActionRepository,
     required bool seedDemoContent,
+    FeedEngineRemoteDataSource? feedEngineDataSource,
   }) : _box = box,
        _remoteDataSource = remoteDataSource,
        _mediaCacheService = mediaCacheService,
        _pendingActionRepository = pendingActionRepository,
-       _seedDemoContent = seedDemoContent;
+       _seedDemoContent = seedDemoContent,
+       _feedEngineDataSource = feedEngineDataSource;
 
   final Box<Map> _box;
   final FeedRemoteDataSource _remoteDataSource;
+  final FeedEngineRemoteDataSource? _feedEngineDataSource;
   final MediaCacheService _mediaCacheService;
   final PendingActionRepository _pendingActionRepository;
   final bool _seedDemoContent;
+
+  /// Post ids already served this session — a client-side belt-and-suspenders
+  /// dedupe on top of the engine's server-side seen-set. Reset when a fresh
+  /// session starts ([fetchRankedFeed] with isNewSession).
+  final Set<String> _servedPostIds = <String>{};
 
   @override
   Future<List<FeedPost>> loadPosts() async {
@@ -119,6 +129,89 @@ class LocalFeedRepository implements LocalFeedRepositoryContract {
         hasMore: true,
         message: 'Could not load older posts.',
       );
+    }
+  }
+
+  @override
+  Future<FeedRankedResult> fetchRankedFeed({
+    int limit = 20,
+    int offset = 0,
+    required String sessionId,
+    required bool isNewSession,
+  }) async {
+    if (isNewSession) _servedPostIds.clear();
+
+    final engine = _feedEngineDataSource;
+    if (engine != null) {
+      try {
+        final result = await engine.fetchFeed(
+          limit: limit,
+          offset: offset,
+          sessionId: sessionId,
+          isNewSession: isNewSession,
+        );
+        // Belt-and-suspenders dedupe: drop any post already served this session
+        // (ads are always kept). The server seen-set is the primary guard.
+        final deduped = <FeedItem>[];
+        for (final item in result.items) {
+          if (item is FeedPostItem) {
+            if (!_servedPostIds.add(item.post.id)) continue;
+          }
+          deduped.add(item);
+        }
+        // Cache the freshest organic posts so a later cold start paints instantly.
+        if (isNewSession) {
+          await _cacheRankedPosts(deduped);
+        }
+        return FeedRankedResult(
+          items: deduped,
+          hasMore: result.hasMore,
+          usedEngine: true,
+        );
+      } catch (_) {
+        // Fall through to the reverse-chron fallback below.
+      }
+    }
+
+    // Fallback: reverse-chron page wrapped as post items so the feed still works
+    // when the engine is unavailable or the user is not authenticated.
+    final List<FeedPost> fallbackPosts;
+    final bool fallbackHasMore;
+    final String? fallbackMessage;
+    if (offset == 0) {
+      final result = await refresh();
+      fallbackPosts = result.posts;
+      fallbackHasMore = result.usedRemote;
+      fallbackMessage = result.message;
+    } else {
+      final result = await loadMorePosts();
+      fallbackPosts = result.posts;
+      fallbackHasMore = result.hasMore;
+      fallbackMessage = result.message;
+    }
+    final items = <FeedItem>[
+      for (final post in fallbackPosts)
+        if (_servedPostIds.add(post.id)) FeedPostItem(post),
+    ];
+    return FeedRankedResult(
+      items: items,
+      hasMore: fallbackHasMore,
+      usedEngine: false,
+      message: fallbackMessage,
+    );
+  }
+
+  /// Persist the organic posts from a ranked page into the Hive cache (ads are
+  /// session-only and never cached), so the next cold start has fresh content.
+  Future<void> _cacheRankedPosts(List<FeedItem> items) async {
+    for (final item in items) {
+      if (item is! FeedPostItem) continue;
+      try {
+        final cached = await _cacheMediaForPost(item.post);
+        await _box.put(cached.id, cached.toJson());
+      } catch (_) {
+        // Caching is best-effort; a failure must not break the feed.
+      }
     }
   }
 

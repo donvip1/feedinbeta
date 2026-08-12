@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/connectivity/connectivity_service.dart';
 import '../../core/connectivity/offline_notice.dart';
@@ -55,6 +57,8 @@ import '../profile/user_profile_screen.dart';
 import '../search/feed_search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'feed_post.dart';
+import 'feed_item.dart';
+import 'immersive/sponsored_feed_card.dart';
 import 'feed_post_pager_screen.dart';
 import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
@@ -1195,7 +1199,7 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> with RouteAware {
-  late Future<List<FeedPost>> _postsFuture;
+  late Future<List<FeedItem>> _postsFuture;
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
@@ -1204,6 +1208,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   int _activePage = 0;
   bool _isLoadingMore = false;
   bool _hasMorePosts = true;
+
+  /// Feed-engine session: a stable id per feed session so the server can track
+  /// the no-repeat cycle; the first fetch of a session sets isNewSession=true.
+  final String _feedSessionId = const Uuid().v4();
+  bool _isNewFeedSession = true;
+  int _feedOffset = 0;
 
   /// True until the first background refresh completes. Used only to keep the
   /// loading state (not the "No posts yet" empty state) on screen when the app
@@ -1245,9 +1255,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     super.initState();
     // Show whatever is already cached instantly (a synchronous-feeling Hive
     // read) so the feed paints immediately on open, then reconcile with the
-    // network in the background. The old path awaited a full remote refresh
-    // before showing anything, which is what made the feed take seconds.
-    _postsFuture = widget.feedRepository.loadPosts();
+    // ranked server engine in the background. The old path awaited a full
+    // remote refresh before showing anything, which made the feed take seconds.
+    _postsFuture = widget.feedRepository
+        .loadPosts()
+        .then((posts) => posts.map<FeedItem>(FeedPostItem.new).toList());
     _refreshInBackground();
     _syncBackController();
     _chrome.attachListener(_onChromeStateChanged);
@@ -1365,10 +1377,17 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   }
 
   Future<void> _reloadAfterRealtimeEvent() async {
-    final result = await widget.feedRepository.refresh();
+    // A realtime nudge starts a fresh ranked session so new activity surfaces.
+    final result = await widget.feedRepository.fetchRankedFeed(
+      sessionId: _feedSessionId,
+      isNewSession: true,
+    );
     if (!mounted) return;
     setState(() {
-      _postsFuture = Future.value(result.posts);
+      _feedOffset = _postCount(result.items);
+      _isNewFeedSession = false;
+      _hasMorePosts = result.hasMore;
+      _postsFuture = Future.value(result.items);
       _clearEngagementOverrides();
       _message = 'New feed activity synced.';
     });
@@ -1379,21 +1398,30 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     // refreshed FeedPost snapshot at the card boundary.
   }
 
-  /// Reconcile the instantly-shown cache with the network without blocking the
-  /// first paint. Called once from [initState]; the cached posts are already on
-  /// screen via `_postsFuture = loadPosts()`, so this only swaps in fresher
-  /// posts once the remote fetch returns. When the network yields nothing new
-  /// (empty/offline), the cache stays put rather than blanking the feed.
+  /// Number of organic posts (excluding injected ads) in a ranked page — the
+  /// engine paginates by post offset, not by item count.
+  int _postCount(List<FeedItem> items) =>
+      items.whereType<FeedPostItem>().length;
+
+  /// Reconcile the instantly-shown cache with the ranked engine without blocking
+  /// the first paint. Called once from [initState]; cached posts are already on
+  /// screen, so this swaps in the ranked+ad list once it returns. When the
+  /// engine yields nothing (empty/offline), the cache stays put.
   void _refreshInBackground() {
     unawaited(() async {
-      final result = await widget.feedRepository.refresh();
+      final result = await widget.feedRepository.fetchRankedFeed(
+        sessionId: _feedSessionId,
+        isNewSession: _isNewFeedSession,
+      );
       if (!mounted) return;
       setState(() {
         _initialRefreshPending = false;
         _message = result.message;
-        _hasMorePosts = result.usedRemote;
-        if (result.posts.isNotEmpty) {
-          _postsFuture = Future.value(result.posts);
+        _hasMorePosts = result.hasMore;
+        if (result.items.isNotEmpty) {
+          _feedOffset = _postCount(result.items);
+          _isNewFeedSession = false;
+          _postsFuture = Future.value(result.items);
           _clearEngagementOverrides();
         }
       });
@@ -1401,13 +1429,19 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   }
 
   Future<void> _refresh() async {
-    final result = await widget.feedRepository.refresh();
+    // Pull-to-refresh restarts the ranked session (new-before-old, no repeats).
+    final result = await widget.feedRepository.fetchRankedFeed(
+      sessionId: _feedSessionId,
+      isNewSession: true,
+    );
     if (!mounted) return;
     setState(() {
-      _postsFuture = Future.value(result.posts);
+      _feedOffset = _postCount(result.items);
+      _isNewFeedSession = false;
+      _postsFuture = Future.value(result.items);
       _clearEngagementOverrides();
       _message = result.message ?? 'Feed refreshed.';
-      _hasMorePosts = result.usedRemote;
+      _hasMorePosts = result.hasMore;
     });
   }
 
@@ -1418,12 +1452,19 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       _message = null;
     });
 
-    final result = await widget.feedRepository.loadMorePosts();
+    final result = await widget.feedRepository.fetchRankedFeed(
+      offset: _feedOffset,
+      sessionId: _feedSessionId,
+      isNewSession: false,
+    );
     if (!mounted) return;
+    final existing = _lastPosts ?? const <FeedItem>[];
+    final merged = [...existing, ...result.items];
     setState(() {
       _isLoadingMore = false;
       _hasMorePosts = result.hasMore;
-      _postsFuture = Future.value(result.posts);
+      _feedOffset += _postCount(result.items);
+      _postsFuture = Future.value(merged);
       _message = result.message;
     });
   }
@@ -1493,10 +1534,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     final cached = _lastPosts;
     if (cached == null || cached.isEmpty) return false;
     final active = cached[_activePage.clamp(0, cached.length - 1)];
-    return active.mediaType == 'video';
+    // Ads are not video surfaces for the immersive timer's purposes.
+    return active is FeedPostItem && active.post.mediaType == 'video';
   }
 
-  List<FeedPost>? _lastPosts;
+  List<FeedItem>? _lastPosts;
 
   Future<void> _deletePost(FeedPost post) async {
     if (post.userId != widget.currentUserId || !_requireOnline()) return;
@@ -1525,7 +1567,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       final currentPosts = await _postsFuture;
       if (!mounted) return;
       final remaining = currentPosts
-          .where((item) => item.id != post.id)
+          .where((item) => item is! FeedPostItem || item.post.id != post.id)
           .toList(growable: false);
       setState(() {
         _postsFuture = Future.value(remaining);
@@ -1706,9 +1748,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         controller.recordQuoteRefeed();
         final currentPosts = await _postsFuture;
         if (!mounted) return;
-        final nextPosts = <FeedPost>[
-          created,
-          ...currentPosts.where((item) => item.id != created.id),
+        final nextPosts = <FeedItem>[
+          FeedPostItem(created),
+          ...currentPosts.where(
+            (item) => item is! FeedPostItem || item.post.id != created.id,
+          ),
         ];
         setState(() {
           _postsFuture = Future.value(nextPosts);
@@ -1731,7 +1775,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<FeedPost>>(
+    return FutureBuilder<List<FeedItem>>(
       future: _postsFuture,
       builder: (context, snapshot) {
         final posts = snapshot.data;
@@ -1811,54 +1855,66 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     );
   }
 
-  Widget _buildImmersivePager(List<FeedPost> posts) {
+  Widget _buildImmersivePager(List<FeedItem> items) {
     // Record a view for whichever post is currently in focus — covers the first
     // post on load and the active post after every page change / tab switch.
     // Scheduled post-frame so it never calls into recordView during build; the
-    // per-session id set keeps it to one record per post.
-    if (posts.isNotEmpty) {
-      final activePost = posts[_activePage.clamp(0, posts.length - 1)];
-      if (!_recordedViewIds.contains(activePost.id)) {
+    // per-session id set keeps it to one record per post. Ad pages record no view.
+    if (items.isNotEmpty) {
+      final active = items[_activePage.clamp(0, items.length - 1)];
+      if (active is FeedPostItem &&
+          !_recordedViewIds.contains(active.post.id)) {
         WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _recordView(activePost),
+          (_) => _recordView(active.post),
         );
       }
     }
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
-      itemCount: posts.length,
+      itemCount: items.length,
       onPageChanged: (index) {
         setState(() => _activePage = index);
-        _maybeLoadMore(index, posts.length);
-        // The active post may have changed media type; re-evaluate the
-        // immersive eligibility so non-video pages don't get the
+        _maybeLoadMore(index, items.length);
+        // The active page may have changed media type / become an ad;
+        // re-evaluate immersive eligibility so non-video pages don't get the
         // auto-hide timer.
         _reapplyImmersiveSurfaceState();
         // Warm the next few reels so swiping to them starts playback instantly.
         ReelPreloader.instance.preloadAround([
-          for (final p in posts)
-            p.displayedPost.mediaUrl ?? p.displayedPost.mediaUrls.firstOrNull,
+          for (final item in items)
+            if (item is FeedPostItem)
+              item.post.displayedPost.mediaUrl ??
+                  item.post.displayedPost.mediaUrls.firstOrNull
+            else
+              null,
         ], index);
       },
       itemBuilder: (context, index) {
-        final post = posts[index];
-        final card = PostControllerCard(
-          key: ValueKey<String>('feed-post-${post.id}'),
-          post: post,
-          repository: widget.feedRepository,
-          isActive: _routeVisible && index == _activePage,
-          onCommentRequested: (_) => _openComments(post),
-          onRefeedRequested: (controller) => _refeedPost(post, controller),
-          onShare: () => _sharePost(post),
-          onGift: widget.onOpenWallet,
-          onAvatar: () => _openCreatorPreview(post),
-          onCreatorName: () =>
-              widget.onOpenUserProfile(post.displayedPost.userId),
-          chromeState: _chromeState,
-          onSurfaceTap: _handleSurfaceTapForPost(post, index),
-          onPlaybackChange: _handlePlaybackChangeForPost(post),
-        );
+        final item = items[index];
+        final Widget card = switch (item) {
+          FeedAdItem(:final ad) => SponsoredFeedCard(
+            key: ValueKey<String>('feed-ad-${ad.adId}'),
+            ad: ad,
+            onCta: () => _handleAdCta(ad),
+          ),
+          FeedPostItem(:final post) => PostControllerCard(
+            key: ValueKey<String>('feed-post-${post.id}'),
+            post: post,
+            repository: widget.feedRepository,
+            isActive: _routeVisible && index == _activePage,
+            onCommentRequested: (_) => _openComments(post),
+            onRefeedRequested: (controller) => _refeedPost(post, controller),
+            onShare: () => _sharePost(post),
+            onGift: widget.onOpenWallet,
+            onAvatar: () => _openCreatorPreview(post),
+            onCreatorName: () =>
+                widget.onOpenUserProfile(post.displayedPost.userId),
+            chromeState: _chromeState,
+            onSurfaceTap: _handleSurfaceTapForPost(post, index),
+            onPlaybackChange: _handlePlaybackChangeForPost(post),
+          ),
+        };
         return _PageTransition(
           controller: _pageController,
           index: index,
@@ -1866,6 +1922,16 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         );
       },
     );
+  }
+
+  /// Open a sponsored ad's link and record the click impression.
+  void _handleAdCta(FeedAd ad) {
+    unawaited(_postViews.recordAdClick(ad.adId));
+    final url = ad.clickUrl;
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 
   /// Single-tap from the immersive video surface. Decides via the
@@ -1895,7 +1961,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       final posts = _lastPosts;
       if (posts == null) return;
       final active = posts[activeIndex.clamp(0, posts.length - 1)];
-      if (active.id != post.id) return;
+      if (active is! FeedPostItem || active.post.id != post.id) return;
       _lastVideoPlaying = isPlaying;
       _chrome.reportVideoPlayback(isPlaying: isPlaying);
     };
@@ -1903,7 +1969,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
 
   Widget _buildTopOverlay(
     BuildContext context, {
-    required List<FeedPost>? posts,
+    required List<FeedItem>? posts,
   }) {
     // The top chrome is part of the full chrome stage. Hidden and
     // socialOnly must not eat taps — wrap with IgnorePointer so the
@@ -1975,13 +2041,17 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                               }
                               final active = filtered[
                                   _activePage.clamp(0, filtered.length - 1)];
-                              if (active.userId != widget.currentUserId) {
+                              // Only own posts get the delete affordance; ads
+                              // and others' posts do not.
+                              if (active is! FeedPostItem ||
+                                  active.post.userId != widget.currentUserId) {
                                 return const SizedBox.shrink();
                               }
                               return IconButton(
                                 key: const Key('feed-post-more-actions'),
                                 tooltip: 'Post actions',
-                                onPressed: () => unawaited(_deletePost(active)),
+                                onPressed: () =>
+                                    unawaited(_deletePost(active.post)),
                                 icon: const Icon(
                                   Icons.more_vert_rounded,
                                   color: Colors.white,
@@ -2005,11 +2075,16 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     );
   }
 
-  List<FeedPost> _filterPosts(List<FeedPost> posts) {
+  /// Filter feed items for the active media tab. Organic posts split by media
+  /// type (Video / Photo); injected ads are kept in both so sponsored slots
+  /// still surface regardless of the tab.
+  List<FeedItem> _filterPosts(List<FeedItem> posts) {
+    bool isVideo(FeedItem item) =>
+        item is FeedPostItem && item.post.mediaType == 'video';
     return switch (_tabIndex) {
-      0 => posts.where((post) => post.mediaType == 'video').toList(),
-      1 => posts.where((post) => post.mediaType != 'video').toList(),
-      2 => const <FeedPost>[],
+      0 => posts.where((item) => item is FeedAdItem || isVideo(item)).toList(),
+      1 => posts.where((item) => item is FeedAdItem || !isVideo(item)).toList(),
+      2 => const <FeedItem>[],
       _ => posts,
     };
   }

@@ -32,6 +32,7 @@ import '../data/local/profile_repository.dart';
 import '../data/local/profile_repository_contract.dart';
 import '../data/local/upload_queue_repository.dart';
 import '../data/remote/feed_remote_data_source.dart';
+import '../data/remote/feed_engine_remote_data_source.dart';
 import '../data/remote/message_recipient_remote_data_source.dart';
 import '../data/remote/messages_remote_data_source.dart';
 import '../data/remote/canonical_messages_remote_data_source.dart';
@@ -193,6 +194,9 @@ class FeedinServices {
       feedRepository: LocalFeedRepository(
         box: feedBox,
         remoteDataSource: FeedRemoteDataSource(
+          isConfigured: config.hasSupabaseConfig,
+        ),
+        feedEngineDataSource: FeedEngineRemoteDataSource(
           isConfigured: config.hasSupabaseConfig,
         ),
         mediaCacheService: mediaCacheService,

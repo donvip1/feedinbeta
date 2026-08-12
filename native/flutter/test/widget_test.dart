@@ -26,6 +26,7 @@ import 'package:feedin/src/features/auth/data/auth_repository.dart';
 import 'package:feedin/src/features/auth/data/auth_repository_contract.dart';
 import 'package:feedin/src/features/create/post_draft.dart';
 import 'package:feedin/src/features/feed/feed_post.dart';
+import 'package:feedin/src/features/feed/feed_item.dart';
 import 'package:feedin/src/features/messages/message_models.dart';
 import 'package:feedin/src/features/messages/message_recipient.dart';
 import 'package:feedin/src/features/notifications/notification_item.dart';
@@ -471,6 +472,21 @@ class _MemoryFeedRepository implements LocalFeedRepositoryContract {
   @override
   Future<FeedPaginationResult> loadMorePosts() async {
     return FeedPaginationResult(posts: await loadPosts(), hasMore: false);
+  }
+
+  @override
+  Future<FeedRankedResult> fetchRankedFeed({
+    int limit = 20,
+    int offset = 0,
+    required String sessionId,
+    required bool isNewSession,
+  }) async {
+    final posts = await loadPosts();
+    return FeedRankedResult(
+      items: [for (final post in posts) FeedPostItem(post)],
+      hasMore: false,
+      usedEngine: false,
+    );
   }
 
   @override

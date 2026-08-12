@@ -214,6 +214,15 @@ class _EngagementRepository implements LocalFeedRepositoryContract {
       const FeedPaginationResult(posts: [], hasMore: false);
 
   @override
+  Future<FeedRankedResult> fetchRankedFeed({
+    int limit = 20,
+    int offset = 0,
+    required String sessionId,
+    required bool isNewSession,
+  }) async =>
+      const FeedRankedResult(items: [], hasMore: false, usedEngine: false);
+
+  @override
   Future<FeedSearchResults> search(String query, {int limit = 30}) async =>
       const FeedSearchResults();
 

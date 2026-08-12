@@ -163,6 +163,14 @@ class _SearchFeedRepository implements LocalFeedRepositoryContract {
   }
 
   @override
+  Future<FeedRankedResult> fetchRankedFeed({
+    int limit = 20,
+    int offset = 0,
+    required String sessionId,
+    required bool isNewSession,
+  }) => throw UnimplementedError();
+
+  @override
   Future<FeedComment> addComment(
     String postId,
     String body, {
