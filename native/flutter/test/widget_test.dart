@@ -69,9 +69,9 @@ void main() {
     await tester.pumpWidget(
       FeedinApp(config: services.config, servicesOverride: services),
     );
-    // The branded splash animation (~1.1s) plays before the auth screen; let it
-    // finish so the gate advances to the login/local-mode surface.
-    await tester.pump(const Duration(milliseconds: 1300));
+    // The branded splash holds ~6s (feeds pre-warm during it) before the auth
+    // screen appears; pump past that window so the gate advances.
+    await tester.pump(const Duration(milliseconds: 6500));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('feedIn'), findsOneWidget);

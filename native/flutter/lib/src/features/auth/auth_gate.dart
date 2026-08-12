@@ -287,8 +287,42 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _signOut() async {
-    await widget.services.authRepository.signOut();
-    await widget.services.profileRepository.clearCurrentProfile();
+    // Sign-out is triggered from a screen pushed on top of the app shell
+    // (Settings). Capture the navigator so we can tear those routes down after
+    // the work completes — otherwise clearing [_user] only rebuilds the login
+    // screen *underneath* the still-visible Settings route.
+    final navigator = Navigator.of(context);
+
+    // Instant feedback: a blocking "Signing out…" overlay above whatever screen
+    // the user tapped from.
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
+        builder: (_) => const _SigningOutOverlay(),
+      ),
+    );
+
+    Future<void> work() async {
+      try {
+        await widget.services.authRepository.signOut();
+        await widget.services.profileRepository.clearCurrentProfile();
+      } catch (_) {
+        // Drop the local session regardless of any remote sign-out failure.
+      }
+    }
+
+    // Keep the indicator on screen just long enough to read as an action rather
+    // than a flash, while still exiting promptly.
+    await Future.wait<void>([
+      work(),
+      Future<void>.delayed(const Duration(milliseconds: 450)),
+    ]);
+
+    // Pop the overlay + every pushed route (Settings, feed shell) back to the
+    // root so the login screen is what's shown — never a stale signed-in screen.
+    navigator.popUntil((route) => route.isFirst);
     if (!mounted) return;
     setState(() {
       _user = null;
@@ -743,6 +777,47 @@ class _PasswordRecoveryScaffold extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Blocking "Signing out…" indicator shown over whatever screen the user tapped
+/// Sign out from, until the session is cleared and the app returns to login.
+class _SigningOutOverlay extends StatelessWidget {
+  const _SigningOutOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return const PopScope(
+      // Can't be dismissed with the back button mid-sign-out.
+      canPop: false,
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(AuthColors.onBrand),
+                ),
+              ),
+              SizedBox(height: AuthSpacing.lg),
+              Text(
+                'Signing out…',
+                style: TextStyle(
+                  color: AuthColors.onBrand,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
