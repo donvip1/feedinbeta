@@ -8,6 +8,10 @@ class SecureSessionStore {
   static const _accessTokenKey = 'feedin.access_token';
   static const _refreshTokenKey = 'feedin.refresh_token';
 
+  /// Epoch millis of the last time the session was seen active (sign-in or a
+  /// successful restore). Backs the app-level 7-day inactivity logout.
+  static const _lastActiveKey = 'feedin.last_active_ms';
+
   final FlutterSecureStorage _storage;
 
   Future<void> saveSession({
@@ -16,6 +20,24 @@ class SecureSessionStore {
   }) async {
     await _storage.write(key: _accessTokenKey, value: accessToken);
     await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    await saveLastActive(DateTime.now());
+  }
+
+  /// Stamp "now" (or [when]) as the last-active moment. Called on sign-in and on
+  /// every successful session restore so the 7-day window slides with use.
+  Future<void> saveLastActive([DateTime? when]) async {
+    final millis = (when ?? DateTime.now()).millisecondsSinceEpoch;
+    await _storage.write(key: _lastActiveKey, value: '$millis');
+  }
+
+  /// The last-active timestamp, or null if never stamped (e.g. legacy session
+  /// saved before this key existed).
+  Future<DateTime?> readLastActive() async {
+    final raw = await _storage.read(key: _lastActiveKey);
+    if (raw == null) return null;
+    final millis = int.tryParse(raw);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
   }
 
   Future<StoredSession?> readSession() async {
@@ -30,6 +52,7 @@ class SecureSessionStore {
   Future<void> clearSession() async {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _lastActiveKey);
   }
 }
 

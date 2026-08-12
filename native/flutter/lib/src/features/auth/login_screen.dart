@@ -105,14 +105,14 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               BrandTextField(
                 controller: widget.emailController,
-                label: 'Email',
-                hintText: 'you@example.com',
-                icon: Icons.alternate_email,
-                keyboardType: TextInputType.emailAddress,
+                label: 'Email or username',
+                hintText: 'you@example.com or yourname',
+                icon: Icons.person_outline,
+                keyboardType: TextInputType.text,
                 textInputAction: TextInputAction.next,
                 enabled: !widget.busy,
-                autofillHints: const [AutofillHints.email],
-                validator: (value) => _emailError(value?.trim() ?? ''),
+                autofillHints: const [AutofillHints.username],
+                validator: (value) => _identifierError(value?.trim() ?? ''),
               ),
               const SizedBox(height: AuthSpacing.lg),
               BrandTextField(
@@ -186,6 +186,16 @@ String? _emailError(String value) {
   if (value.isEmpty) return 'Enter your email address.';
   final valid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
   return valid ? null : 'Enter a valid email address.';
+}
+
+/// Sign-in accepts either an email or a username. A value containing '@' is
+/// validated as an email; otherwise it must be a 3-30 char username of
+/// letters, numbers, or underscores (matching the server-side username rules).
+String? _identifierError(String value) {
+  if (value.isEmpty) return 'Enter your email or username.';
+  if (value.contains('@')) return _emailError(value);
+  final valid = RegExp(r'^[a-zA-Z0-9_]{3,30}$').hasMatch(value);
+  return valid ? null : 'Enter a valid email or username.';
 }
 
 String? _passwordError(String? value) {

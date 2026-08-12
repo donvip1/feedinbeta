@@ -69,6 +69,9 @@ void main() {
     await tester.pumpWidget(
       FeedinApp(config: services.config, servicesOverride: services),
     );
+    // The branded splash animation (~1.1s) plays before the auth screen; let it
+    // finish so the gate advances to the login/local-mode surface.
+    await tester.pump(const Duration(milliseconds: 1300));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('feedIn'), findsOneWidget);
@@ -355,6 +358,12 @@ class _FakeAuthRepository implements AuthRepositoryContract {
   @override
   Future<AuthUser> signInWithPassword({
     required String email,
+    required String password,
+  }) async => const AuthUser.demo();
+
+  @override
+  Future<AuthUser> signInWithIdentifier({
+    required String identifier,
     required String password,
   }) async => const AuthUser.demo();
 

@@ -9,6 +9,15 @@ abstract interface class AuthRepositoryContract {
     required String email,
     required String password,
   });
+
+  /// Sign in with either an email or a username plus [password]. A value that
+  /// looks like an email is used directly; otherwise it is resolved to the
+  /// owning account's email via the `get_user_email_by_username` RPC (web
+  /// parity) before delegating to [signInWithPassword].
+  Future<AuthUser> signInWithIdentifier({
+    required String identifier,
+    required String password,
+  });
   Future<AuthUser?> signUpWithPassword({
     required String email,
     required String password,

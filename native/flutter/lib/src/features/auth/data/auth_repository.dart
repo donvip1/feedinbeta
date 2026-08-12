@@ -14,6 +14,11 @@ class AuthRepository implements AuthRepositoryContract {
   final FeedinConfig _config;
   final SecureSessionStore _sessionStore;
 
+  /// How long a session survives without the app being opened. Each successful
+  /// restore/sign-in slides this window forward (see [restoreSession]), so a
+  /// user is only logged out after 7 full days of not using the app.
+  static const sessionMaxIdle = Duration(days: 7);
+
   @override
   bool get isConfigured => _config.hasSupabaseConfig;
 
@@ -29,6 +34,17 @@ class AuthRepository implements AuthRepositoryContract {
     final session = Supabase.instance.client.auth.currentSession;
     final user = session?.user ?? currentUser;
     if (session == null || user == null) return null;
+
+    // App-level inactivity cap layered over Supabase's own token refresh: if the
+    // app hasn't been opened within [sessionMaxIdle], force a sign-out so the
+    // user re-authenticates. A missing timestamp (legacy session) is treated as
+    // active and stamped now rather than logging the user out on upgrade.
+    final lastActive = await _sessionStore.readLastActive();
+    if (lastActive != null &&
+        DateTime.now().difference(lastActive) > sessionMaxIdle) {
+      await signOut();
+      return null;
+    }
 
     await _saveSession(session);
 
@@ -59,6 +75,38 @@ class AuthRepository implements AuthRepositoryContract {
     await _saveSession(session);
 
     return AuthUser.fromSupabaseUser(user);
+  }
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  @override
+  Future<AuthUser> signInWithIdentifier({
+    required String identifier,
+    required String password,
+  }) async {
+    if (!isConfigured) {
+      return const AuthUser.demo();
+    }
+
+    final trimmed = identifier.trim();
+    if (_emailPattern.hasMatch(trimmed)) {
+      return signInWithPassword(email: trimmed, password: password);
+    }
+
+    // Username path: resolve to the account's email via the server-side
+    // SECURITY DEFINER RPC (mirrors the web app's SignInForm), then sign in.
+    // A generic error keeps username enumeration and wrong-password
+    // indistinguishable.
+    final email = await Supabase.instance.client.rpc(
+      'get_user_email_by_username',
+      params: {'p_username': trimmed},
+    );
+
+    if (email is! String || email.isEmpty) {
+      throw const AuthException('Invalid username or password.');
+    }
+
+    return signInWithPassword(email: email, password: password);
   }
 
   @override
