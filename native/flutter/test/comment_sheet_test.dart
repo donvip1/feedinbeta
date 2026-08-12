@@ -74,6 +74,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(parentId, 'comment-1');
+    // Replies are collapsed by default; expand the thread to reveal the reply.
+    await tester.tap(find.byKey(const Key('comment-toggle-comment-1')));
+    await tester.pumpAndSettle();
     expect(find.text('A threaded reply'), findsOneWidget);
   });
 
@@ -121,6 +124,9 @@ void main() {
       ),
     );
 
+    // Expand the root thread so the nested reply (and its Reply button) show.
+    await tester.tap(find.byKey(const Key('comment-toggle-comment-1')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('comment-reply-reply-1')));
     await tester.tap(find.byKey(const Key('comment-reply-reply-1')));
     await tester.tap(find.byKey(const Key('comment-emoji-button')));
@@ -135,6 +141,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(parentId, 'reply-1');
+    // reply-1's own replies collapse by default; expand to reveal reply-2.
+    await tester.tap(find.byKey(const Key('comment-toggle-reply-1')));
+    await tester.pumpAndSettle();
     expect(find.text('Deep reply 🔥'), findsOneWidget);
     expect(find.byKey(const Key('comment-thread-reply-2')), findsOneWidget);
   });

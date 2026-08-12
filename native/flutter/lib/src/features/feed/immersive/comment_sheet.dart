@@ -5,12 +5,33 @@ import 'package:flutter/services.dart';
 
 import '../feed_post.dart';
 import 'feed_immersive_theme.dart';
+import 'mention_text.dart';
 
 typedef CommentSubmitCallback =
     Future<FeedComment> Function(String body, String? parentCommentId);
 typedef CommentLikeCallback =
     Future<bool> Function(FeedComment comment, bool liked);
 typedef CommentDeleteCallback = Future<void> Function(FeedComment comment);
+
+/// Live user search for @mention autocomplete. Returns lightweight
+/// (userId, displayName, handle, avatarUrl) records for the current query.
+typedef CommentMentionSearch =
+    Future<List<CommentMentionCandidate>> Function(String query);
+
+/// A single @mention autocomplete suggestion.
+class CommentMentionCandidate {
+  const CommentMentionCandidate({
+    required this.userId,
+    required this.displayName,
+    required this.handle,
+    this.avatarUrl,
+  });
+
+  final String userId;
+  final String displayName;
+  final String handle;
+  final String? avatarUrl;
+}
 
 class FeedCommentSheetRoute<T> extends ModalBottomSheetRoute<T> {
   FeedCommentSheetRoute({
@@ -34,6 +55,10 @@ Future<void> showCommentSheet(
   required CommentDeleteCallback onDelete,
   required ValueChanged<String> onOpenUserProfile,
   required String currentUserId,
+  ValueChanged<String>? onOpenHashtag,
+  ValueChanged<String>? onOpenMention,
+  CommentMentionSearch? onSearchMentions,
+  Future<String?> Function()? onPickGif,
 }) {
   final navigator = Navigator.of(context);
   final materialLocalizations = MaterialLocalizations.of(context);
@@ -47,6 +72,10 @@ Future<void> showCommentSheet(
         onDelete: onDelete,
         onOpenUserProfile: onOpenUserProfile,
         currentUserId: currentUserId,
+        onOpenHashtag: onOpenHashtag,
+        onOpenMention: onOpenMention,
+        onSearchMentions: onSearchMentions,
+        onPickGif: onPickGif,
       ),
       isScrollControlled: true,
       useSafeArea: true,
@@ -77,6 +106,10 @@ class CommentSheet extends StatefulWidget {
     required this.onDelete,
     required this.onOpenUserProfile,
     required this.currentUserId,
+    this.onOpenHashtag,
+    this.onOpenMention,
+    this.onSearchMentions,
+    this.onPickGif,
   });
 
   final FeedPost post;
@@ -86,6 +119,19 @@ class CommentSheet extends StatefulWidget {
   final CommentDeleteCallback onDelete;
   final ValueChanged<String> onOpenUserProfile;
   final String currentUserId;
+
+  /// Tapping a `#hashtag` in a comment. Null → tags render as plain text.
+  final ValueChanged<String>? onOpenHashtag;
+
+  /// Tapping an `@handle` in a comment. Null → mentions render as plain text.
+  final ValueChanged<String>? onOpenMention;
+
+  /// Live user search for @mention autocomplete. Null → no autocomplete.
+  final CommentMentionSearch? onSearchMentions;
+
+  /// Opens the GIF picker and returns the chosen GIF URL, or null. When null,
+  /// the GIF button is hidden (no Tenor key configured).
+  final Future<String?> Function()? onPickGif;
 
   @override
   State<CommentSheet> createState() => _CommentSheetState();
@@ -100,11 +146,76 @@ class _CommentSheetState extends State<CommentSheet> {
   bool _emojiPickerVisible = false;
   FeedComment? _replyingTo;
 
+  // @mention autocomplete state.
+  List<CommentMentionCandidate> _mentionSuggestions = const [];
+  int _mentionQueryVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onSearchMentions != null) {
+      _controller.addListener(_onComposerChanged);
+    }
+  }
+
   @override
   void dispose() {
+    _controller.removeListener(_onComposerChanged);
     _controller.dispose();
     _composerFocusNode.dispose();
     super.dispose();
+  }
+
+  /// The `@…` token being typed at the caret, or null if none is active.
+  String? get _activeMentionQuery {
+    final selection = _controller.selection;
+    if (!selection.isValid || !selection.isCollapsed) return null;
+    final upToCaret = _controller.text.substring(0, selection.baseOffset);
+    final match = RegExp(r'(?<![A-Za-z0-9_])@([A-Za-z0-9_.]*)$')
+        .firstMatch(upToCaret);
+    return match?.group(1);
+  }
+
+  Future<void> _onComposerChanged() async {
+    final search = widget.onSearchMentions;
+    if (search == null) return;
+    final query = _activeMentionQuery;
+    if (query == null || query.isEmpty) {
+      if (_mentionSuggestions.isNotEmpty) {
+        setState(() => _mentionSuggestions = const []);
+      }
+      return;
+    }
+    final version = ++_mentionQueryVersion;
+    try {
+      final results = await search(query);
+      if (!mounted || version != _mentionQueryVersion) return;
+      setState(() => _mentionSuggestions = results);
+    } catch (_) {
+      if (!mounted || version != _mentionQueryVersion) return;
+      setState(() => _mentionSuggestions = const []);
+    }
+  }
+
+  /// Replace the active `@…` token with the picked handle.
+  void _applyMention(CommentMentionCandidate candidate) {
+    final selection = _controller.selection;
+    if (!selection.isValid) return;
+    final text = _controller.text;
+    final caret = selection.baseOffset;
+    final before = text.substring(0, caret);
+    final tokenMatch = RegExp(r'@([A-Za-z0-9_.]*)$').firstMatch(before);
+    if (tokenMatch == null) return;
+    final tokenStart = tokenMatch.start;
+    final replacement = '@${candidate.handle} ';
+    final nextText = text.replaceRange(tokenStart, caret, replacement);
+    final nextOffset = tokenStart + replacement.length;
+    _controller.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextOffset),
+    );
+    setState(() => _mentionSuggestions = const []);
+    _composerFocusNode.requestFocus();
   }
 
   List<FeedComment> get _rootComments =>
@@ -191,8 +302,8 @@ class _CommentSheetState extends State<CommentSheet> {
     return 'Could not post comment. Please try again.';
   }
 
-  Future<void> _submit() async {
-    final body = _controller.text.trim();
+  Future<void> _submit({String? overrideBody}) async {
+    final body = overrideBody ?? _controller.text.trim();
     if (body.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
@@ -200,7 +311,7 @@ class _CommentSheetState extends State<CommentSheet> {
       if (!mounted) return;
       setState(() {
         _comments.add(comment);
-        _controller.clear();
+        if (overrideBody == null) _controller.clear();
         _replyingTo = null;
       });
     } catch (error) {
@@ -212,6 +323,16 @@ class _CommentSheetState extends State<CommentSheet> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// Open the GIF picker; a chosen GIF is posted as a comment whose body is the
+  /// GIF URL, rendered inline (and animated) by [_CommentRow].
+  Future<void> _pickGif() async {
+    final pick = widget.onPickGif;
+    if (pick == null || _sending) return;
+    final url = await pick();
+    if (url == null || url.isEmpty || !mounted) return;
+    await _submit(overrideBody: url);
   }
 
   Future<void> _toggleLike(FeedComment comment) async {
@@ -331,6 +452,8 @@ class _CommentSheetState extends State<CommentSheet> {
                                 currentUserId: widget.currentUserId,
                                 processingLikes: _processingLikes,
                                 onOpenUser: widget.onOpenUserProfile,
+                                onOpenMention: widget.onOpenMention,
+                                onOpenHashtag: widget.onOpenHashtag,
                                 onReply: _beginReply,
                                 onLike: _toggleLike,
                                 onDelete: _delete,
@@ -338,6 +461,11 @@ class _CommentSheetState extends State<CommentSheet> {
                             },
                           ),
                   ),
+                  if (_mentionSuggestions.isNotEmpty)
+                    _MentionSuggestions(
+                      candidates: _mentionSuggestions,
+                      onSelected: _applyMention,
+                    ),
                   if (_replyingTo case final reply?)
                     _ReplyBanner(
                       comment: reply,
@@ -360,6 +488,7 @@ class _CommentSheetState extends State<CommentSheet> {
                     onToggleEmoji: () => setState(
                       () => _emojiPickerVisible = !_emojiPickerVisible,
                     ),
+                    onPickGif: widget.onPickGif == null ? null : _pickGif,
                     onSend: _submit,
                   ),
                 ],
@@ -433,7 +562,7 @@ class _EmptyComments extends StatelessWidget {
   );
 }
 
-class _CommentThread extends StatelessWidget {
+class _CommentThread extends StatefulWidget {
   const _CommentThread({
     required this.comment,
     required this.repliesByParent,
@@ -443,6 +572,8 @@ class _CommentThread extends StatelessWidget {
     required this.onReply,
     required this.onLike,
     required this.onDelete,
+    this.onOpenMention,
+    this.onOpenHashtag,
     this.depth = 0,
   });
 
@@ -454,39 +585,140 @@ class _CommentThread extends StatelessWidget {
   final ValueChanged<FeedComment> onReply;
   final ValueChanged<FeedComment> onLike;
   final ValueChanged<FeedComment> onDelete;
+  final ValueChanged<String>? onOpenMention;
+  final ValueChanged<String>? onOpenHashtag;
   final int depth;
 
   @override
+  State<_CommentThread> createState() => _CommentThreadState();
+}
+
+class _CommentThreadState extends State<_CommentThread> {
+  // Threads start collapsed so replies stay tucked under their parent instead
+  // of scattering down the list; the user expands the ones they care about.
+  bool _expanded = false;
+
+  /// Total number of replies nested under this comment (all depths).
+  int get _replyCount {
+    var count = 0;
+    void walk(String id) {
+      final replies = widget.repliesByParent[id] ?? const <FeedComment>[];
+      count += replies.length;
+      for (final reply in replies) {
+        walk(reply.id);
+      }
+    }
+
+    walk(widget.comment.id);
+    return count;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final replies = repliesByParent[comment.id] ?? const <FeedComment>[];
-    final indentation = (depth * 26.0).clamp(0.0, 78.0);
+    final replies =
+        widget.repliesByParent[widget.comment.id] ?? const <FeedComment>[];
+    final hasReplies = replies.isNotEmpty;
+    // Indentation grows with depth but is clamped so deep chains never march
+    // off-screen; past a couple of levels it holds flat.
+    final indentation = (widget.depth * 22.0).clamp(0.0, 44.0);
+    final totalReplies = hasReplies ? _replyCount : 0;
+
     return Padding(
-      key: Key('comment-thread-${comment.id}'),
+      key: Key('comment-thread-${widget.comment.id}'),
       padding: EdgeInsets.only(left: indentation),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CommentRow(
-            comment: comment,
-            currentUserId: currentUserId,
-            processingLike: processingLikes.contains(comment.id),
-            onOpenUser: onOpenUser,
-            onReply: onReply,
-            onLike: onLike,
-            onDelete: onDelete,
+            comment: widget.comment,
+            currentUserId: widget.currentUserId,
+            processingLike: widget.processingLikes.contains(widget.comment.id),
+            onOpenUser: widget.onOpenUser,
+            onOpenMention: widget.onOpenMention,
+            onOpenHashtag: widget.onOpenHashtag,
+            onReply: widget.onReply,
+            onLike: widget.onLike,
+            onDelete: widget.onDelete,
           ),
-          for (final reply in replies)
-            _CommentThread(
-              comment: reply,
-              repliesByParent: repliesByParent,
-              currentUserId: currentUserId,
-              processingLikes: processingLikes,
-              onOpenUser: onOpenUser,
-              onReply: onReply,
-              onLike: onLike,
-              onDelete: onDelete,
-              depth: depth + 1,
+          if (hasReplies)
+            _RepliesToggle(
+              key: Key('comment-toggle-${widget.comment.id}'),
+              count: totalReplies,
+              expanded: _expanded,
+              onTap: () => setState(() => _expanded = !_expanded),
             ),
+          if (hasReplies && _expanded)
+            for (final reply in replies)
+              _CommentThread(
+                comment: reply,
+                repliesByParent: widget.repliesByParent,
+                currentUserId: widget.currentUserId,
+                processingLikes: widget.processingLikes,
+                onOpenUser: widget.onOpenUser,
+                onOpenMention: widget.onOpenMention,
+                onOpenHashtag: widget.onOpenHashtag,
+                onReply: widget.onReply,
+                onLike: widget.onLike,
+                onDelete: widget.onDelete,
+                depth: widget.depth + 1,
+              ),
         ],
+      ),
+    );
+  }
+}
+
+/// The "View N replies" / "Hide replies" affordance that collapses a thread's
+/// children so long conversations stay grouped rather than scattered.
+class _RepliesToggle extends StatelessWidget {
+  const _RepliesToggle({
+    super.key,
+    required this.count,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final int count;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = expanded
+        ? 'Hide replies'
+        : (count == 1 ? 'View 1 reply' : 'View $count replies');
+    return Padding(
+      padding: const EdgeInsets.only(left: 44, top: 2, bottom: 4),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 22,
+              height: 1,
+              color: FeedImmersiveTheme.inkSubtle,
+              margin: const EdgeInsets.only(right: 8),
+            ),
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: FeedImmersiveTheme.brandPink,
+            ),
+            const SizedBox(width: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: FeedImmersiveTheme.brandPink,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -501,6 +733,8 @@ class _CommentRow extends StatelessWidget {
     required this.onReply,
     required this.onLike,
     required this.onDelete,
+    this.onOpenMention,
+    this.onOpenHashtag,
   });
 
   final FeedComment comment;
@@ -510,6 +744,8 @@ class _CommentRow extends StatelessWidget {
   final ValueChanged<FeedComment> onReply;
   final ValueChanged<FeedComment> onLike;
   final ValueChanged<FeedComment> onDelete;
+  final ValueChanged<String>? onOpenMention;
+  final ValueChanged<String>? onOpenHashtag;
 
   @override
   Widget build(BuildContext context) {
@@ -559,14 +795,37 @@ class _CommentRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  comment.content,
-                  style: const TextStyle(
-                    color: FeedImmersiveTheme.inkMuted,
-                    fontSize: 13,
-                    height: 1.35,
+                if (_isGifUrl(comment.content))
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      FeedImmersiveTheme.radiusMd,
+                    ),
+                    child: Image.network(
+                      comment.content.trim(),
+                      width: 160,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, _, _) => const Text(
+                        '[GIF]',
+                        style: TextStyle(
+                          color: FeedImmersiveTheme.inkMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  MentionText(
+                    text: comment.content,
+                    baseStyle: const TextStyle(
+                      color: FeedImmersiveTheme.inkMuted,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                    linkColor: FeedImmersiveTheme.brandPink,
+                    onOpenMention: onOpenMention,
+                    onOpenHashtag: onOpenHashtag,
                   ),
-                ),
                 const SizedBox(height: 5),
                 Row(
                   children: [
@@ -641,6 +900,95 @@ class _CommentRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Horizontal-friendly list of @mention autocomplete suggestions shown above
+/// the composer while an `@…` token is being typed.
+class _MentionSuggestions extends StatelessWidget {
+  const _MentionSuggestions({
+    required this.candidates,
+    required this.onSelected,
+  });
+
+  final List<CommentMentionCandidate> candidates;
+  final ValueChanged<CommentMentionCandidate> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('comment-mention-suggestions'),
+      constraints: const BoxConstraints(maxHeight: 168),
+      color: FeedImmersiveTheme.surfaceElevated,
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: candidates.length,
+        itemBuilder: (context, index) {
+          final candidate = candidates[index];
+          final name = candidate.displayName.trim();
+          final initial = name.isEmpty
+              ? '?'
+              : name.characters.first.toUpperCase();
+          final hasImage = candidate.avatarUrl?.trim().isNotEmpty == true;
+          return InkWell(
+            key: Key('comment-mention-${candidate.userId}'),
+            onTap: () => onSelected(candidate),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: FeedImmersiveTheme.brandGradient,
+                    ),
+                    child: hasImage
+                        ? Image.network(
+                            candidate.avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _Initial(initial),
+                          )
+                        : _Initial(initial),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name.isEmpty ? 'Someone' : name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FeedImmersiveTheme.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '@${candidate.handle}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FeedImmersiveTheme.brandPink,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -769,6 +1117,7 @@ class _Composer extends StatelessWidget {
     required this.hintText,
     required this.onToggleEmoji,
     required this.onSend,
+    this.onPickGif,
   });
 
   final TextEditingController controller;
@@ -778,6 +1127,9 @@ class _Composer extends StatelessWidget {
   final String hintText;
   final VoidCallback onToggleEmoji;
   final VoidCallback onSend;
+
+  /// When non-null, a GIF button is shown that opens the picker.
+  final VoidCallback? onPickGif;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -793,6 +1145,14 @@ class _Composer extends StatelessWidget {
               : FeedImmersiveTheme.inkMuted,
           icon: const Icon(Icons.emoji_emotions_outlined),
         ),
+        if (onPickGif != null)
+          IconButton(
+            key: const Key('comment-gif-button'),
+            tooltip: 'Add a GIF',
+            onPressed: sending ? null : onPickGif,
+            color: FeedImmersiveTheme.inkMuted,
+            icon: const Icon(Icons.gif_box_outlined),
+          ),
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -869,6 +1229,19 @@ class _Composer extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// A comment whose body is a single GIF URL is rendered as an inline image
+/// rather than text. Matches the URLs Tenor returns from the GIF picker.
+bool _isGifUrl(String content) {
+  final value = content.trim();
+  if (value.contains(RegExp(r'\s'))) return false;
+  final lower = value.toLowerCase();
+  if (!lower.startsWith('http')) return false;
+  return lower.endsWith('.gif') ||
+      lower.contains('tenor.com') ||
+      lower.contains('.gif?') ||
+      lower.contains('giphy.com');
 }
 
 String _relativeCommentTime(int createdAtMillis) {
