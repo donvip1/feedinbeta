@@ -32,7 +32,7 @@ void main() {
     );
   }
 
-  testWidgets('More actions stay inline and collapsed by default', (
+  testWidgets('Gift shows by default, Views hidden until More', (
     tester,
   ) async {
     await tester.pumpWidget(host(expanded: false));
@@ -40,24 +40,27 @@ void main() {
     expect(find.byKey(const Key('feed-action-like')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-comment')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-refeed')), findsOneWidget);
-    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+    // Gift is now a default action; Views is no longer shown by default.
+    expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_outlined), findsNothing);
     expect(find.byKey(const Key('feed-action-more')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-save')), findsNothing);
-    expect(find.byKey(const Key('feed-action-gift')), findsNothing);
     expect(find.byKey(const Key('feed-action-share')), findsNothing);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
   });
 
-  testWidgets('Expanded More reveals Save Gift and Share inline', (
+  testWidgets('Expanded More reveals Save, Share, and Views inline', (
     tester,
   ) async {
     await tester.pumpWidget(host(expanded: true));
     await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.byKey(const Key('feed-action-save')), findsOneWidget);
-    expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-share')), findsOneWidget);
+    // Gift stays visible (it's a default action now), Views appears under More.
+    expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
   });

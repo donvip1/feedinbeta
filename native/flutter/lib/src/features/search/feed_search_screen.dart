@@ -16,11 +16,16 @@ class FeedSearchScreen extends StatefulWidget {
     required this.feedRepository,
     required this.onOpenPerson,
     required this.onOpenPost,
+    this.initialQuery,
   });
 
   final LocalFeedRepositoryContract feedRepository;
   final ValueChanged<FeedSearchPerson> onOpenPerson;
   final ValueChanged<FeedPost> onOpenPost;
+
+  /// Pre-populates the search box and runs it immediately — used when opening
+  /// search from a tapped @mention or #hashtag in a comment.
+  final String? initialQuery;
 
   @override
   State<FeedSearchScreen> createState() => _FeedSearchScreenState();
@@ -35,6 +40,19 @@ class _FeedSearchScreenState extends State<FeedSearchScreen>
   bool _loading = false;
   String? _error;
   int _requestVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialQuery?.trim() ?? '';
+    if (initial.isNotEmpty) {
+      _controller.text = initial;
+      // A hashtag tap lands on the People/Posts search for that term; a mention
+      // tap lands on the People tab.
+      if (initial.startsWith('#')) _tabs.index = 1;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _search(initial));
+    }
+  }
 
   @override
   void dispose() {

@@ -9,14 +9,32 @@ import 'hero_transition_layer.dart';
 
 typedef CreatorFollowCallback = Future<bool> Function();
 
+/// Loads live stats (followers / following / posts) for the creator card. Any
+/// value left null is simply hidden. Returning null skips the stats row.
+typedef CreatorStatsLoader = Future<CreatorStats?> Function();
+
+/// Lightweight stats shown on the mini profile card.
+class CreatorStats {
+  const CreatorStats({this.posts, this.followers, this.following});
+
+  final int? posts;
+  final int? followers;
+  final int? following;
+
+  bool get hasAny => posts != null || followers != null || following != null;
+}
+
 Future<void> showCreatorPreview(
   BuildContext context, {
   required Object heroTag,
   required String name,
   String handle = '',
   String? avatarUrl,
+  String? bio,
+  bool isVerified = false,
   bool initiallyFollowing = false,
   CreatorFollowCallback? onToggleFollow,
+  CreatorStatsLoader? loadStats,
   VoidCallback? onViewProfile,
 }) {
   return showGeneralDialog<void>(
@@ -30,8 +48,11 @@ Future<void> showCreatorPreview(
       name: name,
       handle: handle,
       avatarUrl: avatarUrl,
+      bio: bio,
+      isVerified: isVerified,
       initiallyFollowing: initiallyFollowing,
       onToggleFollow: onToggleFollow,
+      loadStats: loadStats,
       onViewProfile: onViewProfile,
     ),
     transitionBuilder: (context, animation, _, child) {
@@ -63,8 +84,11 @@ class _CreatorPreviewCard extends StatefulWidget {
     required this.name,
     required this.handle,
     required this.avatarUrl,
+    required this.bio,
+    required this.isVerified,
     required this.initiallyFollowing,
     required this.onToggleFollow,
+    required this.loadStats,
     required this.onViewProfile,
   });
 
@@ -72,8 +96,11 @@ class _CreatorPreviewCard extends StatefulWidget {
   final String name;
   final String handle;
   final String? avatarUrl;
+  final String? bio;
+  final bool isVerified;
   final bool initiallyFollowing;
   final CreatorFollowCallback? onToggleFollow;
+  final CreatorStatsLoader? loadStats;
   final VoidCallback? onViewProfile;
 
   @override
@@ -84,6 +111,25 @@ class _CreatorPreviewCardState extends State<_CreatorPreviewCard> {
   late bool _following = widget.initiallyFollowing;
   bool _followLoading = false;
   String? _followError;
+  CreatorStats? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final loader = widget.loadStats;
+    if (loader == null) return;
+    try {
+      final stats = await loader();
+      if (!mounted) return;
+      setState(() => _stats = stats);
+    } catch (_) {
+      // Stats are decorative; a failure just leaves the row hidden.
+    }
+  }
 
   String get _initial {
     final name = widget.name.trim();
@@ -169,13 +215,28 @@ class _CreatorPreviewCardState extends State<_CreatorPreviewCard> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      widget.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: FeedImmersiveTheme.authorName.copyWith(
-                        fontSize: 20,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: FeedImmersiveTheme.authorName.copyWith(
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                        if (widget.isVerified) ...[
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 18,
+                            color: FeedImmersiveTheme.brandPink,
+                          ),
+                        ],
+                      ],
                     ),
                     if (widget.handle.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -187,6 +248,24 @@ class _CreatorPreviewCardState extends State<_CreatorPreviewCard> {
                           color: FeedImmersiveTheme.brandPink,
                         ),
                       ),
+                    ],
+                    if (widget.bio?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        widget.bio!.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: FeedImmersiveTheme.inkMuted,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    if (_stats?.hasAny == true) ...[
+                      const SizedBox(height: 16),
+                      _StatsRow(stats: _stats!),
                     ],
                     if (_followError != null) ...[
                       const SizedBox(height: 10),
@@ -286,6 +365,63 @@ class _Initial extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Posts · Followers · Following, shown on the mini profile card when stats
+/// resolve. Each cell hides if its value is null.
+class _StatsRow extends StatelessWidget {
+  const _StatsRow({required this.stats});
+
+  final CreatorStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = <Widget>[
+      if (stats.posts != null) _cell(stats.posts!, 'Posts'),
+      if (stats.followers != null) _cell(stats.followers!, 'Followers'),
+      if (stats.following != null) _cell(stats.following!, 'Following'),
+    ];
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: cells,
+    );
+  }
+
+  Widget _cell(int value, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _compact(value),
+          style: const TextStyle(
+            color: FeedImmersiveTheme.ink,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: FeedImmersiveTheme.inkMuted,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _compact(int value) {
+    if (value >= 1000000) {
+      final v = (value / 1000000).toStringAsFixed(1);
+      return '${v.endsWith('.0') ? v.substring(0, v.length - 2) : v}M';
+    }
+    if (value >= 1000) {
+      final v = (value / 1000).toStringAsFixed(1);
+      return '${v.endsWith('.0') ? v.substring(0, v.length - 2) : v}K';
+    }
+    return '$value';
   }
 }
 

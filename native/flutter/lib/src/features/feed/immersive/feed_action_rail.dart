@@ -110,12 +110,19 @@ class FeedActionRail extends StatelessWidget {
               onTap: onRefeed,
             ),
             const SizedBox(height: _gap),
-            _RailMetric(value: _compactCount(viewsCount)),
+            // Gift is now a default action (it took the slot the Views metric
+            // used to occupy). Views moved behind "More".
+            _RailAction(
+              key: const Key('feed-action-gift'),
+              icon: Icons.card_giftcard_rounded,
+              label: 'Gift',
+              onTap: onGift,
+            ),
             if (isMoreExpanded)
               _ExpandedActions(
                 isSaved: isSaved,
+                viewsLabel: _compactCount(viewsCount),
                 onSave: onSave,
-                onGift: onGift,
                 onShare: onShare,
               ),
             const SizedBox(height: _gap),
@@ -138,14 +145,14 @@ class FeedActionRail extends StatelessWidget {
 class _ExpandedActions extends StatelessWidget {
   const _ExpandedActions({
     required this.isSaved,
+    required this.viewsLabel,
     required this.onSave,
-    required this.onGift,
     required this.onShare,
   });
 
   final bool isSaved;
+  final String viewsLabel;
   final VoidCallback onSave;
-  final VoidCallback onGift;
   final VoidCallback onShare;
 
   @override
@@ -153,6 +160,7 @@ class _ExpandedActions extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        const SizedBox(height: FeedImmersiveTheme.railGap),
         _RailAction(
           key: const Key('feed-action-save'),
           icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border,
@@ -166,18 +174,14 @@ class _ExpandedActions extends StatelessWidget {
         ),
         const SizedBox(height: FeedImmersiveTheme.railGap),
         _RailAction(
-          key: const Key('feed-action-gift'),
-          icon: Icons.card_giftcard_rounded,
-          label: 'Gift',
-          onTap: onGift,
-        ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailAction(
           key: const Key('feed-action-share'),
           icon: Icons.ios_share_rounded,
           label: 'Share',
           onTap: onShare,
         ),
+        const SizedBox(height: FeedImmersiveTheme.railGap),
+        // Views: still available, just no longer a default-visible metric.
+        _RailMetric(value: viewsLabel),
       ],
     );
   }

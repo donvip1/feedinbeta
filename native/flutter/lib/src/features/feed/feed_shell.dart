@@ -58,6 +58,9 @@ import 'feed_post.dart';
 import 'feed_post_pager_screen.dart';
 import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
+import '../../core/config/feedin_config.dart';
+import '../../core/gif/gif_service.dart';
+import 'immersive/gif_picker_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
 import 'immersive/incoming_feed_message_banner.dart';
@@ -555,11 +558,12 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     );
   }
 
-  void _openSearch() {
+  void _openSearch([String? initialQuery]) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FeedSearchScreen(
           feedRepository: widget.feedRepository,
+          initialQuery: initialQuery,
           onOpenPerson: (person) {
             Navigator.of(context).pop();
             _openUserProfile(person.userId);
@@ -731,6 +735,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         realtimeVersion: _feedRealtimeVersion,
         onOpenNotifications: _showNotificationsScreen,
         onOpenSearch: _openSearch,
+        onOpenSearchQuery: _openSearch,
         backController: _feedBackController,
         notificationUnreadCountFuture: _notificationUnreadCountFuture,
         onOpenUserProfile: _openUserProfile,
@@ -1139,6 +1144,7 @@ class FeedScreen extends StatefulWidget {
     required this.realtimeVersion,
     required this.onOpenNotifications,
     required this.onOpenSearch,
+    required this.onOpenSearchQuery,
     required this.backController,
     required this.notificationUnreadCountFuture,
     required this.onOpenUserProfile,
@@ -1158,6 +1164,10 @@ class FeedScreen extends StatefulWidget {
   final int realtimeVersion;
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSearch;
+
+  /// Opens search pre-filled with a query (used by comment @mention / #hashtag
+  /// taps). Routed through the shell so it reuses the same search route.
+  final ValueChanged<String> onOpenSearchQuery;
   final FeedScreenBackController backController;
   final Future<int> notificationUnreadCountFuture;
   final ValueChanged<String> onOpenUserProfile;
@@ -1192,6 +1202,13 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
+
+  /// GIF picker backend — non-null only when a Tenor key is configured, which
+  /// is what gates the GIF button in the comment composer.
+  final GifService? _gifService =
+      FeedinConfig.fromEnvironment.hasGifSupport
+      ? GifService(apiKey: FeedinConfig.fromEnvironment.tenorApiKey)
+      : null;
   String? _message;
   int _tabIndex = 0;
   int _activePage = 0;
@@ -1586,6 +1603,26 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       onToggleFollow: isOwnProfile
           ? null
           : () => widget.socialGraphDataSource.toggleFollow(content.userId),
+      loadStats: content.userId.isEmpty
+          ? null
+          : () async {
+              // Followers/following come from the social graph; the tapped
+              // post's own count stands in for a lightweight "Posts" hint.
+              final results = await Future.wait([
+                widget.socialGraphDataSource
+                    .fetchFollowers(content.userId)
+                    .then((list) => list.length)
+                    .catchError((_) => 0),
+                widget.socialGraphDataSource
+                    .fetchFollowing(content.userId)
+                    .then((list) => list.length)
+                    .catchError((_) => 0),
+              ]);
+              return CreatorStats(
+                followers: results[0],
+                following: results[1],
+              );
+            },
       onViewProfile: () => widget.onOpenUserProfile(content.userId),
     );
   }
@@ -1638,6 +1675,30 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       },
       onOpenUserProfile: widget.onOpenUserProfile,
       currentUserId: widget.currentUserId,
+      onOpenHashtag: (tag) => widget.onOpenSearchQuery('#$tag'),
+      onOpenMention: (handle) => widget.onOpenSearchQuery('@$handle'),
+      onSearchMentions: (query) async {
+        try {
+          final results = await widget.feedRepository.search(query, limit: 8);
+          return results.people
+              .map(
+                (person) => CommentMentionCandidate(
+                  userId: person.userId,
+                  displayName: person.displayName,
+                  handle: person.handle,
+                  avatarUrl: person.avatarUrl,
+                ),
+              )
+              .toList(growable: false);
+        } catch (_) {
+          return const <CommentMentionCandidate>[];
+        }
+      },
+      onPickGif: switch (_gifService) {
+        final service? => () =>
+            showGifPicker(context, service: service).then((gif) => gif?.gifUrl),
+        null => null,
+      },
     );
   }
 
