@@ -1197,6 +1197,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   int _activePage = 0;
   bool _isLoadingMore = false;
   bool _hasMorePosts = true;
+
+  /// True until the first background refresh completes. Used only to keep the
+  /// loading state (not the "No posts yet" empty state) on screen when the app
+  /// opens with a cold/empty cache — otherwise an empty first paint would flash
+  /// the empty state for a beat before posts arrive.
+  bool _initialRefreshPending = true;
   Timer? _realtimeRefreshDebounce;
   ModalRoute<void>? _subscribedRoute;
   bool _routeVisible = true;
@@ -1230,7 +1236,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _postsFuture = _initialLoad();
+    // Show whatever is already cached instantly (a synchronous-feeling Hive
+    // read) so the feed paints immediately on open, then reconcile with the
+    // network in the background. The old path awaited a full remote refresh
+    // before showing anything, which is what made the feed take seconds.
+    _postsFuture = widget.feedRepository.loadPosts();
+    _refreshInBackground();
     _syncBackController();
     _chrome.attachListener(_onChromeStateChanged);
     _messagesRealtimeSub = widget.realtimeService.events
@@ -1361,17 +1372,25 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     // refreshed FeedPost snapshot at the card boundary.
   }
 
-  Future<List<FeedPost>> _initialLoad() async {
-    final cachedPosts = await widget.feedRepository.loadPosts();
-    final result = await widget.feedRepository.refresh();
-    if (!mounted) return result.posts.isNotEmpty ? result.posts : cachedPosts;
-
-    setState(() {
-      _message = result.message;
-      _hasMorePosts = result.usedRemote;
-    });
-
-    return result.posts.isNotEmpty ? result.posts : cachedPosts;
+  /// Reconcile the instantly-shown cache with the network without blocking the
+  /// first paint. Called once from [initState]; the cached posts are already on
+  /// screen via `_postsFuture = loadPosts()`, so this only swaps in fresher
+  /// posts once the remote fetch returns. When the network yields nothing new
+  /// (empty/offline), the cache stays put rather than blanking the feed.
+  void _refreshInBackground() {
+    unawaited(() async {
+      final result = await widget.feedRepository.refresh();
+      if (!mounted) return;
+      setState(() {
+        _initialRefreshPending = false;
+        _message = result.message;
+        _hasMorePosts = result.usedRemote;
+        if (result.posts.isNotEmpty) {
+          _postsFuture = Future.value(result.posts);
+          _clearEngagementOverrides();
+        }
+      });
+    }());
   }
 
   Future<void> _refresh() async {
@@ -1693,12 +1712,17 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           content = _ImmersiveLoadingState(topPadding: overlayHeight);
         } else {
           final filteredPosts = _filterPosts(posts);
+          // Keep the loading state (not the empty state) while the very first
+          // refresh is still in flight against a cold cache; otherwise show the
+          // real empty state once we know there is genuinely nothing to show.
           content = filteredPosts.isEmpty
-              ? _ImmersiveEmptyState(
-                  tabIndex: _tabIndex,
-                  topPadding: overlayHeight,
-                  onRefresh: _refresh,
-                )
+              ? (_initialRefreshPending
+                    ? _ImmersiveLoadingState(topPadding: overlayHeight)
+                    : _ImmersiveEmptyState(
+                        tabIndex: _tabIndex,
+                        topPadding: overlayHeight,
+                        onRefresh: _refresh,
+                      ))
               : _buildImmersivePager(filteredPosts);
         }
 

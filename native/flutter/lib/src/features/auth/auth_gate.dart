@@ -10,6 +10,7 @@ import '../feed/feed_shell.dart';
 import '../onboarding/permission_onboarding_screen.dart';
 import '../profile/profile_completion_screen.dart';
 import '../profile/user_profile.dart';
+import '../splash/animated_splash.dart';
 import 'auth_theme.dart';
 import 'data/auth_repository.dart';
 import 'login_screen.dart';
@@ -47,6 +48,11 @@ class _AuthGateState extends State<AuthGate> {
   UserProfile? _profile;
   StreamSubscription<AuthState>? _authSubscription;
   bool _isCheckingSession = true;
+
+  /// Whether the branded entrance animation has finished. The app only advances
+  /// past the splash once this AND [_isCheckingSession]==false, so the brand
+  /// moment is always seen while the session check + feed pre-warm run.
+  bool _splashDone = false;
   bool _isSubmitting = false;
   bool _isRecoveringPassword = false;
   String? _message;
@@ -112,6 +118,7 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _adoptSignedInSession() async {
     final user = await widget.services.authRepository.restoreSession();
     if (user == null || !mounted) return;
+    _prewarmFeed(user);
     final profile = await widget.services.profileRepository.loadProfileForUser(
       user.id,
     );
@@ -127,6 +134,7 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _restoreSession() async {
     try {
       final user = await widget.services.authRepository.restoreSession();
+      if (user != null) _prewarmFeed(user);
       final profile = user == null
           ? null
           : await widget.services.profileRepository.loadProfileForUser(user.id);
@@ -140,6 +148,22 @@ class _AuthGateState extends State<AuthGate> {
         setState(() => _isCheckingSession = false);
       }
     }
+  }
+
+  /// Warm the feed's Hive cache from the network the moment a real session is
+  /// confirmed — while profile load / permission onboarding are still on screen
+  /// — so `FeedShell`'s feed mounts against fresh data instead of kicking off
+  /// its fetch only once the user reaches it. Fire-and-forget; skipped for the
+  /// offline demo user and unconfigured builds where there is no backend.
+  void _prewarmFeed(AuthUser user) {
+    if (user.isDemo || !widget.services.authRepository.isConfigured) return;
+    unawaited(() async {
+      try {
+        await widget.services.feedRepository.refresh();
+      } catch (_) {
+        // Best-effort warm-up; the feed still loads on its own when reached.
+      }
+    }());
   }
 
   void _switchMode(AuthMode mode) {
@@ -161,8 +185,8 @@ class _AuthGateState extends State<AuthGate> {
     try {
       final user = switch (_mode) {
         AuthMode.signIn =>
-          await widget.services.authRepository.signInWithPassword(
-            email: _emailController.text,
+          await widget.services.authRepository.signInWithIdentifier(
+            identifier: _emailController.text,
             password: _passwordController.text,
           ),
         AuthMode.signUp =>
@@ -296,14 +320,12 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingSession) {
-      return const Scaffold(
-        body: AuthBackground(
-          child: Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AuthColors.onBrand),
-            ),
-          ),
+    if (_isCheckingSession || !_splashDone) {
+      return Scaffold(
+        body: AnimatedSplash(
+          onFinished: () {
+            if (mounted) setState(() => _splashDone = true);
+          },
         ),
       );
     }
