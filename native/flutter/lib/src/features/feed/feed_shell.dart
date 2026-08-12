@@ -58,9 +58,6 @@ import 'feed_post.dart';
 import 'feed_post_pager_screen.dart';
 import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
-import '../../core/config/feedin_config.dart';
-import '../../core/gif/gif_service.dart';
-import 'immersive/gif_picker_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
 import 'immersive/incoming_feed_message_banner.dart';
@@ -1202,13 +1199,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
-
-  /// GIF picker backend — non-null only when a Tenor key is configured, which
-  /// is what gates the GIF button in the comment composer.
-  final GifService? _gifService =
-      FeedinConfig.fromEnvironment.hasGifSupport
-      ? GifService(apiKey: FeedinConfig.fromEnvironment.tenorApiKey)
-      : null;
   String? _message;
   int _tabIndex = 0;
   int _activePage = 0;
@@ -1693,11 +1683,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         } catch (_) {
           return const <CommentMentionCandidate>[];
         }
-      },
-      onPickGif: switch (_gifService) {
-        final service? => () =>
-            showGifPicker(context, service: service).then((gif) => gif?.gifUrl),
-        null => null,
       },
     );
   }

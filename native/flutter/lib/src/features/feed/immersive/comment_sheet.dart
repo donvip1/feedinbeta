@@ -58,7 +58,6 @@ Future<void> showCommentSheet(
   ValueChanged<String>? onOpenHashtag,
   ValueChanged<String>? onOpenMention,
   CommentMentionSearch? onSearchMentions,
-  Future<String?> Function()? onPickGif,
 }) {
   final navigator = Navigator.of(context);
   final materialLocalizations = MaterialLocalizations.of(context);
@@ -75,7 +74,6 @@ Future<void> showCommentSheet(
         onOpenHashtag: onOpenHashtag,
         onOpenMention: onOpenMention,
         onSearchMentions: onSearchMentions,
-        onPickGif: onPickGif,
       ),
       isScrollControlled: true,
       useSafeArea: true,
@@ -109,7 +107,6 @@ class CommentSheet extends StatefulWidget {
     this.onOpenHashtag,
     this.onOpenMention,
     this.onSearchMentions,
-    this.onPickGif,
   });
 
   final FeedPost post;
@@ -128,10 +125,6 @@ class CommentSheet extends StatefulWidget {
 
   /// Live user search for @mention autocomplete. Null → no autocomplete.
   final CommentMentionSearch? onSearchMentions;
-
-  /// Opens the GIF picker and returns the chosen GIF URL, or null. When null,
-  /// the GIF button is hidden (no Tenor key configured).
-  final Future<String?> Function()? onPickGif;
 
   @override
   State<CommentSheet> createState() => _CommentSheetState();
@@ -302,8 +295,8 @@ class _CommentSheetState extends State<CommentSheet> {
     return 'Could not post comment. Please try again.';
   }
 
-  Future<void> _submit({String? overrideBody}) async {
-    final body = overrideBody ?? _controller.text.trim();
+  Future<void> _submit() async {
+    final body = _controller.text.trim();
     if (body.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
@@ -311,7 +304,7 @@ class _CommentSheetState extends State<CommentSheet> {
       if (!mounted) return;
       setState(() {
         _comments.add(comment);
-        if (overrideBody == null) _controller.clear();
+        _controller.clear();
         _replyingTo = null;
       });
     } catch (error) {
@@ -323,16 +316,6 @@ class _CommentSheetState extends State<CommentSheet> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
-  }
-
-  /// Open the GIF picker; a chosen GIF is posted as a comment whose body is the
-  /// GIF URL, rendered inline (and animated) by [_CommentRow].
-  Future<void> _pickGif() async {
-    final pick = widget.onPickGif;
-    if (pick == null || _sending) return;
-    final url = await pick();
-    if (url == null || url.isEmpty || !mounted) return;
-    await _submit(overrideBody: url);
   }
 
   Future<void> _toggleLike(FeedComment comment) async {
@@ -488,7 +471,6 @@ class _CommentSheetState extends State<CommentSheet> {
                     onToggleEmoji: () => setState(
                       () => _emojiPickerVisible = !_emojiPickerVisible,
                     ),
-                    onPickGif: widget.onPickGif == null ? null : _pickGif,
                     onSend: _submit,
                   ),
                 ],
@@ -795,37 +777,17 @@ class _CommentRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                if (_isGifUrl(comment.content))
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      FeedImmersiveTheme.radiusMd,
-                    ),
-                    child: Image.network(
-                      comment.content.trim(),
-                      width: 160,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, _, _) => const Text(
-                        '[GIF]',
-                        style: TextStyle(
-                          color: FeedImmersiveTheme.inkMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  MentionText(
-                    text: comment.content,
-                    baseStyle: const TextStyle(
-                      color: FeedImmersiveTheme.inkMuted,
-                      fontSize: 13,
-                      height: 1.35,
-                    ),
-                    linkColor: FeedImmersiveTheme.brandPink,
-                    onOpenMention: onOpenMention,
-                    onOpenHashtag: onOpenHashtag,
+                MentionText(
+                  text: comment.content,
+                  baseStyle: const TextStyle(
+                    color: FeedImmersiveTheme.inkMuted,
+                    fontSize: 13,
+                    height: 1.35,
                   ),
+                  linkColor: FeedImmersiveTheme.brandPink,
+                  onOpenMention: onOpenMention,
+                  onOpenHashtag: onOpenHashtag,
+                ),
                 const SizedBox(height: 5),
                 Row(
                   children: [
@@ -1117,7 +1079,6 @@ class _Composer extends StatelessWidget {
     required this.hintText,
     required this.onToggleEmoji,
     required this.onSend,
-    this.onPickGif,
   });
 
   final TextEditingController controller;
@@ -1127,9 +1088,6 @@ class _Composer extends StatelessWidget {
   final String hintText;
   final VoidCallback onToggleEmoji;
   final VoidCallback onSend;
-
-  /// When non-null, a GIF button is shown that opens the picker.
-  final VoidCallback? onPickGif;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -1145,14 +1103,6 @@ class _Composer extends StatelessWidget {
               : FeedImmersiveTheme.inkMuted,
           icon: const Icon(Icons.emoji_emotions_outlined),
         ),
-        if (onPickGif != null)
-          IconButton(
-            key: const Key('comment-gif-button'),
-            tooltip: 'Add a GIF',
-            onPressed: sending ? null : onPickGif,
-            color: FeedImmersiveTheme.inkMuted,
-            icon: const Icon(Icons.gif_box_outlined),
-          ),
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -1229,19 +1179,6 @@ class _Composer extends StatelessWidget {
       ],
     ),
   );
-}
-
-/// A comment whose body is a single GIF URL is rendered as an inline image
-/// rather than text. Matches the URLs Tenor returns from the GIF picker.
-bool _isGifUrl(String content) {
-  final value = content.trim();
-  if (value.contains(RegExp(r'\s'))) return false;
-  final lower = value.toLowerCase();
-  if (!lower.startsWith('http')) return false;
-  return lower.endsWith('.gif') ||
-      lower.contains('tenor.com') ||
-      lower.contains('.gif?') ||
-      lower.contains('giphy.com');
 }
 
 String _relativeCommentTime(int createdAtMillis) {

@@ -3,7 +3,6 @@ class FeedinConfig {
     required this.supabaseUrl,
     required this.supabasePublishableKey,
     this.googleServerClientId = '',
-    this.tenorApiKey = '',
   });
 
   static const fromEnvironment = FeedinConfig(
@@ -16,7 +15,6 @@ class FeedinConfig {
       'GOOGLE_SERVER_CLIENT_ID',
       defaultValue: '',
     ),
-    tenorApiKey: String.fromEnvironment('FEEDIN_TENOR_API_KEY', defaultValue: ''),
   );
 
   final String supabaseUrl;
@@ -28,16 +26,8 @@ class FeedinConfig {
   /// user supplies later; until then the native Google flow stays inert.
   final String googleServerClientId;
 
-  /// Tenor (Google GIF) v2 API key. Empty by default — the GIF picker stays
-  /// hidden until a key is supplied via `--dart-define=FEEDIN_TENOR_API_KEY=…`,
-  /// mirroring how [googleServerClientId] gates Google sign-in.
-  final String tenorApiKey;
-
   static const authCallbackUrl = 'feedin://auth-callback';
 
   bool get hasSupabaseConfig =>
       supabaseUrl.trim().isNotEmpty && supabasePublishableKey.trim().isNotEmpty;
-
-  /// Whether the in-app GIF picker can be offered (a Tenor key is configured).
-  bool get hasGifSupport => tenorApiKey.trim().isNotEmpty;
 }
