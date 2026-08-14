@@ -148,6 +148,7 @@ class _FakePostDraftRepository implements PostDraftRepository {
     String privacy = 'everyone',
     String draftKind = 'post',
     String? mediaFilterId,
+    List<String> mediaFilterIds = const [],
   }) async {
     return PostDraft(
       id: 'draft',
@@ -160,6 +161,7 @@ class _FakePostDraftRepository implements PostDraftRepository {
       privacy: privacy,
       draftKind: draftKind,
       mediaFilterId: mediaFilterId,
+      mediaFilterIds: mediaFilterIds,
     );
   }
 }

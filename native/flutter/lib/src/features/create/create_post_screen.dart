@@ -144,6 +144,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           id: _uuid.v4(),
           path: stored,
           kind: widget.initialMediaKind ?? _kindFor(file),
+          filterId: widget.initialMediaFilterId ?? 'original',
         ),
       ];
     });
@@ -181,6 +182,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     onAddMedia: _openCaptureSheet,
     onRemoveMedia: _removeMedia,
     onPreviewIndexChanged: (index) => setState(() => _previewIndex = index),
+    onFilterChanged: (mediaId, filterId) => setState(() {
+      _media = updateComposerMediaFilter(
+        _media,
+        mediaId: mediaId,
+        filterId: filterId,
+      );
+    }),
     onReorderMedia: _reorderMedia,
     onSubmit: _submit,
     onSaveDraft: () => _saveDraft(queueForUpload: false),
@@ -403,6 +411,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final mediaTypes = _media
         .map((m) => m.kind == CreateMediaKind.video ? 'video' : 'image')
         .toList(growable: false);
+    final mediaFilterIds = _media
+        .map((m) => m.isVideo ? 'original' : m.filterId)
+        .toList(growable: false);
+    final legacyMediaFilterId = _media
+        .where((m) => !m.isVideo)
+        .map((m) => m.filterId)
+        .firstOrNull;
 
     final draft = await widget.draftRepository.saveDraft(
       content: _composeContent(),
@@ -412,7 +427,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       mediaTypes: mediaTypes,
       privacy: _privacy.wireValue,
       draftKind: _mode == _CreateMode.story ? 'story' : 'post',
-      mediaFilterId: widget.initialMediaFilterId,
+      mediaFilterId: legacyMediaFilterId,
+      mediaFilterIds: mediaFilterIds,
     );
 
     UploadQueueSummary? summary;
@@ -423,9 +439,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         uploadState: DraftUploadState.queued,
       );
       summary = await widget.uploadQueueService.processQueue();
-      for (final postId in summary.publishedPostIds) {
-        widget.onPostUploaded(postId);
-      }
       if (summary.publishedPostIds case [final postId, ...]) {
         if (mounted) Navigator.of(context).pop(CreatePublished(postId));
         return;

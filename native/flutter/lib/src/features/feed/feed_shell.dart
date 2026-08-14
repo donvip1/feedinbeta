@@ -137,6 +137,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   StreamSubscription<PendingReply>? _replySub;
   StreamSubscription<CallKitAction>? _callKitSub;
   int _feedRealtimeVersion = 0;
+  String? _publishedPostTargetId;
   int _messagesRealtimeVersion = 0;
   final int _newConversationRequests = 0;
   String? _initialConversationId;
@@ -357,8 +358,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     setState(() => _feedChromeVisibility = visibility);
   }
 
-  void _handleIncomingMessageBannerChanged(
-      IncomingFeedMessageBanner? banner) {
+  void _handleIncomingMessageBannerChanged(IncomingFeedMessageBanner? banner) {
     if (!mounted) return;
     if (banner?.id == _incomingMessageBanner?.id) return;
     setState(() => _incomingMessageBanner = banner);
@@ -467,13 +467,13 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     if (!mounted || outcome == null) return;
     switch (outcome) {
       case CreatePublished(:final postId):
-        _handlePostUploaded(postId);
-        final posts = await widget.feedRepository.refresh();
+        await widget.feedRepository.refresh();
         if (!mounted) return;
-        final created = posts.posts
-            .where((post) => post.id == postId)
-            .firstOrNull;
-        if (created != null) _openSearchPost(created);
+        setState(() {
+          _index = 0;
+          _showNotifications = false;
+          _publishedPostTargetId = postId;
+        });
       case CreateDraftSaved():
         await Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
@@ -734,6 +734,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         syncService: widget.syncService,
         connectivityService: widget.connectivityService,
         realtimeVersion: _feedRealtimeVersion,
+        publishedPostTargetId: _publishedPostTargetId,
         onOpenNotifications: _showNotificationsScreen,
         onOpenSearch: _openSearch,
         onOpenSearchQuery: _openSearch,
@@ -864,8 +865,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         // Feed is on screen and the chrome is auto-hidden (or revealed),
         // so we gate it to the Feed tab. The widget itself is a no-op
         // when [IncomingFeedMessageBanner] is null.
-        floatingActionButtonLocation:
-            FloatingActionButtonLocation.endTop,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
         floatingActionButton: _index == 0 && !_showNotifications
             ? _IncomingBannerHost(
                 banner: _incomingMessageBanner,
@@ -897,10 +897,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
 /// `Stack` + `Positioned` so it does not interfere with the Scaffold's
 /// layout. Returns `SizedBox.shrink()` when no banner is provided.
 class _IncomingBannerHost extends StatelessWidget {
-  const _IncomingBannerHost({
-    required this.banner,
-    required this.onOpen,
-  });
+  const _IncomingBannerHost({required this.banner, required this.onOpen});
 
   final IncomingFeedMessageBanner? banner;
   final ValueChanged<String> onOpen;
@@ -1136,6 +1133,53 @@ class FeedScreenBackController {
   }
 }
 
+class PublishedPostPlacement {
+  const PublishedPostPlacement({
+    required this.tabIndex,
+    required this.pageIndex,
+    required this.found,
+  });
+
+  final int tabIndex;
+  final int pageIndex;
+  final bool found;
+}
+
+PublishedPostPlacement locatePublishedPost(
+  List<FeedItem> items,
+  String postId,
+) {
+  final published = items.whereType<FeedPostItem>().where(
+    (item) => item.post.id == postId || item.post.displayedPost.id == postId,
+  );
+  if (published.isEmpty) {
+    return const PublishedPostPlacement(
+      tabIndex: 0,
+      pageIndex: 0,
+      found: false,
+    );
+  }
+
+  final post = published.first.post.displayedPost;
+  final tabIndex = post.hasVideoMedia ? 0 : 1;
+  final filtered = items
+      .whereType<FeedPostItem>()
+      .where((item) {
+        final displayed = item.post.displayedPost;
+        return tabIndex == 0 ? displayed.hasVideoMedia : displayed.isPhotoOnly;
+      })
+      .toList(growable: false);
+  final pageIndex = filtered.indexWhere(
+    (item) => item.post.id == postId || item.post.displayedPost.id == postId,
+  );
+
+  return PublishedPostPlacement(
+    tabIndex: tabIndex,
+    pageIndex: pageIndex < 0 ? 0 : pageIndex,
+    found: pageIndex >= 0,
+  );
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     super.key,
@@ -1143,6 +1187,7 @@ class FeedScreen extends StatefulWidget {
     required this.syncService,
     required this.connectivityService,
     required this.realtimeVersion,
+    required this.publishedPostTargetId,
     required this.onOpenNotifications,
     required this.onOpenSearch,
     required this.onOpenSearchQuery,
@@ -1163,6 +1208,7 @@ class FeedScreen extends StatefulWidget {
   final SyncServiceContract syncService;
   final ConnectivityService connectivityService;
   final int realtimeVersion;
+  final String? publishedPostTargetId;
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSearch;
 
@@ -1221,6 +1267,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   /// the empty state for a beat before posts arrive.
   bool _initialRefreshPending = true;
   Timer? _realtimeRefreshDebounce;
+  String? _appliedPublishedPostTargetId;
   ModalRoute<void>? _subscribedRoute;
   bool _routeVisible = true;
 
@@ -1257,9 +1304,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     // read) so the feed paints immediately on open, then reconcile with the
     // ranked server engine in the background. The old path awaited a full
     // remote refresh before showing anything, which made the feed take seconds.
-    _postsFuture = widget.feedRepository
-        .loadPosts()
-        .then((posts) => posts.map<FeedItem>(FeedPostItem.new).toList());
+    _postsFuture = widget.feedRepository.loadPosts().then(
+      (posts) => posts.map<FeedItem>(FeedPostItem.new).toList(),
+    );
     _refreshInBackground();
     _syncBackController();
     _chrome.attachListener(_onChromeStateChanged);
@@ -1355,6 +1402,30 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         _reloadAfterRealtimeEvent,
       );
     }
+    final targetId = widget.publishedPostTargetId;
+    if (targetId != null && targetId != _appliedPublishedPostTargetId) {
+      _appliedPublishedPostTargetId = targetId;
+      unawaited(_focusPublishedPost(targetId));
+    }
+  }
+
+  Future<void> _focusPublishedPost(String postId) async {
+    final posts = await widget.feedRepository.loadPosts();
+    if (!mounted || widget.publishedPostTargetId != postId) return;
+    final items = posts.map<FeedItem>(FeedPostItem.new).toList(growable: false);
+    final placement = locatePublishedPost(items, postId);
+    setState(() {
+      _postsFuture = Future.value(items);
+      _tabIndex = placement.tabIndex;
+      _activePage = placement.pageIndex;
+      _message = 'Post published.';
+    });
+    _syncBackController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pageController.hasClients) return;
+      _pageController.jumpToPage(placement.pageIndex);
+      _reapplyImmersiveSurfaceState();
+    });
   }
 
   void _syncBackController() {
@@ -1535,7 +1606,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     if (cached == null || cached.isEmpty) return false;
     final active = cached[_activePage.clamp(0, cached.length - 1)];
     // Ads are not video surfaces for the immersive timer's purposes.
-    return active is FeedPostItem && active.post.mediaType == 'video';
+    return active is FeedPostItem && active.post.displayedPost.hasVideoMedia;
   }
 
   List<FeedItem>? _lastPosts;
@@ -1650,10 +1721,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                     .then((list) => list.length)
                     .catchError((_) => 0),
               ]);
-              return CreatorStats(
-                followers: results[0],
-                following: results[1],
-              );
+              return CreatorStats(followers: results[0], following: results[1]);
             },
       onViewProfile: () => widget.onOpenUserProfile(content.userId),
     );
@@ -1677,33 +1745,22 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           body,
           parentCommentId: parentCommentId,
         );
-        if (parentCommentId == null && mounted) {
-          final args = PostControllerArgs(
-            post: post,
-            repository: widget.feedRepository,
-          );
-          ProviderScope.containerOf(
-            context,
-          ).read(postControllerProvider(args).notifier).incrementCommentCount();
-        }
         return created;
       },
       onToggleLike: (comment, liked) =>
           widget.feedRepository.toggleCommentLike(comment.id, liked: liked),
       onDelete: (comment) async {
         await widget.feedRepository.deleteComment(comment.id);
-        if (comment.parentCommentId == null) {
-          final args = PostControllerArgs(
-            post: post,
-            repository: widget.feedRepository,
-          );
-          // The card owns this provider; update the same stable family key.
-          if (mounted) {
-            ProviderScope.containerOf(context)
-                .read(postControllerProvider(args).notifier)
-                .decrementCommentCount();
-          }
-        }
+      },
+      onCountChanged: (delta) {
+        if (!mounted) return;
+        final args = PostControllerArgs(
+          post: post,
+          repository: widget.feedRepository,
+        );
+        ProviderScope.containerOf(
+          context,
+        ).read(postControllerProvider(args).notifier).adjustCommentCount(delta);
       },
       onOpenUserProfile: widget.onOpenUserProfile,
       currentUserId: widget.currentUserId,
@@ -1756,7 +1813,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         ];
         setState(() {
           _postsFuture = Future.value(nextPosts);
-          _tabIndex = created.displayedPost.mediaType == 'video' ? 0 : 1;
+          _tabIndex = created.displayedPost.hasVideoMedia ? 0 : 1;
           _activePage = 0;
           _message = 'Quote shared to your feed.';
         });
@@ -1939,10 +1996,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   /// playback. Non-video posts return an `absorb` decision so the
   /// pager's surface tap never fights the existing double-tap Like.
   void Function(FeedSurfaceTapIntent intent) _handleSurfaceTapForPost(
-      FeedPost post, int postIndex) {
+    FeedPost post,
+    int postIndex,
+  ) {
     return (intent) {
       if (!_routeVisible) return;
-      final isVideo = post.mediaType == 'video';
+      final isVideo = post.displayedPost.hasVideoMedia;
       final decision = FeedGestureResolver.decideSurfaceTap(
         chromeState: _chromeState,
         isActiveVideoPage: isVideo && postIndex == _activePage,
@@ -2028,7 +2087,8 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                           icon: const Icon(Icons.search, color: Colors.white),
                         ),
                         _NotificationBellAction(
-                          unreadCountFuture: widget.notificationUnreadCountFuture,
+                          unreadCountFuture:
+                              widget.notificationUnreadCountFuture,
                           onTap: widget.onOpenNotifications,
                           foregroundColor: Colors.white,
                         ),
@@ -2039,8 +2099,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                               if (filtered.isEmpty) {
                                 return const SizedBox.shrink();
                               }
-                              final active = filtered[
-                                  _activePage.clamp(0, filtered.length - 1)];
+                              final active =
+                                  filtered[_activePage.clamp(
+                                    0,
+                                    filtered.length - 1,
+                                  )];
                               // Only own posts get the delete affordance; ads
                               // and others' posts do not.
                               if (active is! FeedPostItem ||
@@ -2080,10 +2143,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   /// still surface regardless of the tab.
   List<FeedItem> _filterPosts(List<FeedItem> posts) {
     bool isVideo(FeedItem item) =>
-        item is FeedPostItem && item.post.mediaType == 'video';
+        item is FeedPostItem && item.post.displayedPost.hasVideoMedia;
+    bool isPhoto(FeedItem item) =>
+        item is FeedPostItem && item.post.displayedPost.isPhotoOnly;
     return switch (_tabIndex) {
       0 => posts.where((item) => item is FeedAdItem || isVideo(item)).toList(),
-      1 => posts.where((item) => item is FeedAdItem || !isVideo(item)).toList(),
+      1 => posts.where((item) => item is FeedAdItem || isPhoto(item)).toList(),
       2 => const <FeedItem>[],
       _ => posts,
     };

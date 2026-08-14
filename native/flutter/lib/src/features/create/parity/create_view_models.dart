@@ -63,6 +63,7 @@ class ComposerMediaItem {
     this.thumbnailPath,
     this.width,
     this.height,
+    this.filterId = 'original',
   });
 
   /// Stable key for tray/reorder/remove (e.g. a uuid). NOT the file path.
@@ -79,6 +80,7 @@ class ComposerMediaItem {
   final String? thumbnailPath;
   final int? width;
   final int? height;
+  final String filterId;
 
   bool get isVideo => kind == CreateMediaKind.video;
 
@@ -103,6 +105,7 @@ class ComposerMediaItem {
     String? thumbnailPath,
     int? width,
     int? height,
+    String? filterId,
   }) {
     return ComposerMediaItem(
       id: id,
@@ -112,8 +115,23 @@ class ComposerMediaItem {
       thumbnailPath: thumbnailPath ?? this.thumbnailPath,
       width: width ?? this.width,
       height: height ?? this.height,
+      filterId: filterId ?? this.filterId,
     );
   }
+}
+
+List<ComposerMediaItem> updateComposerMediaFilter(
+  List<ComposerMediaItem> media, {
+  required String mediaId,
+  required String filterId,
+}) {
+  return media
+      .map(
+        (item) => item.id == mediaId && !item.isVideo
+            ? item.copyWith(filterId: filterId)
+            : item,
+      )
+      .toList(growable: false);
 }
 
 // ===========================================================================
@@ -219,6 +237,7 @@ class PostComposerCallbacks {
     required this.onRemoveMedia,
     required this.onPreviewIndexChanged,
     required this.onSubmit,
+    this.onFilterChanged,
     this.onReorderMedia,
     this.onSaveDraft,
     this.onClose,
@@ -241,6 +260,7 @@ class PostComposerCallbacks {
   /// Remove by stable [ComposerMediaItem.id].
   final ValueChanged<String> onRemoveMedia;
   final ValueChanged<int> onPreviewIndexChanged;
+  final void Function(String mediaId, String filterId)? onFilterChanged;
   final VoidCallback onSubmit;
   final void Function(int oldIndex, int newIndex)? onReorderMedia;
   final VoidCallback? onSaveDraft;

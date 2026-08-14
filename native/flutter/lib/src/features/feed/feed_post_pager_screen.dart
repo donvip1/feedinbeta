@@ -159,20 +159,18 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       post: post,
       comments: comments,
       onSubmit: (body, parentCommentId) async {
-        final created = await widget.feedRepository.addComment(
+        return widget.feedRepository.addComment(
           post.id,
           body,
           parentCommentId: parentCommentId,
         );
-        if (parentCommentId == null) controller.incrementCommentCount();
-        return created;
       },
       onToggleLike: (comment, liked) =>
           widget.feedRepository.toggleCommentLike(comment.id, liked: liked),
       onDelete: (comment) async {
         await widget.feedRepository.deleteComment(comment.id);
-        if (comment.parentCommentId == null) controller.decrementCommentCount();
       },
+      onCountChanged: controller.adjustCommentCount,
       onOpenUserProfile: widget.onOpenUserProfile,
       currentUserId: widget.currentUserId,
     );

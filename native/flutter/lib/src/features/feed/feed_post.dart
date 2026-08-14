@@ -1,3 +1,20 @@
+class FeedPostMedia {
+  const FeedPostMedia({
+    required this.url,
+    required this.type,
+    required this.filterId,
+    this.localPath,
+  });
+
+  final String url;
+  final String type;
+  final String filterId;
+  final String? localPath;
+
+  bool get isVideo => type == 'video';
+  bool get isImage => !isVideo;
+}
+
 class FeedPost {
   const FeedPost({
     required this.id,
@@ -11,6 +28,7 @@ class FeedPost {
     this.mediaUrls = const [],
     this.mediaTypes = const [],
     this.mediaFilterId,
+    this.mediaFilterIds = const [],
     this.localMediaPath,
     this.likesCount = 0,
     this.commentsCount = 0,
@@ -41,6 +59,7 @@ class FeedPost {
   final List<String> mediaUrls;
   final List<String> mediaTypes;
   final String? mediaFilterId;
+  final List<String> mediaFilterIds;
   final String? localMediaPath;
   final int likesCount;
   final int commentsCount;
@@ -79,6 +98,45 @@ class FeedPost {
   bool get isQuoteRefeed =>
       isRefeed && body.trim().isNotEmpty && originalPost != null;
 
+  List<FeedPostMedia> get normalizedMedia {
+    final urls = <String>[];
+    for (final value in mediaUrls) {
+      final trimmed = value.trim();
+      if (trimmed.isNotEmpty && !urls.contains(trimmed)) urls.add(trimmed);
+    }
+    final legacyUrl = mediaUrl?.trim();
+    if (urls.isEmpty && legacyUrl != null && legacyUrl.isNotEmpty) {
+      urls.add(legacyUrl);
+    }
+
+    return [
+      for (final (index, url) in urls.indexed)
+        FeedPostMedia(
+          url: url,
+          type: index < mediaTypes.length && mediaTypes[index].trim().isNotEmpty
+              ? mediaTypes[index].trim().toLowerCase()
+              : index == 0 && mediaType?.trim().isNotEmpty == true
+              ? mediaType!.trim().toLowerCase()
+              : 'image',
+          filterId:
+              index < mediaFilterIds.length &&
+                  mediaFilterIds[index].trim().isNotEmpty
+              ? mediaFilterIds[index].trim()
+              : index == 0 && mediaFilterId?.trim().isNotEmpty == true
+              ? mediaFilterId!.trim()
+              : 'original',
+          localPath: index == 0 ? localMediaPath : null,
+        ),
+    ];
+  }
+
+  bool get hasVideoMedia => normalizedMedia.any((media) => media.isVideo);
+
+  bool get isPhotoOnly {
+    final media = normalizedMedia;
+    return media.isNotEmpty && media.every((item) => item.isImage);
+  }
+
   FeedPost copyWith({
     String? localMediaPath,
     int? likesCount,
@@ -101,6 +159,7 @@ class FeedPost {
       mediaUrls: mediaUrls,
       mediaTypes: mediaTypes,
       mediaFilterId: mediaFilterId,
+      mediaFilterIds: mediaFilterIds,
       localMediaPath: localMediaPath ?? this.localMediaPath,
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
@@ -138,6 +197,9 @@ class FeedPost {
           (json['mediaTypes'] as List?)?.whereType<String>().toList() ??
           const [],
       mediaFilterId: json['mediaFilterId'] as String?,
+      mediaFilterIds:
+          (json['mediaFilterIds'] as List?)?.whereType<String>().toList() ??
+          const [],
       localMediaPath: json['localMediaPath'] as String?,
       likesCount: json['likesCount'] as int? ?? 0,
       commentsCount: json['commentsCount'] as int? ?? 0,
@@ -175,6 +237,7 @@ class FeedPost {
       'mediaUrls': mediaUrls,
       'mediaTypes': mediaTypes,
       'mediaFilterId': mediaFilterId,
+      'mediaFilterIds': mediaFilterIds,
       'localMediaPath': localMediaPath,
       'likesCount': likesCount,
       'commentsCount': commentsCount,

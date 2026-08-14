@@ -10,6 +10,7 @@ class PostDraft {
     this.privacy = 'everyone',
     this.draftKind = 'post',
     this.mediaFilterId,
+    this.mediaFilterIds = const [],
     this.uploadState = DraftUploadState.local,
   });
 
@@ -22,6 +23,7 @@ class PostDraft {
   final String privacy;
   final String draftKind;
   final String? mediaFilterId;
+  final List<String> mediaFilterIds;
   final int createdAtMillis;
   final DraftUploadState uploadState;
 
@@ -36,6 +38,7 @@ class PostDraft {
       privacy: privacy,
       draftKind: draftKind,
       mediaFilterId: mediaFilterId,
+      mediaFilterIds: mediaFilterIds,
       createdAtMillis: createdAtMillis,
       uploadState: uploadState ?? this.uploadState,
     );
@@ -65,6 +68,9 @@ class PostDraft {
       privacy: json['privacy'] as String? ?? 'everyone',
       draftKind: json['draftKind'] as String? ?? 'post',
       mediaFilterId: json['mediaFilterId'] as String?,
+      mediaFilterIds:
+          (json['mediaFilterIds'] as List?)?.whereType<String>().toList() ??
+          const [],
       createdAtMillis: json['createdAtMillis'] as int,
       uploadState: DraftUploadState.values.byName(
         json['uploadState'] as String? ?? DraftUploadState.local.name,
@@ -83,6 +89,7 @@ class PostDraft {
       'privacy': privacy,
       'draftKind': draftKind,
       'mediaFilterId': mediaFilterId,
+      'mediaFilterIds': mediaFilterIds,
       'createdAtMillis': createdAtMillis,
       'uploadState': uploadState.name,
     };

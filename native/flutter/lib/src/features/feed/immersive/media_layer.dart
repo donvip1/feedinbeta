@@ -6,6 +6,7 @@ import '../state/feed_chrome_state_machine.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_video_player.dart';
 import 'photo_carousel.dart';
+import 'post_photo_viewer.dart';
 
 /// Resolves and renders a post's background media: the immersive video
 /// player, a photo carousel, or a branded gradient text card when there
@@ -47,53 +48,23 @@ class MediaLayer extends StatelessWidget {
   /// so its gesture behavior matches the host's reveal state.
   final FeedChromeVisibility chromeState;
 
-  String? get _primaryMediaType {
-    final type = post.mediaType;
-    if (type != null && type.isNotEmpty) return type;
-    final types = post.mediaTypes;
-    return types.isNotEmpty ? types.first : null;
-  }
-
-  bool get _isVideo => _primaryMediaType == 'video';
-
-  StudioFilter? get _mediaFilter {
-    final id = post.mediaFilterId?.trim();
-    if (id == null || id.isEmpty || id == 'original') return null;
+  StudioFilter? _mediaFilter(String id) {
+    if (id.isEmpty || id == 'original') return null;
     for (final filter in kStudioFilters) {
       if (filter.id == id) return filter;
     }
     return null;
   }
 
-  /// Non-empty image urls from [FeedPost.mediaUrl] + [FeedPost.mediaUrls],
-  /// de-duplicated while preserving order.
-  List<String> get _imageUrls {
-    final seen = <String>{};
-    final urls = <String>[];
-    void add(String? value) {
-      if (value == null) return;
-      final trimmed = value.trim();
-      if (trimmed.isEmpty) return;
-      if (seen.add(trimmed)) urls.add(trimmed);
-    }
-
-    add(post.mediaUrl);
-    for (final url in post.mediaUrls) {
-      add(url);
-    }
-    return urls;
-  }
-
   @override
   Widget build(BuildContext context) {
     Widget media;
-    if (_isVideo) {
-      final url =
-          post.mediaUrl ??
-          (post.mediaUrls.isNotEmpty ? post.mediaUrls.first : null);
+    final normalized = post.normalizedMedia;
+    final video = normalized.where((item) => item.isVideo).firstOrNull;
+    if (video != null) {
       media = ImmersiveVideoPlayer(
-        url: url,
-        localPath: post.localMediaPath,
+        url: video.url,
+        localPath: video.localPath,
         isActive: isActive,
         onDoubleTapLike: onDoubleTapLike,
         onSurfaceTap: onSurfaceTap,
@@ -101,18 +72,26 @@ class MediaLayer extends StatelessWidget {
         chromeState: chromeState,
       );
     } else {
-      final imageUrls = _imageUrls;
-      if (imageUrls.isNotEmpty) {
-        // The post carries a single local media path, so attach it to the first
-        // image and pad the rest with nulls.
-        final localPaths = <String?>[
-          for (var i = 0; i < imageUrls.length; i++)
-            i == 0 ? post.localMediaPath : null,
-        ];
+      final images = normalized.where((item) => item.isImage).toList();
+      if (images.isNotEmpty) {
         media = PhotoCarousel(
-          urls: imageUrls,
-          localPaths: localPaths,
+          urls: images.map((item) => item.url).toList(growable: false),
+          localPaths: images
+              .map((item) => item.localPath)
+              .toList(growable: false),
+          colorFilters: images
+              .map((item) => _mediaFilter(item.filterId)?.filter)
+              .toList(growable: false),
           onDoubleTapLike: onDoubleTapLike,
+          onPhotoTap: (index) => Navigator.of(context).push<void>(
+            PostPhotoViewer.route(
+              urls: images.map((item) => item.url).toList(growable: false),
+              localPaths: images
+                  .map((item) => item.localPath)
+                  .toList(growable: false),
+              initialIndex: index,
+            ),
+          ),
         );
       } else {
         return _TextCardBackground(
@@ -122,10 +101,7 @@ class MediaLayer extends StatelessWidget {
       }
     }
 
-    final colorFilter = _mediaFilter?.filter;
-    return colorFilter == null
-        ? media
-        : ColorFiltered(colorFilter: colorFilter, child: media);
+    return media;
   }
 }
 

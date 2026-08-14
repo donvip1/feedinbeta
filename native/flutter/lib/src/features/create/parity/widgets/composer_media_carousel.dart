@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../camera_studio/studio_filters.dart';
 import '../create_tokens.dart';
 import '../create_view_models.dart';
 
@@ -198,7 +199,7 @@ class _MediaPage extends StatelessWidget {
     if (item.isVideo) {
       return _VideoPreviewTile(item: item);
     }
-    return ColoredBox(
+    Widget image = ColoredBox(
       color: CreateColors.blackTile,
       child: Image.file(
         File(item.previewPath),
@@ -206,6 +207,11 @@ class _MediaPage extends StatelessWidget {
         errorBuilder: (context, error, stackTrace) => const _MediaFallback(),
       ),
     );
+    final filter = studioFilterById(item.filterId)?.filter;
+    if (filter != null) {
+      image = ColorFiltered(colorFilter: filter, child: image);
+    }
+    return image;
   }
 }
 
@@ -232,7 +238,9 @@ class _VideoPreviewTileState extends State<_VideoPreviewTile> {
   @override
   void initState() {
     super.initState();
-    _initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initialize();
+    });
   }
 
   @override
@@ -321,8 +329,10 @@ class _VideoPreviewTileState extends State<_VideoPreviewTile> {
               ),
             ),
           )
+        else if (_failed)
+          const _MediaFallback(key: Key('composer-video-failed'))
         else
-          const _MediaFallback(),
+          const _VideoLoadingSurface(),
         // Dim the frame slightly so the play glyph reads on bright footage.
         const DecoratedBox(
           decoration: BoxDecoration(color: CreateColors.videoScrim),
@@ -349,7 +359,7 @@ class _VideoPreviewTileState extends State<_VideoPreviewTile> {
 /// Neutral gradient placeholder with a play glyph, used when a video has no
 /// thumbnail / fails to initialize. Never a blank/white tile.
 class _MediaFallback extends StatelessWidget {
-  const _MediaFallback();
+  const _MediaFallback({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -360,6 +370,31 @@ class _MediaFallback extends StatelessWidget {
           Icons.play_circle_fill,
           color: CreateColors.whiteSoft,
           size: 56,
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoLoadingSurface extends StatelessWidget {
+  const _VideoLoadingSurface();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      key: Key('composer-video-loading'),
+      color: CreateColors.blackTile,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: CreateColors.primary),
+            SizedBox(height: CreateSpacing.sm),
+            Text(
+              'Preparing video preview…',
+              style: TextStyle(color: CreateColors.onMedia),
+            ),
+          ],
         ),
       ),
     );

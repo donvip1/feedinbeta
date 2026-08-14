@@ -122,12 +122,16 @@ class PostController extends FamilyNotifier<PostState, PostControllerArgs> {
   }
 
   void incrementCommentCount() {
-    state = state.copyWith(commentsCount: state.commentsCount + 1);
+    adjustCommentCount(1);
   }
 
   void decrementCommentCount() {
+    adjustCommentCount(-1);
+  }
+
+  void adjustCommentCount(int delta) {
     state = state.copyWith(
-      commentsCount: _nonNegative(state.commentsCount - 1),
+      commentsCount: _nonNegative(state.commentsCount + delta),
     );
   }
 

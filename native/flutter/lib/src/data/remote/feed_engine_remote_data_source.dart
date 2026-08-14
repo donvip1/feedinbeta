@@ -95,7 +95,9 @@ class FeedEngineRemoteDataSource {
     final authorName = (displayName != null && displayName.isNotEmpty)
         ? displayName
         : (username != null && username.isNotEmpty ? username : 'feedIn User');
-    final handle = (username != null && username.isNotEmpty) ? '@$username' : '';
+    final handle = (username != null && username.isNotEmpty)
+        ? '@$username'
+        : '';
 
     final original = json['original_post'];
     final originalPost = original is Map
@@ -113,6 +115,8 @@ class FeedEngineRemoteDataSource {
       mediaType: _text(json['media_type']),
       mediaUrls: _stringList(json['media_urls']),
       mediaTypes: _stringList(json['media_types']),
+      mediaFilterId: _text(json['media_filter_id']),
+      mediaFilterIds: _stringList(json['media_filter_ids']),
       likesCount: _int(json['likes_count']),
       commentsCount: _int(json['comments_count']),
       viewsCount: _int(json['views_count']),

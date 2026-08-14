@@ -80,6 +80,57 @@ void main() {
     expect(find.text('A threaded reply'), findsOneWidget);
   });
 
+  testWidgets('header and count callback include replies after submission', (
+    tester,
+  ) async {
+    const reply = FeedComment(
+      id: 'reply-existing',
+      userId: 'viewer',
+      authorName: 'Viewer',
+      authorHandle: '@viewer',
+      content: 'Existing reply',
+      createdAtMillis: 2,
+      parentCommentId: 'comment-1',
+    );
+    final deltas = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CommentSheet(
+            post: post,
+            comments: const [root, reply],
+            currentUserId: 'viewer',
+            onSubmit: (body, parentCommentId) async => FeedComment(
+              id: 'reply-new',
+              userId: 'viewer',
+              authorName: 'Viewer',
+              authorHandle: '@viewer',
+              content: body,
+              createdAtMillis: 3,
+              parentCommentId: parentCommentId,
+            ),
+            onToggleLike: (comment, liked) async => !liked,
+            onDelete: (_) async {},
+            onOpenUserProfile: (_) {},
+            onCountChanged: deltas.add,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('2 Comments'), findsOneWidget);
+    await tester.tap(find.text('Reply'));
+    await tester.enterText(
+      find.byKey(const Key('comment-composer')),
+      'New reply',
+    );
+    await tester.tap(find.bySemanticsLabel('Send comment'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 Comments'), findsOneWidget);
+    expect(deltas, [1]);
+  });
+
   testWidgets('reply-to-reply preserves exact parent and emoji inserts', (
     tester,
   ) async {
@@ -193,6 +244,44 @@ void main() {
     expect(find.text('First comment'), findsNothing);
     expect(find.text('Child'), findsNothing);
     expect(find.text('Grandchild'), findsNothing);
+  });
+
+  testWidgets('deleting a root reports every removed descendant', (
+    tester,
+  ) async {
+    const child = FeedComment(
+      id: 'reply-1',
+      userId: 'owner-1',
+      authorName: 'Grace',
+      authorHandle: '@grace',
+      content: 'Child',
+      createdAtMillis: 2,
+      parentCommentId: 'comment-1',
+    );
+    final deltas = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CommentSheet(
+            post: post,
+            comments: const [root, child],
+            currentUserId: 'owner-1',
+            onSubmit: (_, _) => throw UnimplementedError(),
+            onToggleLike: (comment, liked) async => !liked,
+            onDelete: (_) async {},
+            onOpenUserProfile: (_) {},
+            onCountChanged: deltas.add,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Delete').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(deltas, [-2]);
   });
 
   testWidgets('comment likes update optimistically', (tester) async {

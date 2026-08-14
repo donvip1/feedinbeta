@@ -9,7 +9,7 @@ class FeedRemoteDataSource {
   final bool isConfigured;
 
   static const _postFields =
-      'id, user_id, content, media_url, media_type, media_urls, media_types, media_filter_id, created_at, likes_count, comments_count, views_count, refeeds_count, location, post_type, status, original_post_id, profiles:user_id(username, display_name, avatar_url)';
+      'id, user_id, content, media_url, media_type, media_urls, media_types, media_filter_id, media_filter_ids, created_at, likes_count, comments_count, views_count, refeeds_count, location, post_type, status, original_post_id, profiles:user_id(username, display_name, avatar_url)';
 
   Future<List<FeedPost>> fetchFeed({
     int limit = 30,
@@ -601,6 +601,7 @@ class FeedRemoteDataSource {
       mediaUrls: _stringList(row['media_urls']),
       mediaTypes: _stringList(row['media_types']),
       mediaFilterId: row['media_filter_id']?.toString(),
+      mediaFilterIds: _stringList(row['media_filter_ids']),
       likesCount: _intValue(row['likes_count']),
       commentsCount: _intValue(row['comments_count']),
       viewsCount: _intValue(row['views_count']),

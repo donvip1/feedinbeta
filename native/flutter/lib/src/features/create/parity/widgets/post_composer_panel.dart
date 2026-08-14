@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../camera_studio/studio_filter_tray.dart';
+import '../../camera_studio/studio_filters.dart';
 import '../create_tokens.dart';
 import '../create_view_models.dart';
 import 'composer_media_carousel.dart';
@@ -131,6 +133,23 @@ class PostComposerPanel extends StatelessWidget {
       ),
     ];
 
+    final activeIndex = view.currentPreviewIndex.clamp(
+      0,
+      view.media.length - 1,
+    );
+    final activeMedia = view.media[activeIndex];
+    final onFilterChanged = callbacks.onFilterChanged;
+    if (!activeMedia.isVideo && onFilterChanged != null) {
+      section.add(const SizedBox(height: CreateSpacing.sm));
+      section.add(
+        _ComposerFilterControls(
+          key: ValueKey('composer-filter-${activeMedia.id}'),
+          item: activeMedia,
+          onSelected: (filter) => onFilterChanged(activeMedia.id, filter.id),
+        ),
+      );
+    }
+
     if (!view.isAtMediaLimit) {
       section.add(const SizedBox(height: CreateSpacing.sm));
       section.add(
@@ -146,6 +165,48 @@ class PostComposerPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: section,
+    );
+  }
+}
+
+class _ComposerFilterControls extends StatefulWidget {
+  const _ComposerFilterControls({
+    super.key,
+    required this.item,
+    required this.onSelected,
+  });
+
+  final ComposerMediaItem item;
+  final ValueChanged<StudioFilter> onSelected;
+
+  @override
+  State<_ComposerFilterControls> createState() =>
+      _ComposerFilterControlsState();
+}
+
+class _ComposerFilterControlsState extends State<_ComposerFilterControls> {
+  bool _visible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () => setState(() => _visible = !_visible),
+            icon: const Icon(Icons.tune_rounded),
+            label: const Text('Filter'),
+          ),
+        ),
+        StudioFilterTray(
+          visible: _visible,
+          selectedId: widget.item.filterId,
+          onSelected: widget.onSelected,
+          onClose: () => setState(() => _visible = false),
+        ),
+      ],
     );
   }
 }

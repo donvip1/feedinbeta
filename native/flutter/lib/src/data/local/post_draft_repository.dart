@@ -28,6 +28,7 @@ class PostDraftRepository {
     String privacy = 'everyone',
     String draftKind = 'post',
     String? mediaFilterId,
+    List<String> mediaFilterIds = const [],
   }) async {
     final normalizedMediaPaths = mediaPaths.isNotEmpty
         ? List<String>.unmodifiable(mediaPaths)
@@ -50,6 +51,7 @@ class PostDraftRepository {
       privacy: privacy,
       draftKind: draftKind,
       mediaFilterId: mediaFilterId,
+      mediaFilterIds: List<String>.unmodifiable(mediaFilterIds),
       createdAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
     await _box.put(draft.id, draft.toJson());

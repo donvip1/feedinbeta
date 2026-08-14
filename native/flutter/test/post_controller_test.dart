@@ -87,6 +87,23 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'Comment count adjusts by reply-inclusive deltas without going negative',
+    () {
+      final repository = _PostRepository();
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final args = PostControllerArgs(post: post, repository: repository);
+      final controller = container.read(postControllerProvider(args).notifier);
+
+      controller.adjustCommentCount(3);
+      expect(container.read(postControllerProvider(args)).commentsCount, 5);
+
+      controller.adjustCommentCount(-10);
+      expect(container.read(postControllerProvider(args)).commentsCount, 0);
+    },
+  );
 }
 
 class _PostRepository implements LocalFeedRepositoryContract {

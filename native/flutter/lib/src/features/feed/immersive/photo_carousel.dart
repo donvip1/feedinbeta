@@ -15,7 +15,9 @@ class PhotoCarousel extends StatefulWidget {
     super.key,
     required this.urls,
     required this.localPaths,
+    this.colorFilters = const [],
     this.onDoubleTapLike,
+    this.onPhotoTap,
   });
 
   /// Remote image urls (each entry expected to be a non-empty string).
@@ -23,9 +25,11 @@ class PhotoCarousel extends StatefulWidget {
 
   /// Parallel list to [urls]; an entry may be a cached file path or null.
   final List<String?> localPaths;
+  final List<ColorFilter?> colorFilters;
 
   /// Invoked on a double-tap anywhere over the photos (TikTok-style like).
   final VoidCallback? onDoubleTapLike;
+  final ValueChanged<int>? onPhotoTap;
 
   @override
   State<PhotoCarousel> createState() => _PhotoCarouselState();
@@ -50,6 +54,11 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   String? _localPathFor(int index) {
     if (index < 0 || index >= widget.localPaths.length) return null;
     return widget.localPaths[index];
+  }
+
+  ColorFilter? _colorFilterFor(int index) {
+    if (index < 0 || index >= widget.colorFilters.length) return null;
+    return widget.colorFilters[index];
   }
 
   @override
@@ -78,10 +87,20 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
               setState(() => _currentIndex = index);
             },
             itemBuilder: (context, index) {
-              return _CarouselImage(
-                url: urls[index],
-                localPath: _localPathFor(index),
+              Widget image = GestureDetector(
+                key: ValueKey('photo-carousel-page-$index'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => widget.onPhotoTap?.call(index),
+                child: _CarouselImage(
+                  url: urls[index],
+                  localPath: _localPathFor(index),
+                ),
               );
+              final filter = _colorFilterFor(index);
+              if (filter != null) {
+                image = ColorFiltered(colorFilter: filter, child: image);
+              }
+              return image;
             },
           ),
 

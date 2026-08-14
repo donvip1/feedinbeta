@@ -101,6 +101,14 @@ const List<StudioFilter> kStudioFilters = [
   ),
 ];
 
+StudioFilter? studioFilterById(String? id) {
+  if (id == null || id.isEmpty || id == 'original') return null;
+  for (final filter in kStudioFilters) {
+    if (filter.id == id) return filter;
+  }
+  return null;
+}
+
 /// Subtle brightening/softening applied when Beauty is toggled on, layered over
 /// the selected filter via a second [ColorFiltered].
 const ColorFilter kBeautyFilter = ColorFilter.matrix(<double>[

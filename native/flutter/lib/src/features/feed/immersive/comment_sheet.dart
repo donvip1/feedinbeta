@@ -12,6 +12,9 @@ typedef CommentSubmitCallback =
 typedef CommentLikeCallback =
     Future<bool> Function(FeedComment comment, bool liked);
 typedef CommentDeleteCallback = Future<void> Function(FeedComment comment);
+typedef CommentCountChangedCallback = void Function(int delta);
+
+void _ignoreCommentCountDelta(int delta) {}
 
 /// Live user search for @mention autocomplete. Returns lightweight
 /// (userId, displayName, handle, avatarUrl) records for the current query.
@@ -53,6 +56,7 @@ Future<void> showCommentSheet(
   required CommentSubmitCallback onSubmit,
   required CommentLikeCallback onToggleLike,
   required CommentDeleteCallback onDelete,
+  required CommentCountChangedCallback onCountChanged,
   required ValueChanged<String> onOpenUserProfile,
   required String currentUserId,
   ValueChanged<String>? onOpenHashtag,
@@ -69,6 +73,7 @@ Future<void> showCommentSheet(
         onSubmit: onSubmit,
         onToggleLike: onToggleLike,
         onDelete: onDelete,
+        onCountChanged: onCountChanged,
         onOpenUserProfile: onOpenUserProfile,
         currentUserId: currentUserId,
         onOpenHashtag: onOpenHashtag,
@@ -102,6 +107,7 @@ class CommentSheet extends StatefulWidget {
     required this.onSubmit,
     required this.onToggleLike,
     required this.onDelete,
+    this.onCountChanged = _ignoreCommentCountDelta,
     required this.onOpenUserProfile,
     required this.currentUserId,
     this.onOpenHashtag,
@@ -114,6 +120,7 @@ class CommentSheet extends StatefulWidget {
   final CommentSubmitCallback onSubmit;
   final CommentLikeCallback onToggleLike;
   final CommentDeleteCallback onDelete;
+  final CommentCountChangedCallback onCountChanged;
   final ValueChanged<String> onOpenUserProfile;
   final String currentUserId;
 
@@ -136,6 +143,7 @@ class _CommentSheetState extends State<CommentSheet> {
   late final List<FeedComment> _comments = [...widget.comments];
   final Set<String> _processingLikes = <String>{};
   bool _sending = false;
+  bool _countMutated = false;
   bool _emojiPickerVisible = false;
   FeedComment? _replyingTo;
 
@@ -164,8 +172,9 @@ class _CommentSheetState extends State<CommentSheet> {
     final selection = _controller.selection;
     if (!selection.isValid || !selection.isCollapsed) return null;
     final upToCaret = _controller.text.substring(0, selection.baseOffset);
-    final match = RegExp(r'(?<![A-Za-z0-9_])@([A-Za-z0-9_.]*)$')
-        .firstMatch(upToCaret);
+    final match = RegExp(
+      r'(?<![A-Za-z0-9_])@([A-Za-z0-9_.]*)$',
+    ).firstMatch(upToCaret);
     return match?.group(1);
   }
 
@@ -231,9 +240,9 @@ class _CommentSheetState extends State<CommentSheet> {
   }
 
   String get _countLabel {
-    final n = _rootComments.isEmpty
-        ? widget.post.commentsCount
-        : _rootComments.length;
+    final n = _comments.isNotEmpty || _countMutated
+        ? _comments.length
+        : widget.post.commentsCount;
     return n == 1 ? '1 Comment' : '$n Comments';
   }
 
@@ -304,9 +313,11 @@ class _CommentSheetState extends State<CommentSheet> {
       if (!mounted) return;
       setState(() {
         _comments.add(comment);
+        _countMutated = true;
         _controller.clear();
         _replyingTo = null;
       });
+      widget.onCountChanged(1);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -370,15 +381,17 @@ class _CommentSheetState extends State<CommentSheet> {
     );
     if (confirmed != true || !mounted) return;
     try {
+      final removedIds = _descendantIds(comment.id);
       await widget.onDelete(comment);
       if (!mounted) return;
-      final removedIds = _descendantIds(comment.id);
       setState(() {
         _comments.removeWhere((item) => removedIds.contains(item.id));
+        _countMutated = true;
         if (_replyingTo case final reply?) {
           if (removedIds.contains(reply.id)) _replyingTo = null;
         }
       });
+      widget.onCountChanged(-removedIds.length);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -153,6 +153,7 @@ class UploadQueueService {
           'media_urls': mediaUrls,
           'media_types': mediaTypes,
           'media_filter_id': draft.mediaFilterId,
+          'media_filter_ids': draft.mediaFilterIds,
           'privacy': draft.privacy,
           'post_type': 'post',
           'status': 'active',
