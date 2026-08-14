@@ -20,7 +20,9 @@ void main() {
       machine.reportImmersiveSurface(isActive: true);
       machine.reportVideoPlayback(isPlaying: true);
 
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 3));
+      expect(machine.state, FeedChromeVisibility.full);
+      clock.advance(const Duration(seconds: 1));
       expect(machine.state, FeedChromeVisibility.hidden);
       expect(changes, [FeedChromeVisibility.hidden]);
     });
@@ -39,7 +41,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
       expect(machine.state, FeedChromeVisibility.hidden);
 
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
@@ -54,7 +56,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
 
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.socialOnly);
@@ -66,7 +68,7 @@ void main() {
 
       // Full remains visible for the complete inactivity delay, then returns
       // to immersive mode while playback is still active.
-      clock.advance(const Duration(milliseconds: 1999));
+      clock.advance(const Duration(milliseconds: 3999));
       expect(machine.state, FeedChromeVisibility.full);
       clock.advance(const Duration(milliseconds: 1));
       expect(machine.state, FeedChromeVisibility.hidden);
@@ -89,7 +91,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
       expect(machine.state, FeedChromeVisibility.hidden);
 
       machine.reportImmersiveSurface(isActive: false);
@@ -101,7 +103,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
       expect(machine.state, FeedChromeVisibility.hidden);
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.socialOnly);
@@ -117,7 +119,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.socialOnly);
 
@@ -132,7 +134,7 @@ void main() {
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 2));
+      clock.advance(const Duration(seconds: 4));
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       machine.handleSurfaceTap(FeedSurfaceTapIntent.chromeReveal);
       expect(machine.state, FeedChromeVisibility.full);
@@ -143,12 +145,34 @@ void main() {
       expect(machine.state, FeedChromeVisibility.full);
     });
 
+    test(
+      'pausing hidden video reveals chrome and resuming restarts four-second timer',
+      () {
+        final clock = FakeFeedChromeClock();
+        final machine = FeedChromeStateMachine(clock: clock)
+          ..reportImmersiveSurface(isActive: true)
+          ..reportVideoPlayback(isPlaying: true);
+        clock.advance(const Duration(seconds: 4));
+        expect(machine.state, FeedChromeVisibility.hidden);
+
+        machine.reportVideoPlayback(isPlaying: false);
+        expect(machine.state, FeedChromeVisibility.full);
+
+        machine.reportVideoPlayback(isPlaying: true);
+        clock.advance(const Duration(seconds: 3));
+        expect(machine.state, FeedChromeVisibility.full);
+        clock.advance(const Duration(seconds: 1));
+        expect(machine.state, FeedChromeVisibility.hidden);
+      },
+    );
+
     test('multiple advance calls fire timers in chronological order', () {
       final clock = FakeFeedChromeClock();
       final machine = FeedChromeStateMachine(clock: clock)
         ..reportImmersiveSurface(isActive: true)
         ..reportVideoPlayback(isPlaying: true);
-      clock.advance(const Duration(seconds: 1));
+      clock.advance(const Duration(seconds: 3));
+      expect(machine.state, FeedChromeVisibility.full);
       clock.advance(const Duration(seconds: 1));
       expect(machine.state, FeedChromeVisibility.hidden);
     });

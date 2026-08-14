@@ -39,18 +39,23 @@ import '../calls/livekit_call_media_engine.dart';
 import '../channels/screens/channels_screen.dart';
 import '../contacts/contacts_screen.dart';
 import '../groups/screens/groups_screen.dart';
+import '../gifts/data/gift_remote_data_source.dart';
+import '../gifts/presentation/gift_marketplace_sheet.dart';
 import '../live/live_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../create/camera_studio/camera_studio_screen.dart';
 import '../create/camera_studio/studio_capture_controls.dart';
 import '../create/create_outcome.dart';
-import '../create/create_post_screen.dart' show showCreateMediaSourceSheet;
+import '../create/create_action_sheet.dart';
+import '../create/create_post_screen.dart';
 import '../create/drafts_uploads_screen.dart';
 import '../create/parity/create_view_models.dart';
 import '../messages/messages_screen.dart';
 import '../notifications/parity/notifications_view_models.dart';
 import '../notifications/parity/widgets/notification_bell_badge.dart';
 import '../notifications/notifications_screen.dart';
+import '../promotions/data/promotion_remote_data_source.dart';
+import '../promotions/presentation/promote_post_flow.dart';
 import '../profile/profile_screen.dart';
 import '../profile/user_profile.dart';
 import '../profile/user_profile_screen.dart';
@@ -64,6 +69,7 @@ import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
+import 'immersive/feed_post_actions_sheet.dart';
 import 'immersive/incoming_feed_message_banner.dart';
 import 'immersive/refeed_sheet.dart';
 import '../../core/realtime/incoming_message_resolver.dart';
@@ -434,10 +440,29 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
   /// Create is a floating "+" action. Source selection happens before camera
   /// initialization, so opening Create never requests camera access by itself.
   void _openCreate() {
-    showCreateMediaSourceSheet(
-      context,
-      onMethod: (method) => unawaited(_openSelectedCreateMethod(method)),
-    );
+    unawaited(_chooseCreateAction());
+  }
+
+  Future<void> _chooseCreateAction() async {
+    final action = await showCreateActionSheet(context);
+    if (!mounted || action == null) return;
+    switch (action) {
+      case CreateAction.video:
+        await _openSelectedCreateMethod(CaptureMethod.recordVideo);
+      case CreateAction.photo:
+        await _openSelectedCreateMethod(CaptureMethod.takePhoto);
+      case CreateAction.story:
+        await _openStoryComposerRoute();
+      case CreateAction.goLive:
+        final liveAction = await showLiveCreateActionSheet(context);
+        if (!mounted || liveAction == null) return;
+        switch (liveAction) {
+          case LiveCreateAction.videoLive:
+            await showGoLiveSheet(context);
+          case LiveCreateAction.audioSpace:
+            await showStartLiveSpaceSheet(context);
+        }
+    }
   }
 
   void _handlePostUploaded(String? postId) {
@@ -461,6 +486,44 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
               ? StudioCaptureMode.video60
               : StudioCaptureMode.photo,
           onPostUploaded: _handlePostUploaded,
+        ),
+      ),
+    );
+    if (!mounted || outcome == null) return;
+    switch (outcome) {
+      case CreatePublished(:final postId):
+        await widget.feedRepository.refresh();
+        if (!mounted) return;
+        setState(() {
+          _index = 0;
+          _showNotifications = false;
+          _publishedPostTargetId = postId;
+        });
+      case CreateDraftSaved():
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => DraftsUploadsScreen(
+              draftRepository: widget.postDraftRepository,
+              uploadQueueRepository: widget.uploadQueueRepository,
+              uploadQueueService: widget.uploadQueueService,
+              onPostUploaded: _handlePostUploaded,
+            ),
+          ),
+        );
+    }
+  }
+
+  Future<void> _openStoryComposerRoute() async {
+    final outcome = await Navigator.of(context).push<CreateOutcome>(
+      MaterialPageRoute<CreateOutcome>(
+        fullscreenDialog: true,
+        builder: (_) => CreatePostScreen(
+          draftRepository: widget.postDraftRepository,
+          uploadQueueRepository: widget.uploadQueueRepository,
+          uploadQueueService: widget.uploadQueueService,
+          connectivityService: widget.connectivityService,
+          onPostUploaded: _handlePostUploaded,
+          initialStoryMode: true,
         ),
       ),
     );
@@ -1118,6 +1181,50 @@ class _NotificationBellAction extends StatelessWidget {
   }
 }
 
+/// Keeps the feed selector at the viewport midpoint while reserving equal
+/// chrome space for the brand and the variable right-side action cluster.
+class FeedTopChromeLayout extends StatelessWidget {
+  const FeedTopChromeLayout({
+    super.key,
+    required this.leading,
+    required this.center,
+    required this.trailing,
+  });
+
+  final Widget leading;
+  final Widget center;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Keep at least an 80px center slot on narrow phones. The compact
+        // action cluster is 108px wide when the post menu is present.
+        final sideWidth =
+            ((constraints.maxWidth - 80) / 2).clamp(0, 128) as double;
+        return Row(
+          children: [
+            SizedBox(
+              width: sideWidth,
+              child: Align(alignment: Alignment.centerLeft, child: leading),
+            ),
+            Expanded(
+              child: Center(
+                child: FittedBox(fit: BoxFit.scaleDown, child: center),
+              ),
+            ),
+            SizedBox(
+              width: sideWidth,
+              child: Align(alignment: Alignment.centerRight, child: trailing),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class FeedScreenBackController {
   VoidCallback? _activeBackHandler;
 
@@ -1249,6 +1356,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   final PageController _pageController = PageController();
   final PostViewsRemoteDataSource _postViews =
       PostViewsRemoteDataSource.autoDetect();
+  final GiftRemoteDataSource _giftRepository =
+      GiftRemoteDataSource.autoDetect();
+  final PromotionRemoteDataSource _promotionRepository =
+      PromotionRemoteDataSource.autoDetect();
   String? _message;
   int _tabIndex = 0;
   int _activePage = 0;
@@ -1659,6 +1770,34 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     }
   }
 
+  Future<void> _openPostActions(FeedPost post) async {
+    final content = post.displayedPost;
+    final action = await showFeedPostActionsSheet(
+      context,
+      canDelete: post.userId == widget.currentUserId,
+      canPromote:
+          content.visibility == FeedPostVisibility.public &&
+          !content.isPromoted,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case FeedPostMenuAction.promote:
+        final campaign = await Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => PromotePostFlow(
+              post: content,
+              repository: _promotionRepository,
+            ),
+          ),
+        );
+        if (!mounted || campaign == null) return;
+        setState(() => _message = 'Promotion created successfully.');
+      case FeedPostMenuAction.delete:
+        await _deletePost(post);
+    }
+  }
+
   Future<void> _sharePost(FeedPost post) async {
     final action = await showFeedShareSheet(context, post: post);
     if (!mounted || action == null) return;
@@ -1680,6 +1819,19 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     } catch (_) {
       if (!mounted) return;
       setState(() => _message = 'Could not open the share sheet.');
+    }
+  }
+
+  Future<void> _openGiftMarketplace(FeedPost post) async {
+    try {
+      await showGiftMarketplaceSheet(
+        context,
+        postId: post.displayedPost.id,
+        repository: _giftRepository,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _message = 'Could not open gifts right now.');
     }
   }
 
@@ -1725,6 +1877,23 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             },
       onViewProfile: () => widget.onOpenUserProfile(content.userId),
     );
+  }
+
+  Future<void> _followCreator(FeedPost creatorPost) async {
+    try {
+      final following = await widget.socialGraphDataSource.toggleFollow(
+        creatorPost.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _message = following
+            ? 'You are now following ${creatorPost.authorName}.'
+            : 'Follow status updated.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _message = 'Could not follow this creator.');
+    }
   }
 
   Future<void> _openComments(FeedPost post) async {
@@ -1963,7 +2132,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             onCommentRequested: (_) => _openComments(post),
             onRefeedRequested: (controller) => _refeedPost(post, controller),
             onShare: () => _sharePost(post),
-            onGift: widget.onOpenWallet,
+            onGift: () => unawaited(_openGiftMarketplace(post)),
+            onFollow:
+                post.displayedPost.userId == widget.currentUserId ||
+                    post.displayedPost.viewerIsFollowing
+                ? null
+                : () => unawaited(_followCreator(post.displayedPost)),
             onAvatar: () => _openCreatorPreview(post),
             onCreatorName: () =>
                 widget.onOpenUserProfile(post.displayedPost.userId),
@@ -2059,9 +2233,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        const Text.rich(
+                    SizedBox(
+                      height: 48,
+                      child: FeedTopChromeLayout(
+                        leading: const Text.rich(
                           TextSpan(
                             children: [
                               TextSpan(text: 'feed'),
@@ -2080,53 +2255,71 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                             shadows: FeedImmersiveTheme.textShadow,
                           ),
                         ),
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Search',
-                          onPressed: widget.onOpenSearch,
-                          icon: const Icon(Icons.search, color: Colors.white),
+                        center: _ImmersiveFeedTabs(
+                          key: const Key('feed-top-tabs'),
+                          selectedIndex: _tabIndex,
+                          onChanged: _onTabChanged,
                         ),
-                        _NotificationBellAction(
-                          unreadCountFuture:
-                              widget.notificationUnreadCountFuture,
-                          onTap: widget.onOpenNotifications,
-                          foregroundColor: Colors.white,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Search',
+                              onPressed: widget.onOpenSearch,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 32,
+                                height: 32,
+                              ),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(
+                                Icons.search,
+                                color: Colors.white,
+                              ),
+                            ),
+                            _NotificationBellAction(
+                              unreadCountFuture:
+                                  widget.notificationUnreadCountFuture,
+                              onTap: widget.onOpenNotifications,
+                              foregroundColor: Colors.white,
+                            ),
+                            if (posts != null &&
+                                posts.isNotEmpty &&
+                                _tabIndex != 2)
+                              Builder(
+                                builder: (context) {
+                                  final filtered = _filterPosts(posts);
+                                  if (filtered.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final active =
+                                      filtered[_activePage.clamp(
+                                        0,
+                                        filtered.length - 1,
+                                      )];
+                                  if (active is! FeedPostItem) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return IconButton(
+                                    key: const Key('feed-post-more-actions'),
+                                    tooltip: 'Post actions',
+                                    onPressed: () => unawaited(
+                                      _openPostActions(active.post),
+                                    ),
+                                    constraints: const BoxConstraints.tightFor(
+                                      width: 32,
+                                      height: 32,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(
+                                      Icons.more_vert_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
                         ),
-                        if (posts != null && posts.isNotEmpty && _tabIndex != 2)
-                          Builder(
-                            builder: (context) {
-                              final filtered = _filterPosts(posts);
-                              if (filtered.isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-                              final active =
-                                  filtered[_activePage.clamp(
-                                    0,
-                                    filtered.length - 1,
-                                  )];
-                              // Only own posts get the delete affordance; ads
-                              // and others' posts do not.
-                              if (active is! FeedPostItem ||
-                                  active.post.userId != widget.currentUserId) {
-                                return const SizedBox.shrink();
-                              }
-                              return IconButton(
-                                key: const Key('feed-post-more-actions'),
-                                tooltip: 'Post actions',
-                                onPressed: () =>
-                                    unawaited(_deletePost(active.post)),
-                                icon: const Icon(
-                                  Icons.more_vert_rounded,
-                                  color: Colors.white,
-                                ),
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                    _ImmersiveFeedTabs(
-                      selectedIndex: _tabIndex,
-                      onChanged: _onTabChanged,
+                      ),
                     ),
                   ],
                 ),
@@ -2197,6 +2390,7 @@ class _PageTransition extends StatelessWidget {
 
 class _ImmersiveFeedTabs extends StatelessWidget {
   const _ImmersiveFeedTabs({
+    super.key,
     required this.selectedIndex,
     required this.onChanged,
   });
@@ -2257,7 +2451,7 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
         duration: FeedImmersiveTheme.motionPress,
         curve: FeedImmersiveTheme.premiumSettleCurve,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2274,7 +2468,7 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
                     style: TextStyle(
                       color: selected ? Colors.white : Colors.white60,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 16,
+                      fontSize: 10,
                       letterSpacing: selected ? 0.0 : 0.1,
                       shadows: FeedImmersiveTheme.textShadow,
                     ),
@@ -2282,12 +2476,12 @@ class _ImmersiveTabState extends State<_ImmersiveTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 2),
               AnimatedContainer(
                 duration: FeedImmersiveTheme.motionFast,
                 curve: FeedImmersiveTheme.premiumSettleCurve,
-                height: 3,
-                width: selected ? 24 : 0,
+                height: 2,
+                width: selected ? 18 : 0,
                 decoration: const BoxDecoration(
                   gradient: FeedImmersiveTheme.brandGradient,
                   borderRadius: BorderRadius.all(Radius.circular(2)),

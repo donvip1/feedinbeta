@@ -40,9 +40,9 @@ enum FeedSurfaceTapIntent { chromeReveal, videoPlayback, none }
 class FeedChromeStateMachine {
   FeedChromeStateMachine({
     FeedChromeClock clock = const _SystemClock(),
-    Duration autoHideDelay = const Duration(seconds: 2),
-  })  : _clock = clock,
-        _autoHideDelay = autoHideDelay;
+    Duration autoHideDelay = const Duration(seconds: 4),
+  }) : _clock = clock,
+       _autoHideDelay = autoHideDelay;
 
   final FeedChromeClock _clock;
   final Duration _autoHideDelay;
@@ -91,9 +91,15 @@ class FeedChromeStateMachine {
     if (wasPlaying == isPlaying) return;
 
     if (isPlaying && _isImmersiveSurfaceActive) {
+      if (_state != FeedChromeVisibility.full) {
+        setState(FeedChromeVisibility.full);
+      }
       _scheduleAutoHide();
     } else {
       _cancelAutoHide();
+      if (!isPlaying && _isImmersiveSurfaceActive) {
+        setState(FeedChromeVisibility.full);
+      }
     }
   }
 
@@ -162,7 +168,7 @@ class FeedChromeStateMachine {
       case FeedChromeVisibility.socialOnly:
         setState(FeedChromeVisibility.full);
         // The user explicitly revealed full chrome. If the video is still
-        // playing, restart the 2-second inactivity countdown so the Feed
+        // playing, restart the four-second inactivity countdown so the Feed
         // returns to immersive mode without requiring a playback change.
         _scheduleAutoHide();
         return _state;
