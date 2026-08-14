@@ -20,6 +20,9 @@ dist-ssr
 # WorkBuddy project-local state
 .workbuddy-ai/
 
+# Local isolated implementation worktrees
+.worktrees/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
