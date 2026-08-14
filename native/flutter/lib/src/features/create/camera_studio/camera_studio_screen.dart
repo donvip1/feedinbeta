@@ -5,22 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/connectivity/connectivity_service.dart';
+import '../../../core/connectivity/offline_notice.dart';
 import '../../../core/sync/upload_queue_service.dart';
 import '../../../data/local/post_draft_repository.dart';
 import '../../../data/local/upload_queue_repository.dart';
 import '../../feed/immersive/feed_immersive_theme.dart';
 import '../create_outcome.dart';
-import '../create_post_screen.dart';
 import '../parity/create_view_models.dart';
+import 'camera_studio_flow.dart';
 import 'camera_studio_review.dart';
 import 'studio_capture_controls.dart';
 import 'studio_filters.dart';
+import 'studio_post_details.dart';
+import 'studio_post_submission.dart';
 import 'studio_tool_rail.dart';
 import 'studio_top_bar.dart';
 
 /// Full-screen live camera studio. Owns the camera lifecycle and capture state
-/// machine, presents the premium studio chrome, and — on Next — hands the
-/// captured file to the existing [CreatePostScreen] publish pipeline.
+/// machine and keeps capture, review, post details, and publication on this
+/// single full-screen route.
 class CameraStudioScreen extends StatefulWidget {
   const CameraStudioScreen({
     super.key,
@@ -59,6 +62,17 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
   bool _beauty = false;
   int _timer = 0; // 0 / 3 / 10 seconds
   bool _isRecording = false;
+  StudioFlowState _flow = const StudioFlowState.capture();
+  XFile? _selectedFile;
+  String _caption = '';
+  PostPrivacy _privacy = PostPrivacy.everyone;
+  bool _isSubmitting = false;
+  String? _publishError;
+  late final StudioPostSubmission _submission = StudioPostSubmission(
+    draftRepository: widget.draftRepository,
+    uploadQueueRepository: widget.uploadQueueRepository,
+    uploadQueueService: widget.uploadQueueService,
+  );
 
   int _countdown = 0;
   Timer? _countdownTimer;
@@ -274,45 +288,87 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
   }
 
   void _openReview(XFile file, {required bool isVideo}) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => CameraStudioReview(
-          file: file,
-          isVideo: isVideo,
-          initialFilter: kStudioFilters.first,
-          onNext: (filter) =>
-              _handoffToComposer(file, isVideo: isVideo, filterId: filter.id),
-        ),
-      ),
-    );
+    setState(() {
+      _selectedFile = file;
+      _flow = StudioFlowState.review(mediaPath: file.path, isVideo: isVideo);
+      _publishError = null;
+    });
   }
 
-  Future<void> _handoffToComposer(
-    XFile file, {
-    required bool isVideo,
-    required String filterId,
-  }) async {
-    final outcome = await Navigator.of(context).push<CreateOutcome>(
-      MaterialPageRoute<CreateOutcome>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Complete Post')),
-          body: CreatePostScreen(
-            draftRepository: widget.draftRepository,
-            uploadQueueRepository: widget.uploadQueueRepository,
-            uploadQueueService: widget.uploadQueueService,
-            connectivityService: widget.connectivityService,
-            onPostUploaded: widget.onPostUploaded,
-            initialMediaPath: file.path,
-            initialMediaKind: isVideo
-                ? CreateMediaKind.video
-                : CreateMediaKind.image,
-            initialMediaFilterId: filterId == 'original' ? null : filterId,
-          ),
+  void _showPostDetails(StudioFilter filter) {
+    setState(() {
+      _flow = _flow.withFilter(filter.id).showDetails();
+      _publishError = null;
+    });
+  }
+
+  void _returnToReview() {
+    if (_isSubmitting) return;
+    setState(() {
+      _flow = _flow.showReview();
+      _publishError = null;
+    });
+  }
+
+  void _retake() {
+    setState(() {
+      _flow = const StudioFlowState.capture();
+      _selectedFile = null;
+      _publishError = null;
+    });
+    if (widget.initialSource == CaptureMethod.photoLibrary ||
+        widget.initialSource == CaptureMethod.videoLibrary) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openGallery());
+    } else if (_controller == null) {
+      unawaited(_setupCameras());
+    }
+  }
+
+  StudioFilter get _selectedFilter => kStudioFilters.firstWhere(
+    (filter) => filter.id == _flow.filterId,
+    orElse: () => kStudioFilters.first,
+  );
+
+  Future<void> _publishPost() async {
+    final file = _selectedFile;
+    if (file == null || _isSubmitting) return;
+    if (!widget.connectivityService.isOnline) {
+      showOfflineSnackBar(
+        context,
+        message: "You're offline. Reconnect before publishing this post.",
+      );
+      return;
+    }
+    setState(() {
+      _isSubmitting = true;
+      _publishError = null;
+    });
+    try {
+      final result = await _submission.submit(
+        StudioPostSubmissionInput(
+          caption: _caption,
+          mediaPath: file.path,
+          isVideo: _flow.isVideo,
+          privacy: _privacy.wireValue,
+          filterId: _flow.filterId,
         ),
-      ),
-    );
-    if (!mounted || outcome == null) return;
-    Navigator.of(context).pop(outcome);
+      );
+      if (!mounted) return;
+      if (result.publishedPostId case final postId?) {
+        Navigator.of(context).pop(CreatePublished(postId));
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _publishError = result.summary.message;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _publishError = 'Could not publish this post. Please try again.';
+      });
+    }
   }
 
   void _showError(String message) {
@@ -324,6 +380,37 @@ class _CameraStudioScreenState extends State<CameraStudioScreen>
 
   @override
   Widget build(BuildContext context) {
+    final file = _selectedFile;
+    if (_flow.stage == StudioFlowStage.review && file != null) {
+      return CameraStudioReview(
+        key: const Key('studio-review-stage'),
+        file: file,
+        isVideo: _flow.isVideo,
+        initialFilter: _selectedFilter,
+        onRetake: _retake,
+        onNext: _showPostDetails,
+      );
+    }
+    if (_flow.stage == StudioFlowStage.details && file != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: StudioPostDetails(
+          file: file,
+          isVideo: _flow.isVideo,
+          filter: _selectedFilter,
+          caption: _caption,
+          privacy: _privacy,
+          isSubmitting: _isSubmitting,
+          errorMessage: _publishError,
+          onBack: _returnToReview,
+          onCaptionChanged: (value) => _caption = value,
+          onPrivacyChanged: (value) => setState(() => _privacy = value),
+          onFilterChanged: (filter) =>
+              setState(() => _flow = _flow.withFilter(filter.id)),
+          onSubmit: _publishPost,
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       body: _error != null

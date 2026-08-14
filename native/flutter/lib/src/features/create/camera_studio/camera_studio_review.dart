@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../feed/immersive/feed_immersive_theme.dart';
 import 'studio_filter_tray.dart';
@@ -16,12 +17,14 @@ class CameraStudioReview extends StatefulWidget {
     required this.file,
     required this.isVideo,
     required this.initialFilter,
+    required this.onRetake,
     required this.onNext,
   });
 
   final XFile file;
   final bool isVideo;
   final StudioFilter initialFilter;
+  final VoidCallback onRetake;
   final ValueChanged<StudioFilter> onNext;
 
   @override
@@ -31,6 +34,36 @@ class CameraStudioReview extends StatefulWidget {
 class _CameraStudioReviewState extends State<CameraStudioReview> {
   late StudioFilter _filter = widget.initialFilter;
   bool _filtersOpen = false;
+  VideoPlayerController? _videoController;
+  Object? _videoError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isVideo) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _initializeVideo());
+    }
+  }
+
+  Future<void> _initializeVideo() async {
+    if (!mounted) return;
+    final controller = VideoPlayerController.file(File(widget.file.path));
+    _videoController = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.play();
+    } catch (error) {
+      _videoError = error;
+    }
+    if (mounted && identical(_videoController, controller)) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +83,7 @@ class _CameraStudioReviewState extends State<CameraStudioReview> {
                   icon: Icons.replay_rounded,
                   semanticLabel: 'Retake',
                   caption: 'Retake',
-                  onTap: () => Navigator.of(context).maybePop(),
+                  onTap: widget.onRetake,
                 ),
               ),
             ),
@@ -102,6 +135,7 @@ class _CameraStudioReviewState extends State<CameraStudioReview> {
                       ),
                     ),
                     _NextButton(
+                      key: const Key('studio-review-next'),
                       onTap: () {
                         HapticFeedback.selectionClick();
                         widget.onNext(_filter);
@@ -119,23 +153,39 @@ class _CameraStudioReviewState extends State<CameraStudioReview> {
 
   Widget _preview() {
     if (widget.isVideo) {
-      return const ColoredBox(
+      final controller = _videoController;
+      if (_videoError != null) {
+        return const ColoredBox(
+          key: Key('studio-review-video-failed'),
+          color: Colors.black,
+          child: Center(
+            child: Text(
+              'Video preview unavailable',
+              style: TextStyle(color: FeedImmersiveTheme.inkMuted),
+            ),
+          ),
+        );
+      }
+      if (controller == null || !controller.value.isInitialized) {
+        return const ColoredBox(
+          key: Key('studio-review-video-loading'),
+          color: Colors.black,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: FeedImmersiveTheme.brandPink,
+            ),
+          ),
+        );
+      }
+      return ColoredBox(
+        key: const Key('studio-review-video-ready'),
         color: Colors.black,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.movie_creation_rounded,
-                color: FeedImmersiveTheme.inkMuted,
-                size: 64,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Video captured',
-                style: TextStyle(color: FeedImmersiveTheme.inkMuted),
-              ),
-            ],
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
           ),
         ),
       );
@@ -175,7 +225,7 @@ class _ReviewScrims extends StatelessWidget {
 }
 
 class _NextButton extends StatelessWidget {
-  const _NextButton({required this.onTap});
+  const _NextButton({super.key, required this.onTap});
 
   final VoidCallback onTap;
 
