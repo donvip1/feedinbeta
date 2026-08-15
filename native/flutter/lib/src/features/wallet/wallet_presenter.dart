@@ -65,6 +65,12 @@ class WalletPresenter extends ChangeNotifier {
   CurrencyQuote _currencyQuote = CurrencyQuote.usd;
   CurrencyQuote get currencyQuote => _currencyQuote;
 
+  CurrencyDisplayPrice get balanceApproximation =>
+      CurrencyDisplayPrice.fromUsdMinor(
+        (_balance.approxUsd * 100).round(),
+        _currencyQuote,
+      );
+
   CurrencyDisplayPrice packagePrice(CreditPackage package) =>
       CurrencyDisplayPrice.fromUsdMinor(package.priceCents, _currencyQuote);
 

@@ -260,6 +260,8 @@ class _WalletScreenState extends State<WalletScreen>
               children: [
                 WalletBalanceCard(
                   balance: presenter.balance,
+                  localApproximation: presenter.balanceApproximation,
+                  rateTimestamp: presenter.currencyQuote.rateTimestampLabel,
                   onBuy: _showPackages,
                 ),
                 if (presenter.checkoutState != WalletCheckoutState.idle) ...[

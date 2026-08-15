@@ -20,6 +20,14 @@ class CurrencyQuote {
 
   bool get isUsd => currencyCode == 'USD';
 
+  String get rateTimestampLabel {
+    if (isUsd || updatedAtMillis <= 0) return 'USD base rate';
+    final date = DateTime.fromMillisecondsSinceEpoch(updatedAtMillis).toLocal();
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return 'Rate updated ${date.year}-$month-$day';
+  }
+
   int localMinorFromUsdMinor(int usdMinor) => (usdMinor * ratePerUsd).round();
 }
 

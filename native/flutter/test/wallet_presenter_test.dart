@@ -32,6 +32,12 @@ void main() {
     final price = presenter.packagePrice(data.packages.single);
     expect(price.primaryLabel, '₦15,150');
     expect(price.canonicalLabel, r'$10.00 USD equivalent');
+    expect(presenter.currencyQuote.rateTimestampLabel, 'Rate updated 1970-01-01');
+    expect(
+      CurrencyDisplayPrice.fromUsdMinor(1000, presenter.currencyQuote)
+          .primaryLabel,
+      '₦15,150',
+    );
   });
 
   test('falls back to canonical USD when local currency is unavailable', () async {

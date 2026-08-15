@@ -590,54 +590,9 @@ serve(async (req) => {
     const checkoutAmountMinor = checkoutMoney.amountMinor;
     const checkoutCurrency = checkoutMoney.currency;
 
-    if (purchaseType === "subscription" && billingInterval) {
-      if (checkoutCurrency !== "USD") paystackPlanCode = null;
-      if (!paystackPlanCode) {
-        const createdPlanCode = await createPaystackPlan(
-          paystackSecretKey,
-          description,
-          checkoutAmountMinor,
-          checkoutCurrency,
-          billingInterval,
-        );
-        if (checkoutCurrency === "USD") {
-          const { data: configuredPlanCode, error: configurePlanError } =
-            await admin.rpc("wallet_configure_paystack_plan", {
-              p_tier_id: itemId,
-              p_plan_code: createdPlanCode,
-            });
-          if (configurePlanError) throw configurePlanError;
-          paystackPlanCode = optionalString(configuredPlanCode);
-          if (!paystackPlanCode) {
-            throw new RequestError(
-              "Subscription Paystack plan could not be configured",
-              500,
-              "CATALOG_ERROR",
-            );
-          }
-          if (paystackPlanCode !== createdPlanCode) {
-            await validatePaystackPlan(
-              paystackSecretKey,
-              paystackPlanCode,
-              checkoutAmountMinor,
-              checkoutCurrency,
-              billingInterval,
-            );
-          }
-        } else {
-          paystackPlanCode = createdPlanCode;
-        }
-      } else {
-        await validatePaystackPlan(
-          paystackSecretKey,
-          paystackPlanCode,
-          checkoutAmountMinor,
-          checkoutCurrency,
-          billingInterval,
-        );
-      }
-    }
-
+    // Claim the idempotent intent before creating any provider-side plan. A
+    // retry must observe the existing intent instead of creating an orphaned
+    // Paystack plan on every request.
     const { data: registered, error: registerError } = await admin.rpc(
       "wallet_register_payment_intent",
       {
@@ -719,6 +674,72 @@ serve(async (req) => {
         409,
         "CHECKOUT_INITIALIZING",
       );
+    }
+
+    if (purchaseType === "subscription" && billingInterval) {
+      paystackPlanCode = optionalString(intent.metadata?.paystack_plan_code) ??
+        paystackPlanCode;
+      if (checkoutCurrency !== "USD") paystackPlanCode = null;
+      if (!paystackPlanCode) {
+        const createdPlanCode = await createPaystackPlan(
+          paystackSecretKey,
+          description,
+          checkoutAmountMinor,
+          checkoutCurrency,
+          billingInterval,
+        );
+        if (checkoutCurrency === "USD") {
+          const { data: configuredPlanCode, error: configurePlanError } =
+            await admin.rpc("wallet_configure_paystack_plan", {
+              p_tier_id: itemId,
+              p_plan_code: createdPlanCode,
+            });
+          if (configurePlanError) throw configurePlanError;
+          paystackPlanCode = optionalString(configuredPlanCode);
+          if (!paystackPlanCode) {
+            throw new RequestError(
+              "Subscription Paystack plan could not be configured",
+              500,
+              "CATALOG_ERROR",
+            );
+          }
+          if (paystackPlanCode !== createdPlanCode) {
+            await validatePaystackPlan(
+              paystackSecretKey,
+              paystackPlanCode,
+              checkoutAmountMinor,
+              checkoutCurrency,
+              billingInterval,
+            );
+          }
+        } else {
+          paystackPlanCode = createdPlanCode;
+        }
+      } else {
+        await validatePaystackPlan(
+          paystackSecretKey,
+          paystackPlanCode,
+          checkoutAmountMinor,
+          checkoutCurrency,
+          billingInterval,
+        );
+      }
+
+      const updatedMetadata = {
+        ...intent.metadata,
+        paystack_plan_code: paystackPlanCode,
+      };
+      const { data: updatedIntent, error: metadataError } = await admin
+        .from("wallet_payment_intents")
+        .update({ metadata: updatedMetadata })
+        .eq("id", intent.id)
+        .eq("initialization_token", initializationToken)
+        .select()
+        .single();
+      if (metadataError || !updatedIntent) {
+        throw metadataError ?? new Error("Could not persist subscription plan");
+      }
+      intent = updatedIntent as PaymentIntent;
     }
     currentIntentId = intent.id;
 
