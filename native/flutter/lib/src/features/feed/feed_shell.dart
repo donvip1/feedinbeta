@@ -1202,7 +1202,7 @@ class FeedTopChromeLayout extends StatelessWidget {
         // Keep at least an 80px center slot on narrow phones. The compact
         // action cluster is 108px wide when the post menu is present.
         final sideWidth =
-            ((constraints.maxWidth - 80) / 2).clamp(0, 128) as double;
+            ((constraints.maxWidth - 80) / 2).clamp(0.0, 128.0).toDouble();
         return Row(
           children: [
             SizedBox(

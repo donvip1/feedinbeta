@@ -86,6 +86,8 @@ void main() {
     await tester.tap(find.text('Continue'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(const Offset(200, 300));
+    await tester.pump();
 
     expect(find.text('Videos'), findsOneWidget);
     expect(find.text('Photos'), findsOneWidget);
@@ -119,6 +121,8 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pump(const Duration(milliseconds: 200));
+    await tester.tapAt(const Offset(200, 300));
+    await tester.pump();
     expect(find.text('Videos'), findsOneWidget);
     expect(find.text('Feed'), findsOneWidget);
     expect(find.text('Chats'), findsOneWidget);
