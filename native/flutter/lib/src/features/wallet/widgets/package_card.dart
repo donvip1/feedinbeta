@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/currency_models.dart';
 import '../data/wallet_models.dart';
 import '../wallet_theme.dart';
 import 'wallet_common.dart';
@@ -14,11 +15,13 @@ class WalletPackageCard extends StatelessWidget {
     super.key,
     required this.package,
     required this.onPurchase,
+    required this.displayPrice,
     this.busy = false,
   });
 
   final CreditPackage package;
   final VoidCallback onPurchase;
+  final CurrencyDisplayPrice displayPrice;
   final bool busy;
 
   /// Default "use credits for" perks (mirrors the web `DEFAULT_CREDIT_FEATURES`
@@ -196,11 +199,11 @@ class WalletPackageCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          formatMoney(package.priceMajor, package.currency),
+                          displayPrice.primaryLabel,
                           style: WalletTextStyles.price,
                         ),
                         Text(
-                          package.currency,
+                          displayPrice.canonicalLabel ?? package.currency,
                           style: WalletTextStyles.rowMuted.copyWith(
                             fontSize: 11,
                           ),

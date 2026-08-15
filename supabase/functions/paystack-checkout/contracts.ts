@@ -17,6 +17,13 @@ const uuidPattern =
 const idempotencyPattern = /^[A-Za-z0-9._:-]{8,128}$/;
 const providerReferencePattern = /^[A-Za-z0-9._=:-]{1,128}$/;
 const maxNativeMinorAmount = 2_147_483_647;
+const paystackCheckoutCurrencies = new Set(["USD", "NGN", "GHS", "KES", "ZAR"]);
+
+export type CheckoutMoney = {
+  amountMinor: number;
+  currency: string;
+  canonicalUsdMinor: number;
+};
 
 export function parsePurchaseType(value: unknown): PurchaseType {
   if (value === "credits" || value === "subscription") return value;
@@ -133,6 +140,62 @@ export function normalizeCatalogMoney(
       code: "CATALOG_ERROR",
     }),
     currency: normalizeCurrency(currency),
+  };
+}
+
+export function resolveRequestedCheckoutCurrency(value: unknown): string {
+  if (value == null) return "USD";
+  const currency = normalizeCurrency(value);
+  if (!paystackCheckoutCurrencies.has(currency)) {
+    throw new RequestError(
+      "This currency is not supported for Paystack checkout",
+      409,
+      "CHECKOUT_CURRENCY_UNSUPPORTED",
+    );
+  }
+  return currency;
+}
+
+export function convertCanonicalUsdToLocalMinor(input: {
+  canonicalUsdMinor: unknown;
+  requestedCurrency: unknown;
+  ratePerUsd?: unknown;
+  rateIsActive?: unknown;
+}): CheckoutMoney {
+  const canonicalUsdMinor = parseSafeInteger(
+    input.canonicalUsdMinor,
+    "canonical USD price",
+    { status: 500, code: "CATALOG_ERROR" },
+  );
+  const currency = resolveRequestedCheckoutCurrency(input.requestedCurrency);
+  if (currency === "USD") {
+    return { amountMinor: canonicalUsdMinor, currency, canonicalUsdMinor };
+  }
+  if (input.rateIsActive !== true) {
+    throw new RequestError(
+      "The selected currency is temporarily unavailable",
+      409,
+      "CURRENCY_RATE_UNAVAILABLE",
+    );
+  }
+  const rate = typeof input.ratePerUsd === "string"
+    ? Number(input.ratePerUsd)
+    : input.ratePerUsd;
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) {
+    throw new RequestError(
+      "The selected currency rate is invalid",
+      500,
+      "CURRENCY_RATE_INVALID",
+    );
+  }
+  const amountMinor = Math.round(canonicalUsdMinor * rate);
+  return {
+    amountMinor: parseSafeInteger(amountMinor, "converted checkout amount", {
+      status: 500,
+      code: "CURRENCY_CONVERSION_INVALID",
+    }),
+    currency,
+    canonicalUsdMinor,
   };
 }
 

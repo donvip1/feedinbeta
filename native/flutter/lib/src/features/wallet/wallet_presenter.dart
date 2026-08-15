@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'data/currency_models.dart';
 import 'data/wallet_gift_models.dart';
 import 'data/wallet_models.dart';
 import 'data/wallet_remote_data_source.dart';
@@ -61,6 +62,14 @@ class WalletPresenter extends ChangeNotifier {
   WalletLoadState get packagesState => _packagesState;
   List<CreditPackage> _packages = const [];
   List<CreditPackage> get packages => _packages;
+  CurrencyQuote _currencyQuote = CurrencyQuote.usd;
+  CurrencyQuote get currencyQuote => _currencyQuote;
+
+  CurrencyDisplayPrice packagePrice(CreditPackage package) =>
+      CurrencyDisplayPrice.fromUsdMinor(package.priceCents, _currencyQuote);
+
+  CurrencyDisplayPrice subscriptionPrice(SubscriptionTier tier) =>
+      CurrencyDisplayPrice.fromUsdMinor(tier.priceCents, _currencyQuote);
 
   // --- Transactions ---
   WalletLoadState _transactionsState = WalletLoadState.idle;
@@ -234,7 +243,12 @@ class WalletPresenter extends ChangeNotifier {
     _packagesState = WalletLoadState.loading;
     _safeNotify();
     try {
-      _packages = await _data.fetchPackages();
+      final results = await Future.wait([
+        _data.fetchPackages(),
+        _data.fetchCurrencyQuote(),
+      ]);
+      _packages = results[0] as List<CreditPackage>;
+      _currencyQuote = results[1] as CurrencyQuote;
       _packagesState = WalletLoadState.ready;
     } catch (_) {
       _packagesState = WalletLoadState.error;
@@ -333,13 +347,19 @@ class WalletPresenter extends ChangeNotifier {
   // --- Money moves (delegate to the data source; caller handles UX) -------
 
   Future<WalletCheckoutSession> startCreditCheckout(String packageId) async {
-    final session = await _data.startCreditCheckout(packageId);
+    final session = await _data.startCreditCheckout(
+      packageId,
+      currency: _currencyQuote.currencyCode,
+    );
     _rememberCheckout(session);
     return session;
   }
 
   Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) async {
-    final session = await _data.startSubscriptionCheckout(tierId);
+    final session = await _data.startSubscriptionCheckout(
+      tierId,
+      currency: _currencyQuote.currencyCode,
+    );
     _rememberCheckout(session);
     return session;
   }

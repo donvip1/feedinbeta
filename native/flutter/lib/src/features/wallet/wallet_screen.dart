@@ -374,6 +374,7 @@ class _WalletScreenState extends State<WalletScreen>
               padding: const EdgeInsets.only(bottom: WalletSpacing.md),
               child: WalletPackageCard(
                 package: package,
+                displayPrice: presenter.packagePrice(package),
                 onPurchase: () => _buy(package),
                 busy: _busyPackageId == package.id,
               ),
@@ -391,6 +392,7 @@ class _WalletScreenState extends State<WalletScreen>
               padding: const EdgeInsets.only(bottom: WalletSpacing.md),
               child: WalletSubscriptionCard(
                 tier: tier,
+                displayPrice: presenter.subscriptionPrice(tier),
                 isCurrent: presenter.activeTierId == tier.id,
                 busy: _busyTierId == tier.id,
                 onSubscribe: () => _subscribe(tier),

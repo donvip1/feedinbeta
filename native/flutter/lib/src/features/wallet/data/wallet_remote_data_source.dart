@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'currency_models.dart';
+import 'currency_remote_data_source.dart';
 import 'wallet_gift_models.dart';
 import 'wallet_models.dart';
 
@@ -7,6 +9,8 @@ import 'wallet_models.dart';
 /// implementation while presenters can use deterministic fakes.
 abstract interface class WalletDataSource {
   Future<CreditBalance> fetchBalance();
+
+  Future<CurrencyQuote> fetchCurrencyQuote();
 
   Future<List<CreditPackage>> fetchPackages();
 
@@ -38,9 +42,15 @@ abstract interface class WalletDataSource {
     required String accountNumber,
   });
 
-  Future<WalletCheckoutSession> startCreditCheckout(String packageId);
+  Future<WalletCheckoutSession> startCreditCheckout(
+    String packageId, {
+    required String currency,
+  });
 
-  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId);
+  Future<WalletCheckoutSession> startSubscriptionCheckout(
+    String tierId, {
+    required String currency,
+  });
 
   Future<WalletCheckoutVerification> verifyCheckout(String reference);
 
@@ -79,6 +89,7 @@ abstract final class WalletServerContract {
 
   static const checkoutTypeKey = 'type';
   static const checkoutItemIdKey = 'itemId';
+  static const checkoutCurrencyKey = 'currency';
   static const checkoutUrlKey = 'authorization_url';
   static const checkoutReferenceKey = 'reference';
   static const checkoutPaymentIntentIdKey = 'payment_intent_id';
@@ -98,6 +109,19 @@ abstract final class WalletServerContract {
   static const financeBuybackCreditsParam = 'p_credits_amount';
   static const financeBuybackIdempotencyParam = 'p_idempotency_key';
   static const financeBuybackRequestIdParam = 'p_request_id';
+
+  static Map<String, Object?> buildCheckoutBody({
+    required WalletCheckoutKind kind,
+    required String itemId,
+    required String currency,
+  }) => {
+    checkoutTypeKey: switch (kind) {
+      WalletCheckoutKind.credits => 'credits',
+      WalletCheckoutKind.subscription => 'subscription',
+    },
+    checkoutItemIdKey: itemId,
+    checkoutCurrencyKey: currency.toUpperCase(),
+  };
 
   static WalletCheckoutSession parseCheckoutSession(
     Object? raw, {
@@ -384,6 +408,18 @@ class WalletRemoteDataSource implements WalletDataSource {
         .maybeSingle();
     if (row == null) return CreditBalance.empty;
     return CreditBalance.fromJson(Map<String, Object?>.from(row));
+  }
+
+  @override
+  Future<CurrencyQuote> fetchCurrencyQuote() async {
+    final client = _client;
+    final userId = currentUserId;
+    if (client == null || userId == null) return CurrencyQuote.usd;
+    try {
+      return await CurrencyRemoteDataSource(client).fetchPreferredQuote(userId);
+    } catch (_) {
+      return CurrencyQuote.usd;
+    }
   }
 
   // --- Packages -----------------------------------------------------------
@@ -686,23 +722,35 @@ class WalletRemoteDataSource implements WalletDataSource {
   /// SECURITY: no payment keys are used here — the Edge Function owns the
   /// provider secret and returns only a redirect URL.
   @override
-  Future<WalletCheckoutSession> startCreditCheckout(String packageId) {
-    return _startCheckout(kind: WalletCheckoutKind.credits, itemId: packageId);
+  Future<WalletCheckoutSession> startCreditCheckout(
+    String packageId, {
+    required String currency,
+  }) {
+    return _startCheckout(
+      kind: WalletCheckoutKind.credits,
+      itemId: packageId,
+      currency: currency,
+    );
   }
 
   /// Start a hosted checkout to subscribe to [tierId]. Same server-owned
   /// contract as [startCreditCheckout].
   @override
-  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) {
+  Future<WalletCheckoutSession> startSubscriptionCheckout(
+    String tierId, {
+    required String currency,
+  }) {
     return _startCheckout(
       kind: WalletCheckoutKind.subscription,
       itemId: tierId,
+      currency: currency,
     );
   }
 
   Future<WalletCheckoutSession> _startCheckout({
     required WalletCheckoutKind kind,
     required String itemId,
+    required String currency,
   }) async {
     final client = _client;
     final userId = currentUserId;
@@ -713,13 +761,11 @@ class WalletRemoteDataSource implements WalletDataSource {
     try {
       final response = await client.functions.invoke(
         WalletServerContract.checkoutFunction,
-        body: {
-          WalletServerContract.checkoutTypeKey: switch (kind) {
-            WalletCheckoutKind.credits => 'credits',
-            WalletCheckoutKind.subscription => 'subscription',
-          },
-          WalletServerContract.checkoutItemIdKey: itemId,
-        },
+        body: WalletServerContract.buildCheckoutBody(
+          kind: kind,
+          itemId: itemId,
+          currency: currency,
+        ),
       );
       return WalletServerContract.parseCheckoutSession(
         response.data,

@@ -1,9 +1,11 @@
 import 'package:feedin/src/features/wallet/data/wallet_models.dart';
 import 'package:feedin/src/features/wallet/data/wallet_gift_models.dart';
 import 'package:feedin/src/features/wallet/data/wallet_remote_data_source.dart';
+import 'package:feedin/src/features/wallet/data/currency_models.dart';
 
 class FakeWalletDataSource implements WalletDataSource {
   CreditBalance balance = CreditBalance.empty;
+  CurrencyQuote currencyQuote = CurrencyQuote.usd;
   List<CreditPackage> packages = const [];
   List<CreditTransaction> transactions = const [];
   List<WalletGiftReceipt> receivedGifts = const [];
@@ -37,9 +39,13 @@ class FakeWalletDataSource implements WalletDataSource {
   String? verifiedReference;
   int? requestedFinanceBuybackCredits;
   String? canceledFinanceBuybackRequestId;
+  String? requestedCheckoutCurrency;
 
   @override
   Future<CreditBalance> fetchBalance() async => balance;
+
+  @override
+  Future<CurrencyQuote> fetchCurrencyQuote() async => currencyQuote;
 
   @override
   Future<List<CreditPackage>> fetchPackages() async => packages;
@@ -114,7 +120,11 @@ class FakeWalletDataSource implements WalletDataSource {
   }
 
   @override
-  Future<WalletCheckoutSession> startCreditCheckout(String packageId) async {
+  Future<WalletCheckoutSession> startCreditCheckout(
+    String packageId, {
+    required String currency,
+  }) async {
+    requestedCheckoutCurrency = currency;
     final session = creditCheckout;
     if (session == null || session.itemId != packageId) {
       throw StateError('Missing credit checkout for $packageId');
@@ -123,7 +133,11 @@ class FakeWalletDataSource implements WalletDataSource {
   }
 
   @override
-  Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) async {
+  Future<WalletCheckoutSession> startSubscriptionCheckout(
+    String tierId, {
+    required String currency,
+  }) async {
+    requestedCheckoutCurrency = currency;
     final session = subscriptionCheckout;
     if (session == null || session.itemId != tierId) {
       throw StateError('Missing subscription checkout for $tierId');

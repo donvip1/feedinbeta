@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   BillingInterval,
   checkoutExpiry,
+  convertCanonicalUsdToLocalMinor,
   createPaystackReference,
   JsonRecord,
   normalizeCatalogMoney,
@@ -20,6 +21,7 @@ import {
   requireHttpsUrl,
   requirePaystackCheckoutUrl,
   resolveIdempotencyKey,
+  resolveRequestedCheckoutCurrency,
   safeProviderMessage,
   toPaystackPlanInterval,
 } from "./contracts.ts";
@@ -465,13 +467,7 @@ serve(async (req) => {
     }
 
     const purchaseType = parsePurchaseType(body.type);
-    if (purchaseType !== "credits") {
-      throw new RequestError(
-        "Paystack checkout currently supports Feedin credit purchases only",
-        409,
-        "PURCHASE_TYPE_DISABLED",
-      );
-    }
+    const requestedCurrency = resolveRequestedCheckoutCurrency(body.currency);
     const itemId = parseUuid(body.itemId, "item ID");
     const requestedIdempotencyKey = resolveIdempotencyKey(
       body.idempotencyKey,
@@ -558,44 +554,85 @@ serve(async (req) => {
       description = `${tier.name} subscription`;
     }
 
+    if (catalogCurrency !== "USD") {
+      throw new RequestError(
+        "Wallet catalog prices must use canonical USD",
+        500,
+        "CATALOG_ERROR",
+      );
+    }
+
+    let ratePerUsd: number | null = null;
+    let rateUpdatedAt: string | null = null;
+    if (requestedCurrency !== "USD") {
+      const { data: currencyRate, error: currencyRateError } = await admin
+        .from("currency_rates")
+        .select("currency_code,rate_to_usd,is_active,updated_at")
+        .eq("currency_code", requestedCurrency)
+        .eq("is_active", true)
+        .single();
+      if (currencyRateError || !currencyRate) {
+        throw new RequestError(
+          "The selected currency is temporarily unavailable",
+          409,
+          "CURRENCY_RATE_UNAVAILABLE",
+        );
+      }
+      ratePerUsd = Number(currencyRate.rate_to_usd);
+      rateUpdatedAt = optionalString(currencyRate.updated_at);
+    }
+    const checkoutMoney = convertCanonicalUsdToLocalMinor({
+      canonicalUsdMinor: priceMinor,
+      requestedCurrency,
+      ratePerUsd,
+      rateIsActive: requestedCurrency === "USD" || ratePerUsd != null,
+    });
+    const checkoutAmountMinor = checkoutMoney.amountMinor;
+    const checkoutCurrency = checkoutMoney.currency;
+
     if (purchaseType === "subscription" && billingInterval) {
+      if (checkoutCurrency !== "USD") paystackPlanCode = null;
       if (!paystackPlanCode) {
         const createdPlanCode = await createPaystackPlan(
           paystackSecretKey,
           description,
-          priceMinor,
-          catalogCurrency,
+          checkoutAmountMinor,
+          checkoutCurrency,
           billingInterval,
         );
-        const { data: configuredPlanCode, error: configurePlanError } =
-          await admin.rpc("wallet_configure_paystack_plan", {
-            p_tier_id: itemId,
-            p_plan_code: createdPlanCode,
-          });
-        if (configurePlanError) throw configurePlanError;
-        paystackPlanCode = optionalString(configuredPlanCode);
-        if (!paystackPlanCode) {
-          throw new RequestError(
-            "Subscription Paystack plan could not be configured",
-            500,
-            "CATALOG_ERROR",
-          );
-        }
-        if (paystackPlanCode !== createdPlanCode) {
-          await validatePaystackPlan(
-            paystackSecretKey,
-            paystackPlanCode,
-            priceMinor,
-            catalogCurrency,
-            billingInterval,
-          );
+        if (checkoutCurrency === "USD") {
+          const { data: configuredPlanCode, error: configurePlanError } =
+            await admin.rpc("wallet_configure_paystack_plan", {
+              p_tier_id: itemId,
+              p_plan_code: createdPlanCode,
+            });
+          if (configurePlanError) throw configurePlanError;
+          paystackPlanCode = optionalString(configuredPlanCode);
+          if (!paystackPlanCode) {
+            throw new RequestError(
+              "Subscription Paystack plan could not be configured",
+              500,
+              "CATALOG_ERROR",
+            );
+          }
+          if (paystackPlanCode !== createdPlanCode) {
+            await validatePaystackPlan(
+              paystackSecretKey,
+              paystackPlanCode,
+              checkoutAmountMinor,
+              checkoutCurrency,
+              billingInterval,
+            );
+          }
+        } else {
+          paystackPlanCode = createdPlanCode;
         }
       } else {
         await validatePaystackPlan(
           paystackSecretKey,
           paystackPlanCode,
-          priceMinor,
-          catalogCurrency,
+          checkoutAmountMinor,
+          checkoutCurrency,
           billingInterval,
         );
       }
@@ -609,14 +646,18 @@ serve(async (req) => {
         p_item_id: itemId,
         p_provider: "paystack",
         p_idempotency_key: requestedIdempotencyKey,
-        p_amount_minor: priceMinor,
-        p_currency: catalogCurrency,
+        p_amount_minor: checkoutAmountMinor,
+        p_currency: checkoutCurrency,
         p_credits_amount: creditsAmount,
         p_billing_interval: billingInterval,
         p_metadata: {
           description,
           catalog_amount_minor: priceMinor,
           catalog_currency: catalogCurrency,
+          charged_amount_minor: checkoutAmountMinor,
+          charged_currency: checkoutCurrency,
+          rate_per_usd: ratePerUsd,
+          rate_updated_at: rateUpdatedAt,
           paystack_plan_code: paystackPlanCode,
         },
       },

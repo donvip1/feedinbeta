@@ -1,4 +1,5 @@
 import {
+  convertCanonicalUsdToLocalMinor,
   createPaystackReference,
   normalizeCatalogMoney,
   parsePaystackMetadata,
@@ -6,8 +7,49 @@ import {
   parsePurchaseType,
   requirePaystackCheckoutUrl,
   resolveIdempotencyKey,
+  resolveRequestedCheckoutCurrency,
   toPaystackPlanInterval,
 } from "./contracts.ts";
+
+Deno.test("converts canonical USD once into a supported local currency", () => {
+  const checkout = convertCanonicalUsdToLocalMinor({
+    canonicalUsdMinor: 1000,
+    requestedCurrency: "NGN",
+    ratePerUsd: 1515,
+    rateIsActive: true,
+  });
+  if (
+    checkout.amountMinor !== 1_515_000 || checkout.currency !== "NGN" ||
+    checkout.canonicalUsdMinor !== 1000
+  ) {
+    throw new Error(`Unexpected checkout money: ${JSON.stringify(checkout)}`);
+  }
+});
+
+Deno.test("rejects unsupported or inactive local checkout currencies", () => {
+  for (const currency of ["EUR", "CAD"]) {
+    let rejected = false;
+    try {
+      resolveRequestedCheckoutCurrency(currency);
+    } catch {
+      rejected = true;
+    }
+    if (!rejected) throw new Error(`${currency} was accepted for Paystack`);
+  }
+
+  let inactiveRejected = false;
+  try {
+    convertCanonicalUsdToLocalMinor({
+      canonicalUsdMinor: 1000,
+      requestedCurrency: "NGN",
+      ratePerUsd: 1515,
+      rateIsActive: false,
+    });
+  } catch {
+    inactiveRejected = true;
+  }
+  if (!inactiveRejected) throw new Error("Inactive rate was accepted");
+});
 
 Deno.test("keeps catalog amounts in their configured currency", () => {
   const usd = normalizeCatalogMoney(499, "usd");
