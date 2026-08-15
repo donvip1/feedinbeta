@@ -1,46 +1,66 @@
-import 'package:feedin/src/features/gifts/data/gift_models.dart';
-import 'package:feedin/src/features/gifts/data/gift_repository.dart';
+import 'package:feedin/src/features/gifts/data/gift_remote_data_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('repository contract keeps one idempotency key per send attempt', () {
-    final repository = RecordingGiftRepository();
-    final key = repository.beginSend();
-    expect(key, isNotEmpty);
-    expect(repository.beginSend(), isNot(key));
-    expect(repository.reconcile(key), isTrue);
-  });
-}
+  test(
+    'sendPostGift forwards one idempotency key and parses the receipt',
+    () async {
+      String? functionName;
+      Map<String, dynamic>? parameters;
+      final dataSource = GiftRemoteDataSource(
+        isConfigured: true,
+        rpcInvoker: (name, params) async {
+          functionName = name;
+          parameters = params;
+          return {
+            'gift_record_id': 'receipt-1',
+            'balance_after': 70,
+            'recipient_balance_after': 24,
+            'notification_id': 'notification-1',
+            'recipient_credit_value': 24,
+            'platform_fee_credits': 6,
+            'assets': {'key': 'golden-star', 'version': 2},
+          };
+        },
+      );
 
-class RecordingGiftRepository implements GiftRepository {
-  final _attempts = <String>{};
+      final result = await dataSource.sendPostGift(
+        giftId: 'gift-1',
+        postId: 'post-1',
+        idempotencyKey: 'attempt-1',
+      );
 
-  @override
-  Future<List<GiftCatalogItem>> fetchPostGifts() async => const [];
+      expect(functionName, 'send_post_gift');
+      expect(parameters, {
+        'p_gift_id': 'gift-1',
+        'p_post_id': 'post-1',
+        'p_idempotency_key': 'attempt-1',
+      });
+      expect(result.giftRecordId, 'receipt-1');
+      expect(result.balanceAfter, 70);
+      expect(result.recipientBalanceAfter, 24);
+      expect(result.notificationId, 'notification-1');
+      expect(result.recipientCreditValue, 24);
+      expect(result.platformFeeCredits, 6);
+      expect(result.assets.version, 2);
+    },
+  );
 
-  @override
-  Future<GiftSendResult> sendPostGift({
-    required String giftId,
-    required String postId,
-    required String idempotencyKey,
-  }) async {
-    _attempts.add(idempotencyKey);
-    return GiftSendResult(
-      giftRecordId: idempotencyKey,
-      balanceAfter: 0,
-      recipientBalanceAfter: 0,
-      notificationId: null,
-      recipientCreditValue: 0,
-      platformFeeCredits: 0,
-      assets: GiftAssetManifest.fallback('pulse-heart'),
+  test('sendPostGift rejects a malformed RPC response', () async {
+    final dataSource = GiftRemoteDataSource(
+      isConfigured: true,
+      rpcInvoker: (_, _) async => const ['not-a-receipt'],
     );
-  }
 
-  String beginSend() {
-    final key = DateTime.now().microsecondsSinceEpoch.toString();
-    _attempts.add(key);
-    return key;
-  }
-
-  bool reconcile(String key) => _attempts.contains(key);
+    expect(
+      () => dataSource.sendPostGift(
+        giftId: 'gift-1',
+        postId: 'post-1',
+        idempotencyKey: 'attempt-1',
+      ),
+      throwsA(
+        predicate((error) => error.toString().contains('INVALID_RESPONSE')),
+      ),
+    );
+  });
 }

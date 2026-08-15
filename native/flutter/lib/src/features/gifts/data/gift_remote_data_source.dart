@@ -5,8 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'gift_models.dart';
 import 'gift_repository.dart';
 
+typedef GiftRpcInvoker =
+    Future<Object?> Function(
+      String functionName,
+      Map<String, dynamic> parameters,
+    );
+
 class GiftRemoteDataSource implements GiftRepository {
-  const GiftRemoteDataSource({required this.isConfigured});
+  const GiftRemoteDataSource({required this.isConfigured, this.rpcInvoker});
 
   factory GiftRemoteDataSource.autoDetect() {
     try {
@@ -18,6 +24,7 @@ class GiftRemoteDataSource implements GiftRepository {
   }
 
   final bool isConfigured;
+  final GiftRpcInvoker? rpcInvoker;
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -52,14 +59,14 @@ class GiftRemoteDataSource implements GiftRepository {
   }) async {
     if (!isConfigured) throw const GiftUnavailable();
     try {
-      final raw = await _client.rpc(
-        'send_post_gift',
-        params: {
-          'p_gift_id': giftId,
-          'p_post_id': postId,
-          'p_idempotency_key': idempotencyKey,
-        },
-      );
+      final parameters = <String, dynamic>{
+        'p_gift_id': giftId,
+        'p_post_id': postId,
+        'p_idempotency_key': idempotencyKey,
+      };
+      final raw = rpcInvoker == null
+          ? await _client.rpc('send_post_gift', params: parameters)
+          : await rpcInvoker!('send_post_gift', parameters);
       if (raw is! Map) throw UnknownGiftFailure('INVALID_RESPONSE');
       final map = Map<String, dynamic>.from(raw);
       final assets = map['assets'];
