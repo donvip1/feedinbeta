@@ -80,3 +80,8 @@ verify_jwt = true
 
 [functions.send-message-push]
 verify_jwt = true
+
+# Database-triggered durable gift/social push worker. The request only wakes the
+# worker; all notification details are resolved server-side from the outbox.
+[functions.dispatch-notification-push]
+verify_jwt = false

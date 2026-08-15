@@ -114,6 +114,41 @@ export interface SendResult {
   error?: string;
 }
 
+export interface DataMessagePayload {
+  message: {
+    token: string;
+    data: Record<string, string>;
+    android: { priority: 'high' };
+    apns: {
+      headers: Record<string, string>;
+      payload: { aps: { 'content-available': 1 } };
+    };
+  };
+}
+
+/** Build the shared data-only envelope used by native background handlers. */
+export function buildDataMessagePayload(
+  deviceToken: string,
+  data: Record<string, string>,
+): DataMessagePayload {
+  return {
+    message: {
+      token: deviceToken,
+      data: { ...data, click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+      android: { priority: 'high' },
+      apns: {
+        headers: { 'apns-priority': '5', 'apns-push-type': 'background' },
+        payload: { aps: { 'content-available': 1 } },
+      },
+    },
+  };
+}
+
+/** FCM errors that cannot recover by retrying the same device token. */
+export function isPermanentlyInvalidFcmToken(error?: string): boolean {
+  return error === 'UNREGISTERED' || error === 'INVALID_ARGUMENT';
+}
+
 /**
  * Send a DATA-ONLY, high-priority FCM v1 message to a single device token.
  * All values in [data] must be strings (FCM data payloads are string maps).
@@ -124,22 +159,8 @@ export async function sendDataMessage(
   deviceToken: string,
   data: Record<string, string>,
 ): Promise<SendResult> {
-  const fcmPayload = {
-    message: {
-      token: deviceToken,
-      // NOTE: no `notification` block — data-only so the app's background
-      // isolate handles presentation (CallKit / flutter_local_notifications).
-      data: { ...data, click_action: 'FLUTTER_NOTIFICATION_CLICK' },
-      android: { priority: 'high' as const },
-      // iOS is deferred (no apns tokens registered yet). A background push (for
-      // when iOS lands) must use apns-priority 5; calls will ultimately need a
-      // dedicated VoIP/PushKit push, not this one.
-      apns: {
-        headers: { 'apns-priority': '5', 'apns-push-type': 'background' },
-        payload: { aps: { 'content-available': 1 } },
-      },
-    },
-  };
+  // No `notification` block: the app's background isolate owns presentation.
+  const fcmPayload = buildDataMessagePayload(deviceToken, data);
 
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -198,7 +219,7 @@ export async function pushToUsers(
         data,
       );
       results.push(result);
-      if (!result.success && (result.error === 'UNREGISTERED' || result.error === 'INVALID_ARGUMENT')) {
+      if (!result.success && isPermanentlyInvalidFcmToken(result.error)) {
         invalidTokens.push(token);
       }
     } catch (err) {

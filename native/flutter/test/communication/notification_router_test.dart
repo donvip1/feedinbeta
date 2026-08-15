@@ -53,6 +53,40 @@ void main() {
       );
 
   group('payload contract', () {
+    test('maps every supported push type to its destination route', () {
+      expect(
+        notificationRouteFromData({'type': 'gift', 'post_id': 'p1'}),
+        'post:p1',
+      );
+      expect(
+        notificationRouteFromData({'type': 'comment', 'post_id': 'p2'}),
+        'post:p2',
+      );
+      expect(
+        notificationRouteFromData({'type': 'mention', 'related_id': 'p3'}),
+        'post:p3',
+      );
+      expect(
+        notificationRouteFromData({'type': 'tag', 'post_id': 'p4'}),
+        'post:p4',
+      );
+      expect(
+        notificationRouteFromData({'type': 'follow', 'profile_id': 'u1'}),
+        'profile:u1',
+      );
+      expect(
+        notificationRouteFromData({
+          'type': 'message',
+          'conversation_id': 'c1',
+        }),
+        'conversation:c1',
+      );
+      expect(
+        notificationRouteFromData({'type': 'call', 'call_id': 'k1'}),
+        'call:k1',
+      );
+    });
+
     test('toData/fromData round-trips the v1 shape', () {
       const payload = NotificationPayload(
         category: NotificationCategory.mention,

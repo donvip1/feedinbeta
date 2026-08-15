@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/local/notification_repository_contract.dart';
+import '../../features/communication/domain/notification_payload.dart';
 import 'callkit_service.dart';
 import 'local_notifications_service.dart';
 
@@ -43,8 +44,8 @@ Future<void> feedinFirebaseBackgroundHandler(RemoteMessage message) async {
   // any platform channel (CallKit / local notifications) is usable.
   DartPluginRegistrant.ensureInitialized();
   final data = message.data;
-  switch (data['type']?.toString()) {
-    case 'call':
+  switch (backgroundPresentationForData(data)) {
+    case BackgroundPushPresentation.call:
       final callId = data['call_id']?.toString();
       if (callId == null || callId.isEmpty) return;
       await CallKitService.showIncomingCall(
@@ -54,7 +55,7 @@ Future<void> feedinFirebaseBackgroundHandler(RemoteMessage message) async {
         avatarUrl: data['caller_avatar']?.toString(),
       );
       break;
-    case 'message':
+    case BackgroundPushPresentation.message:
       final conversationId = data['conversation_id']?.toString();
       final body = data['body']?.toString();
       if (conversationId == null || conversationId.isEmpty || body == null) {
@@ -69,10 +70,37 @@ Future<void> feedinFirebaseBackgroundHandler(RemoteMessage message) async {
         messageId: data['message_id']?.toString(),
       );
       break;
-    default:
-      // Unknown / notification-only payload: the OS handles display.
+    case BackgroundPushPresentation.social:
+      final route = notificationRouteFromData(data);
+      if (route == null) return;
+      final local = LocalNotificationsService(isConfigured: true);
+      await local.initialize();
+      await local.showSocialNotification(
+        title: data['title']?.toString() ?? 'feedIn',
+        body: data['body']?.toString() ?? 'You have a new notification.',
+        route: route,
+        eventType: data['type']?.toString() ?? 'social',
+        notificationId: data['notification_id']?.toString(),
+      );
+      break;
+    case BackgroundPushPresentation.ignore:
       break;
   }
+}
+
+enum BackgroundPushPresentation { call, message, social, ignore }
+
+BackgroundPushPresentation backgroundPresentationForData(
+  Map<String, Object?> data,
+) {
+  final type = data['type']?.toString() ?? data['category']?.toString();
+  return switch (type) {
+    'call' => BackgroundPushPresentation.call,
+    'message' => BackgroundPushPresentation.message,
+    'gift' || 'comment' || 'mention' || 'tag' || 'follow' || 'reply' ||
+    'reaction' => BackgroundPushPresentation.social,
+    _ => BackgroundPushPresentation.ignore,
+  };
 }
 
 /// Wires Firebase Cloud Messaging into the app:
@@ -215,13 +243,7 @@ class PushNotificationService {
 
   String? _routeFrom(RemoteMessage? message) {
     if (message == null) return null;
-    final route = _stringData(message, 'route');
-    if (route != null && route.isNotEmpty) return route;
-    final conversationId = _stringData(message, 'conversation_id');
-    if (conversationId != null && conversationId.isNotEmpty) {
-      return 'conversation:$conversationId';
-    }
-    return null;
+    return notificationRouteFromData(message.data);
   }
 
   static String? _stringData(RemoteMessage message, String key) {
