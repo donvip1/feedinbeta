@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'data/wallet_gift_models.dart';
 import 'data/wallet_models.dart';
 import 'data/wallet_remote_data_source.dart';
 
@@ -71,6 +72,14 @@ class WalletPresenter extends ChangeNotifier {
   TransactionFilter get transactionFilter => _transactionFilter;
   List<CreditTransaction> get filteredTransactions =>
       _transactions.where(_transactionFilter.matches).toList();
+
+  // --- Gifts ---
+  WalletLoadState _giftsState = WalletLoadState.idle;
+  WalletLoadState get giftsState => _giftsState;
+  List<WalletGiftReceipt> _receivedGifts = const [];
+  List<WalletGiftReceipt> get receivedGifts => _receivedGifts;
+  List<WalletGiftReceipt> _sentGifts = const [];
+  List<WalletGiftReceipt> get sentGifts => _sentGifts;
 
   // --- Finance buyback ---
   WalletLoadState _buybackState = WalletLoadState.idle;
@@ -246,6 +255,24 @@ class WalletPresenter extends ChangeNotifier {
     _safeNotify();
   }
 
+  Future<void> loadGifts() async {
+    if (_giftsState == WalletLoadState.loading) return;
+    _giftsState = WalletLoadState.loading;
+    _safeNotify();
+    try {
+      final results = await Future.wait([
+        _data.fetchReceivedGifts(),
+        _data.fetchSentGifts(),
+      ]);
+      _receivedGifts = results[0];
+      _sentGifts = results[1];
+      _giftsState = WalletLoadState.ready;
+    } catch (_) {
+      _giftsState = WalletLoadState.error;
+    }
+    _safeNotify();
+  }
+
   Future<void> loadFinanceBuybacks() async {
     if (_buybackState == WalletLoadState.loading) return;
     _buybackState = WalletLoadState.loading;
@@ -300,7 +327,7 @@ class WalletPresenter extends ChangeNotifier {
 
   /// Refresh the balance + ledger after a money move.
   Future<void> refreshAfterMutation() async {
-    await Future.wait([loadOverview(), loadTransactions()]);
+    await Future.wait([loadOverview(), loadTransactions(), loadGifts()]);
   }
 
   // --- Money moves (delegate to the data source; caller handles UX) -------

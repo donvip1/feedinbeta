@@ -1,10 +1,13 @@
 import 'package:feedin/src/features/wallet/data/wallet_models.dart';
+import 'package:feedin/src/features/wallet/data/wallet_gift_models.dart';
 import 'package:feedin/src/features/wallet/data/wallet_remote_data_source.dart';
 
 class FakeWalletDataSource implements WalletDataSource {
   CreditBalance balance = CreditBalance.empty;
   List<CreditPackage> packages = const [];
   List<CreditTransaction> transactions = const [];
+  List<WalletGiftReceipt> receivedGifts = const [];
+  List<WalletGiftReceipt> sentGifts = const [];
   List<SubscriptionTier> tiers = const [];
   UserSubscription? activeSubscription;
   CreatorMonetization monetization = CreatorMonetization.empty;
@@ -45,6 +48,14 @@ class FakeWalletDataSource implements WalletDataSource {
   Future<List<CreditTransaction>> fetchTransactions({int limit = 100}) async {
     return transactions.take(limit).toList();
   }
+
+  @override
+  Future<List<WalletGiftReceipt>> fetchReceivedGifts({int limit = 50}) async =>
+      receivedGifts.take(limit).toList();
+
+  @override
+  Future<List<WalletGiftReceipt>> fetchSentGifts({int limit = 50}) async =>
+      sentGifts.take(limit).toList();
 
   @override
   Future<List<SubscriptionTier>> fetchTiers() async {

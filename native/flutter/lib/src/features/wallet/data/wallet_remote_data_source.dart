@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'wallet_gift_models.dart';
 import 'wallet_models.dart';
 
 /// Testable wallet boundary. Server contract details remain in the remote
@@ -10,6 +11,10 @@ abstract interface class WalletDataSource {
   Future<List<CreditPackage>> fetchPackages();
 
   Future<List<CreditTransaction>> fetchTransactions({int limit = 100});
+
+  Future<List<WalletGiftReceipt>> fetchReceivedGifts({int limit = 50});
+
+  Future<List<WalletGiftReceipt>> fetchSentGifts({int limit = 50});
 
   Future<List<SubscriptionTier>> fetchTiers();
 
@@ -331,6 +336,7 @@ class WalletRemoteDataSource implements WalletDataSource {
   static const _userCreditsTable = 'user_credits';
   static const _packagesTable = 'credit_packages';
   static const _transactionsTable = 'credit_transactions';
+  static const _postGiftsTable = 'post_gifts';
   static const _tiersTable = 'subscription_tiers';
   static const _subscriptionsTable = 'user_subscriptions';
   static const _monetizationTable = 'creator_monetization';
@@ -423,6 +429,50 @@ class WalletRemoteDataSource implements WalletDataSource {
         .whereType<Map>()
         .map(
           (row) => CreditTransaction.fromJson(Map<String, Object?>.from(row)),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<WalletGiftReceipt>> fetchReceivedGifts({int limit = 50}) async {
+    final userId = currentUserId;
+    if (userId == null) return const [];
+    return _fetchPostGifts(
+      column: 'recipient_id',
+      userId: userId,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<List<WalletGiftReceipt>> fetchSentGifts({int limit = 50}) async {
+    final userId = currentUserId;
+    if (userId == null) return const [];
+    return _fetchPostGifts(column: 'sender_id', userId: userId, limit: limit);
+  }
+
+  Future<List<WalletGiftReceipt>> _fetchPostGifts({
+    required String column,
+    required String userId,
+    required int limit,
+  }) async {
+    final client = _client;
+    if (client == null) return const [];
+    final rows = await client
+        .from(_postGiftsTable)
+        .select(
+          'id, sender_id, recipient_id, gift_key, gift_name, credit_cost, '
+          'recipient_credit_value, state, created_at, '
+          'sender:profiles!post_gifts_sender_id_fkey(display_name, username, avatar_url), '
+          'recipient:profiles!post_gifts_recipient_id_fkey(display_name, username)',
+        )
+        .eq(column, userId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return rows
+        .whereType<Map>()
+        .map(
+          (row) => WalletGiftReceipt.fromJson(Map<String, Object?>.from(row)),
         )
         .toList();
   }

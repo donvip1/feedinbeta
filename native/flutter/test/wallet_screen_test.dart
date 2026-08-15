@@ -7,6 +7,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'wallet_test_fakes.dart';
 
 void main() {
+  testWidgets('renders five wallet tabs and replaces the selected body', (
+    tester,
+  ) async {
+    final presenter = WalletPresenter(dataSource: FakeWalletDataSource());
+
+    await tester.pumpWidget(
+      MaterialApp(home: WalletScreen(presenter: presenter)),
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in [
+      'Packages',
+      'Gifts',
+      'History',
+      'Sell Credits',
+      'P2P',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.byKey(const Key('wallet-packages-tab')), findsOneWidget);
+
+    await tester.tap(find.text('Gifts'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('wallet-gifts-tab')), findsOneWidget);
+    expect(find.byKey(const Key('wallet-packages-tab')), findsNothing);
+  });
+
   testWidgets('verifies hosted checkout when the app resumes', (tester) async {
     final data = FakeWalletDataSource()
       ..packages = const [
@@ -131,6 +159,8 @@ void main() {
       MaterialApp(home: WalletScreen(presenter: presenter)),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Sell Credits'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Finance team buyback'),
       300,
@@ -145,7 +175,7 @@ void main() {
     expect(find.text('Creator payouts'), findsNothing);
     expect(find.text('Payout'), findsNothing);
     expect(find.text('Send'), findsNothing);
-    expect(data.fetchTiersCalls, 0);
+    expect(data.fetchTiersCalls, 1);
     expect(data.fetchPayoutRequestsCalls, 0);
   });
 
@@ -168,6 +198,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: WalletScreen(presenter: presenter)),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sell Credits'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('finance_buyback_credits_input')),
