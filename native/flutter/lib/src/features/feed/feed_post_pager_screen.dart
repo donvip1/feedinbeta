@@ -18,6 +18,9 @@ import 'immersive/feed_immersive_theme.dart';
 import 'immersive/refeed_sheet.dart';
 import 'presentation/post_controller_card.dart';
 import 'state/post_controller.dart';
+import '../promotions/data/promotion_repository.dart';
+import '../promotions/data/promotion_models.dart';
+import '../promotions/presentation/promote_post_flow.dart';
 
 typedef OpenFeedUserProfile = void Function(String userId);
 
@@ -37,6 +40,8 @@ class FeedPostPagerScreen extends StatefulWidget {
     required this.onOpenUserProfile,
     required this.socialGraphDataSource,
     this.shareService = const FeedShareService(),
+    this.promotionRepository,
+    this.currentCredits,
   });
 
   final List<FeedPost> posts;
@@ -48,6 +53,8 @@ class FeedPostPagerScreen extends StatefulWidget {
   final OpenFeedUserProfile onOpenUserProfile;
   final SocialGraphRemoteDataSource socialGraphDataSource;
   final FeedShareService shareService;
+  final PromotionRepository? promotionRepository;
+  final int? currentCredits;
 
   @override
   State<FeedPostPagerScreen> createState() => _FeedPostPagerScreenState();
@@ -186,6 +193,41 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
       return;
     }
 
+    if (action == FeedShareAction.save) {
+      try {
+        await widget.feedRepository.toggleSave(
+          post.id,
+          saved: !post.viewerHasSaved,
+        );
+        if (mounted) {
+          setState(
+            () => _message = post.viewerHasSaved
+                ? 'Post removed from saved.'
+                : 'Post saved.',
+          );
+        }
+      } catch (_) {
+        if (mounted) setState(() => _message = 'Could not save this post.');
+      }
+      return;
+    }
+
+    if (action == FeedShareAction.download) {
+      try {
+        final path = await widget.shareService.downloadPost(post);
+        if (mounted) {
+          setState(
+            () => _message = path == null
+                ? 'This post has no downloadable media.'
+                : 'Downloaded to app storage.',
+          );
+        }
+      } catch (_) {
+        if (mounted) setState(() => _message = 'Could not download this post.');
+      }
+      return;
+    }
+
     try {
       await widget.shareService.openNativeShareSheet(post);
       await widget.shareService.recordShare(
@@ -272,6 +314,22 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
     }
   }
 
+  Future<void> _promotePost(FeedPost post) async {
+    final repository = widget.promotionRepository;
+    if (repository == null) return;
+    final result = await Navigator.of(context).push<PromotionCreated>(
+      MaterialPageRoute(
+        builder: (_) => PromotePostFlow(
+          post: post,
+          repository: repository,
+          currentCredits: widget.currentCredits,
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _message = 'Campaign launched successfully.');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -302,6 +360,10 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
                   onAvatar: () => unawaited(_openCreatorPreview(post)),
                   onCreatorName: () =>
                       widget.onOpenUserProfile(post.displayedPost.userId),
+                  onOriginalPost: post.isQuoteRefeed
+                      ? () =>
+                            widget.onOpenUserProfile(post.displayedPost.userId)
+                      : null,
                 );
               },
             ),
@@ -325,12 +387,16 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
                     ),
                     const Spacer(),
                     if (_posts.isNotEmpty &&
-                        _posts[_activePage].userId == widget.currentUserId)
+                        (widget.promotionRepository != null ||
+                            _posts[_activePage].userId == widget.currentUserId))
                       IconButton(
                         key: const Key('post-more-actions'),
                         tooltip: 'Post actions',
-                        onPressed: () =>
-                            unawaited(_deletePost(_posts[_activePage])),
+                        onPressed: () => unawaited(
+                          widget.promotionRepository == null
+                              ? _deletePost(_posts[_activePage])
+                              : _showPostActions(_posts[_activePage]),
+                        ),
                         icon: const Icon(
                           Icons.more_vert_rounded,
                           color: Colors.white,
@@ -384,5 +450,44 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _showPostActions(FeedPost post) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF101521),
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxHeight: 260),
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            if (widget.promotionRepository != null)
+              ListTile(
+                leading: const Icon(
+                  Icons.rocket_launch,
+                  color: Color(0xFFFF3D9A),
+                ),
+                title: const Text('Promote post'),
+                subtitle: const Text(
+                  'Reach more people with a managed campaign',
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'promote'),
+              ),
+            if (post.userId == widget.currentUserId)
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.redAccent,
+                ),
+                title: const Text('Delete post'),
+                onTap: () => Navigator.pop(sheetContext, 'delete'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'promote') await _promotePost(post);
+    if (action == 'delete') await _deletePost(post);
   }
 }

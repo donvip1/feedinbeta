@@ -40,6 +40,7 @@ import '../data/remote/notifications_remote_data_source.dart';
 import '../data/remote/profile_remote_data_source.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/auth_repository_contract.dart';
+import '../features/promotions/data/promotion_repository.dart';
 
 class FeedinServices {
   FeedinServices({
@@ -64,6 +65,7 @@ class FeedinServices {
     required this.pushNotificationService,
     required this.localNotificationsService,
     required this.callKitService,
+    this.promotionRepository = const PromotionRepository(isConfigured: false),
     this.incrementalMessageSyncService,
   });
 
@@ -88,6 +90,7 @@ class FeedinServices {
   final PushNotificationService pushNotificationService;
   final LocalNotificationsService localNotificationsService;
   final CallKitService callKitService;
+  final PromotionRepository promotionRepository;
   final IncrementalMessageSyncService? incrementalMessageSyncService;
 
   factory FeedinServices.create(FeedinConfig config) {
@@ -236,6 +239,9 @@ class FeedinServices {
         isConfigured: config.hasSupabaseConfig,
       ),
       callKitService: CallKitService(isConfigured: config.hasSupabaseConfig),
+      promotionRepository: PromotionRepository(
+        isConfigured: config.hasSupabaseConfig,
+      ),
       incrementalMessageSyncService: incrementalMessageSyncService,
       pushNotificationService: PushNotificationService(
         isConfigured: config.hasSupabaseConfig,

@@ -42,6 +42,7 @@ class ImmersivePostCard extends StatefulWidget {
     required this.onGift,
     this.onAvatar,
     this.onCreatorName,
+    this.onOriginalPost,
     this.chromeState = FeedChromeVisibility.full,
   });
 
@@ -66,6 +67,7 @@ class ImmersivePostCard extends StatefulWidget {
   /// route directly to the creator's full profile.
   final VoidCallback? onAvatar;
   final VoidCallback? onCreatorName;
+  final VoidCallback? onOriginalPost;
 
   /// Visibility stage for the chrome around this post. The card decides
   /// which groups (caption, action rail) are interactive based on this
@@ -144,6 +146,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
               child: CaptionLayer(
                 post: widget.post,
                 onCreatorTap: widget.onCreatorName ?? widget.onAvatar,
+                onOriginalPostTap: widget.onOriginalPost,
               ),
             ),
           ),

@@ -40,9 +40,9 @@ enum FeedSurfaceTapIntent { chromeReveal, videoPlayback, none }
 class FeedChromeStateMachine {
   FeedChromeStateMachine({
     FeedChromeClock clock = const _SystemClock(),
-    Duration autoHideDelay = const Duration(seconds: 2),
-  })  : _clock = clock,
-        _autoHideDelay = autoHideDelay;
+    Duration autoHideDelay = const Duration(seconds: 4),
+  }) : _clock = clock,
+       _autoHideDelay = autoHideDelay;
 
   final FeedChromeClock _clock;
   final Duration _autoHideDelay;
@@ -154,10 +154,11 @@ class FeedChromeStateMachine {
   FeedChromeVisibility _advanceChrome() {
     switch (_state) {
       case FeedChromeVisibility.hidden:
-        setState(FeedChromeVisibility.socialOnly);
-        // First reveal stage stays visible until the second tap; the
-        // inactivity countdown begins only after full chrome is shown.
-        _cancelAutoHide();
+        // A corner tap restores the complete normal preview in one gesture.
+        // The old social-only intermediate state made the feed feel stuck
+        // between two layouts and required a second tap.
+        setState(FeedChromeVisibility.full);
+        _scheduleAutoHide();
         return _state;
       case FeedChromeVisibility.socialOnly:
         setState(FeedChromeVisibility.full);

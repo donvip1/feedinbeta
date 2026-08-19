@@ -119,12 +119,7 @@ class FeedActionRail extends StatelessWidget {
               onTap: onGift,
             ),
             if (isMoreExpanded)
-              _ExpandedActions(
-                isSaved: isSaved,
-                viewsLabel: _compactCount(viewsCount),
-                onSave: onSave,
-                onShare: onShare,
-              ),
+              _ExpandedActions(isSaved: isSaved, onShare: onShare),
             const SizedBox(height: _gap),
             _RailAction(
               key: const Key('feed-action-more'),
@@ -143,46 +138,31 @@ class FeedActionRail extends StatelessWidget {
 }
 
 class _ExpandedActions extends StatelessWidget {
-  const _ExpandedActions({
-    required this.isSaved,
-    required this.viewsLabel,
-    required this.onSave,
-    required this.onShare,
-  });
+  const _ExpandedActions({required this.isSaved, required this.onShare});
 
   final bool isSaved;
-  final String viewsLabel;
-  final VoidCallback onSave;
   final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailAction(
-          key: const Key('feed-action-save'),
-          icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border,
-          iconColor: isSaved
-              ? FeedImmersiveTheme.saveActive
-              : FeedImmersiveTheme.onMedia,
-          activeColor: isSaved ? FeedImmersiveTheme.saveChip : null,
-          active: isSaved,
-          label: 'Save',
-          onTap: onSave,
-        ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        _RailAction(
+    return Padding(
+      padding: const EdgeInsets.only(top: FeedImmersiveTheme.railGap),
+      child: KeyedSubtree(
+        key: const Key('feed-action-save'),
+        child: KeyedSubtree(
           key: const Key('feed-action-share'),
-          icon: Icons.ios_share_rounded,
-          label: 'Share',
-          onTap: onShare,
+          child: _RailAction(
+            icon: isSaved
+                ? Icons.bookmark_added_rounded
+                : Icons.ios_share_rounded,
+            iconColor: isSaved
+                ? FeedImmersiveTheme.saveActive
+                : FeedImmersiveTheme.onMedia,
+            label: 'Save or share',
+            onTap: onShare,
+          ),
         ),
-        const SizedBox(height: FeedImmersiveTheme.railGap),
-        // Views: still available, just no longer a default-visible metric.
-        _RailMetric(value: viewsLabel),
-      ],
+      ),
     );
   }
 }
@@ -401,10 +381,18 @@ class _GlassActionSurface extends StatelessWidget {
           width: FeedImmersiveTheme.railChipSize,
           height: FeedImmersiveTheme.railChipSize,
           decoration: BoxDecoration(
-            color: background,
+            color: background == FeedImmersiveTheme.railChip
+                ? Colors.transparent
+                : background,
             shape: BoxShape.circle,
-            border: Border.all(color: FeedImmersiveTheme.glassBorder),
-            boxShadow: FeedImmersiveTheme.controlShadow,
+            border: Border.all(
+              color: background == FeedImmersiveTheme.railChip
+                  ? Colors.transparent
+                  : FeedImmersiveTheme.glassBorder,
+            ),
+            boxShadow: background == FeedImmersiveTheme.railChip
+                ? const []
+                : FeedImmersiveTheme.controlShadow,
           ),
           child: AnimatedSwitcher(
             duration: FeedImmersiveTheme.motionPress,
@@ -420,39 +408,6 @@ class _GlassActionSurface extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RailMetric extends StatelessWidget {
-  const _RailMetric({required this.value});
-
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    label: 'Views',
-    value: value,
-    child: SizedBox(
-      width: FeedImmersiveTheme.touchTargetMin,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: FeedImmersiveTheme.touchTargetMin,
-            height: FeedImmersiveTheme.touchTargetMin,
-            child: Center(
-              child: _GlassActionSurface(
-                background: FeedImmersiveTheme.railChip,
-                icon: Icons.visibility_outlined,
-                iconColor: FeedImmersiveTheme.onMediaMuted,
-              ),
-            ),
-          ),
-          const SizedBox(height: 1),
-          Text(value, style: FeedImmersiveTheme.countLabel),
-        ],
-      ),
-    ),
-  );
 }
 
 String _compactCount(int value) {

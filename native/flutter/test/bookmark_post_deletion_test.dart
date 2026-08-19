@@ -94,15 +94,21 @@ void main() {
 
     await tester.tap(find.byKey(const Key('feed-action-more')));
     await tester.pump(const Duration(milliseconds: 350));
-    final bookmarkAction = find.byKey(const Key('feed-action-save'));
-    expect(bookmarkAction, findsOneWidget);
-    await tester.tap(bookmarkAction);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    final combinedAction = find.byKey(const Key('feed-action-share'));
+    expect(combinedAction, findsOneWidget);
+    await tester.tap(combinedAction);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -260),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Save post'));
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(repository.saveCalls, [('saved-1', true)]);
     expect(repository.failSave, isTrue);
-    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
+    expect(find.text('Could not save this post.'), findsOneWidget);
   });
 
   testWidgets('owner can permanently delete a post after confirmation', (
@@ -138,6 +144,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.byKey(const Key('post-more-actions')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Delete post'));
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.text('This permanently deletes the post.'), findsOneWidget);
 

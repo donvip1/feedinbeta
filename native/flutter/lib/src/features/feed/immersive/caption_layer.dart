@@ -14,10 +14,16 @@ import 'feed_immersive_theme.dart';
 /// Composition-only — it reads everything from [post] (the wrapper, so
 /// re-shares resolve correctly) and forwards creator taps to [onCreatorTap].
 class CaptionLayer extends StatelessWidget {
-  const CaptionLayer({super.key, required this.post, this.onCreatorTap});
+  const CaptionLayer({
+    super.key,
+    required this.post,
+    this.onCreatorTap,
+    this.onOriginalPostTap,
+  });
 
   final FeedPost post;
   final VoidCallback? onCreatorTap;
+  final VoidCallback? onOriginalPostTap;
 
   bool _isVerified(FeedPost content) =>
       content.postType?.toLowerCase().contains('verified') ?? false;
@@ -62,7 +68,7 @@ class CaptionLayer extends StatelessWidget {
           ],
           if (post.isQuoteRefeed) ...[
             const SizedBox(height: 10),
-            _QuotedOriginal(post: original),
+            _QuotedOriginal(post: original, onTap: onOriginalPostTap),
           ],
           if (hasLocation) ...[
             const SizedBox(height: 11),
@@ -80,52 +86,59 @@ class CaptionLayer extends StatelessWidget {
 }
 
 class _QuotedOriginal extends StatelessWidget {
-  const _QuotedOriginal({required this.post});
+  const _QuotedOriginal({required this.post, this.onTap});
 
   final FeedPost post;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final handle = (post.authorHandle ?? post.meta).trim();
     return Semantics(
       label: 'Quoted post by ${post.authorName}',
-      child: Container(
-        key: const Key('quote-refeed-original'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: FeedImmersiveTheme.glassSurfaceStrong,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FeedImmersiveTheme.glassBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              handle.isEmpty ? post.authorName : '${post.authorName} · $handle',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FeedImmersiveTheme.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (post.body.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          key: const Key('quote-refeed-original'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: FeedImmersiveTheme.glassSurfaceStrong,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: FeedImmersiveTheme.glassBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                post.body,
-                maxLines: 2,
+                handle.isEmpty
+                    ? post.authorName
+                    : '${post.authorName} · $handle',
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: FeedImmersiveTheme.inkMuted,
+                  color: FeedImmersiveTheme.ink,
                   fontSize: 12,
-                  height: 1.3,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
+              if (post.body.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  post.body,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FeedImmersiveTheme.inkMuted,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

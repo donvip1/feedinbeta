@@ -71,6 +71,9 @@ import 'presentation/post_controller_card.dart';
 import 'state/feed_chrome_state_machine.dart';
 import 'state/feed_gesture_resolver.dart';
 import 'state/post_controller.dart';
+import '../promotions/data/promotion_repository.dart';
+import '../promotions/data/promotion_models.dart';
+import '../promotions/presentation/promote_post_flow.dart';
 
 class FeedShell extends StatefulWidget {
   const FeedShell({
@@ -95,6 +98,7 @@ class FeedShell extends StatefulWidget {
     required this.pushNotificationService,
     required this.localNotificationsService,
     required this.callKitService,
+    required this.promotionRepository,
     required this.connectivityService,
     required this.onSignOut,
     this.incrementalMessageSyncService,
@@ -120,6 +124,7 @@ class FeedShell extends StatefulWidget {
   final PushNotificationService pushNotificationService;
   final LocalNotificationsService localNotificationsService;
   final CallKitService callKitService;
+  final PromotionRepository promotionRepository;
   final ConnectivityService connectivityService;
   final VoidCallback onSignOut;
   final IncrementalMessageSyncService? incrementalMessageSyncService;
@@ -590,6 +595,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
           currentUserId: _profile.userId,
           onOpenUserProfile: _openUserProfile,
           socialGraphDataSource: _socialGraph,
+          promotionRepository: widget.promotionRepository,
         ),
       ),
     );
@@ -748,6 +754,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
         onIncomingMessageBannerChanged: _handleIncomingMessageBannerChanged,
         onOpenConversation: _openConversationFromBanner,
         realtimeService: widget.realtimeService,
+        promotionRepository: widget.promotionRepository,
       ),
       MessagesScreen(
         messagesRepository: widget.messagesRepository,
@@ -1201,6 +1208,7 @@ class FeedScreen extends StatefulWidget {
     required this.onIncomingMessageBannerChanged,
     required this.onOpenConversation,
     required this.realtimeService,
+    required this.promotionRepository,
     this.shareService = const FeedShareService(),
   });
 
@@ -1239,6 +1247,7 @@ class FeedScreen extends StatefulWidget {
   /// Used to listen for incoming-message Realtime events. We only need
   /// the stream surface; the shell already owns connect/disconnect.
   final FeedinRealtimeService realtimeService;
+  final PromotionRepository promotionRepository;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -1659,6 +1668,51 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     }
   }
 
+  Future<void> _promotePost(FeedPost post) async {
+    final result = await Navigator.of(context).push<PromotionCreated>(
+      MaterialPageRoute(
+        builder: (_) =>
+            PromotePostFlow(post: post, repository: widget.promotionRepository),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _message = 'Campaign launched successfully.');
+  }
+
+  Future<void> _showPostActions(FeedPost post) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF101521),
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.rocket_launch,
+                color: Color(0xFFFF3D9A),
+              ),
+              title: const Text('Promote post'),
+              subtitle: const Text('Reach more people with a managed campaign'),
+              onTap: () => Navigator.pop(sheetContext, 'promote'),
+            ),
+            if (post.userId == widget.currentUserId)
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.redAccent,
+                ),
+                title: const Text('Delete post'),
+                onTap: () => Navigator.pop(sheetContext, 'delete'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'promote') await _promotePost(post);
+    if (action == 'delete') await _deletePost(post);
+  }
+
   Future<void> _sharePost(FeedPost post) async {
     final action = await showFeedShareSheet(context, post: post);
     if (!mounted || action == null) return;
@@ -1666,6 +1720,41 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       await widget.shareService.copyPostLink(post);
       if (!mounted) return;
       setState(() => _message = 'Post link copied.');
+      return;
+    }
+
+    if (action == FeedShareAction.save) {
+      try {
+        await widget.feedRepository.toggleSave(
+          post.id,
+          saved: !post.viewerHasSaved,
+        );
+        if (!mounted) return;
+        setState(() {
+          _message = post.viewerHasSaved
+              ? 'Post removed from saved.'
+              : 'Post saved.';
+        });
+      } catch (_) {
+        if (mounted) setState(() => _message = 'Could not save this post.');
+      }
+      return;
+    }
+
+    if (action == FeedShareAction.download) {
+      try {
+        final path = await widget.shareService.downloadPost(post);
+        if (!mounted) return;
+        setState(() {
+          _message = path == null
+              ? 'This post has no downloadable media.'
+              : 'Downloaded to app storage.';
+        });
+      } catch (_) {
+        if (mounted) {
+          setState(() => _message = 'Could not download this post.');
+        }
+      }
       return;
     }
 
@@ -1967,15 +2056,23 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             onAvatar: () => _openCreatorPreview(post),
             onCreatorName: () =>
                 widget.onOpenUserProfile(post.displayedPost.userId),
+            onOriginalPost: post.isQuoteRefeed
+                ? () => widget.onOpenUserProfile(post.displayedPost.userId)
+                : null,
             chromeState: _chromeState,
             onSurfaceTap: _handleSurfaceTapForPost(post, index),
             onPlaybackChange: _handlePlaybackChangeForPost(post),
           ),
         };
+        final framedCard = _chromeState == FeedChromeVisibility.full
+            ? Center(
+                child: AspectRatio(aspectRatio: 9 / 16, child: card),
+              )
+            : card;
         return _PageTransition(
           controller: _pageController,
           index: index,
-          child: card,
+          child: framedCard,
         );
       },
     );
@@ -2104,17 +2201,14 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                                     0,
                                     filtered.length - 1,
                                   )];
-                              // Only own posts get the delete affordance; ads
-                              // and others' posts do not.
-                              if (active is! FeedPostItem ||
-                                  active.post.userId != widget.currentUserId) {
+                              if (active is! FeedPostItem) {
                                 return const SizedBox.shrink();
                               }
                               return IconButton(
                                 key: const Key('feed-post-more-actions'),
                                 tooltip: 'Post actions',
                                 onPressed: () =>
-                                    unawaited(_deletePost(active.post)),
+                                    unawaited(_showPostActions(active.post)),
                                 icon: const Icon(
                                   Icons.more_vert_rounded,
                                   color: Colors.white,

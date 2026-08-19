@@ -32,9 +32,7 @@ void main() {
     );
   }
 
-  testWidgets('Gift shows by default, Views hidden until More', (
-    tester,
-  ) async {
+  testWidgets('Gift shows by default, Views hidden until More', (tester) async {
     await tester.pumpWidget(host(expanded: false));
 
     expect(find.byKey(const Key('feed-action-like')), findsOneWidget);
@@ -44,23 +42,22 @@ void main() {
     expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
     expect(find.byIcon(Icons.visibility_outlined), findsNothing);
     expect(find.byKey(const Key('feed-action-more')), findsOneWidget);
-    expect(find.byKey(const Key('feed-action-save')), findsNothing);
+    expect(find.byKey(const Key('feed-action-share')), findsNothing);
     expect(find.byKey(const Key('feed-action-share')), findsNothing);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
   });
 
-  testWidgets('Expanded More reveals Save, Share, and Views inline', (
+  testWidgets('Expanded More reveals the combined save/share action', (
     tester,
   ) async {
     await tester.pumpWidget(host(expanded: true));
     await tester.pump(const Duration(milliseconds: 350));
 
-    expect(find.byKey(const Key('feed-action-save')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-share')), findsOneWidget);
-    // Gift stays visible (it's a default action now), Views appears under More.
+    // Gift stays visible and save/share are opened together in one action.
     expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
-    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_added_rounded), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
   });
@@ -74,7 +71,6 @@ void main() {
       Key('feed-action-comment'),
       Key('feed-action-refeed'),
       Key('feed-action-more'),
-      Key('feed-action-save'),
       Key('feed-action-gift'),
       Key('feed-action-share'),
     ]) {
