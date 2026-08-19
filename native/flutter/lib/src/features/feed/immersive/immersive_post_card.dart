@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../feed_post.dart';
 import '../state/feed_chrome_state_machine.dart';
 import 'caption_layer.dart';
+import 'creator_header.dart';
 import 'feed_action_rail.dart';
 import 'feed_immersive_theme.dart';
 import 'gesture_layer.dart';
@@ -117,7 +118,13 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
         children: [
           // 1. Background media layer. Always visible — even when the
           //    chrome is hidden the user is still watching the video.
-          Positioned.fill(
+          AnimatedPositioned(
+            duration: FeedImmersiveTheme.motionFast,
+            curve: FeedImmersiveTheme.premiumSettleCurve,
+            top: _fullChromeVisible ? 100 : 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: RepaintBoundary(
               child: MediaLayer(
                 post: _contentPost,
@@ -134,6 +141,20 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
           // 3. Layered edge treatment protecting the caption/rail.
           const Positioned.fill(child: ReadabilityScrims()),
 
+          Positioned(
+            top: 116,
+            left: _contentInset,
+            right: _railWidth,
+            child: _ChromeStageOverlay(
+              visible: _fullChromeVisible,
+              active: widget.isActive,
+              child: _CreatorTopMeta(
+                post: widget.post,
+                onTap: widget.onCreatorName ?? widget.onAvatar,
+              ),
+            ),
+          ),
+
           // 4. Bottom-left text overlay. Only visible in the full chrome
           //    stage; hidden chrome never reveals it.
           Positioned(
@@ -147,6 +168,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
                 post: widget.post,
                 onCreatorTap: widget.onCreatorName ?? widget.onAvatar,
                 onOriginalPostTap: widget.onOriginalPost,
+                showCreatorHeader: false,
               ),
             ),
           ),
@@ -181,6 +203,7 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
                   onShare: widget.onShare,
                   onAvatar: widget.onAvatar,
                   avatarHeroTag: 'creator-avatar-${widget.post.id}',
+                  showAvatar: false,
                 ),
               ),
             ),
@@ -192,6 +215,73 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
       ),
     );
   }
+}
+
+class _CreatorTopMeta extends StatelessWidget {
+  const _CreatorTopMeta({required this.post, this.onTap});
+
+  final FeedPost post;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = post.isQuoteRefeed ? post : post.displayedPost;
+    final handle = (content.authorHandle ?? content.meta).trim();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: CircleAvatar(
+            radius: 30,
+            backgroundImage: content.avatarUrl?.trim().isNotEmpty == true
+                ? NetworkImage(content.avatarUrl!)
+                : null,
+            child: content.avatarUrl?.trim().isNotEmpty == true
+                ? null
+                : Text(
+                    content.authorName.isEmpty
+                        ? '?'
+                        : content.authorName[0].toUpperCase(),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CreatorHeader(
+                authorName: content.authorName,
+                handle: handle,
+                isVerified:
+                    content.postType?.toLowerCase().contains('verified') ??
+                    false,
+                onTap: onTap,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${_relativePostTime(content.createdAtMillis)} · Public',
+                style: FeedImmersiveTheme.handle.copyWith(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _relativePostTime(int millis) {
+  final age = DateTime.now().difference(
+    DateTime.fromMillisecondsSinceEpoch(millis),
+  );
+  if (age.inDays >= 365) return '${age.inDays ~/ 365}y';
+  if (age.inDays >= 30) return '${age.inDays ~/ 30}mo';
+  if (age.inDays >= 1) return '${age.inDays}d';
+  if (age.inHours >= 1) return '${age.inHours}h';
+  if (age.inMinutes >= 1) return '${age.inMinutes}m';
+  return 'now';
 }
 
 /// Animates a chrome group in/out as both the page becomes active AND

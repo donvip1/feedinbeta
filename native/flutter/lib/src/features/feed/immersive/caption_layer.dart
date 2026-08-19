@@ -19,20 +19,18 @@ class CaptionLayer extends StatelessWidget {
     required this.post,
     this.onCreatorTap,
     this.onOriginalPostTap,
+    this.showCreatorHeader = true,
   });
 
   final FeedPost post;
   final VoidCallback? onCreatorTap;
   final VoidCallback? onOriginalPostTap;
-
-  bool _isVerified(FeedPost content) =>
-      content.postType?.toLowerCase().contains('verified') ?? false;
+  final bool showCreatorHeader;
 
   @override
   Widget build(BuildContext context) {
     final original = post.displayedPost;
     final visibleAuthor = post.isQuoteRefeed ? post : original;
-    final handle = visibleAuthor.meta.trim();
     final hasLocation = original.location?.trim().isNotEmpty ?? false;
     final visibleCaption = post.isQuoteRefeed ? post.body : original.body;
     final hasCaption = visibleCaption.trim().isNotEmpty;
@@ -44,6 +42,15 @@ class CaptionLayer extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (showCreatorHeader)
+            CreatorHeader(
+              authorName: visibleAuthor.authorName,
+              handle: visibleAuthor.meta.trim(),
+              isVerified:
+                  visibleAuthor.postType?.toLowerCase().contains('verified') ??
+                  false,
+              onTap: onCreatorTap,
+            ),
           if (post.isRefeed && !post.isQuoteRefeed) ...[
             OverlayBadge(
               icon: Icons.repeat_rounded,
@@ -51,12 +58,6 @@ class CaptionLayer extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          CreatorHeader(
-            authorName: visibleAuthor.authorName,
-            handle: handle,
-            isVerified: _isVerified(visibleAuthor),
-            onTap: onCreatorTap,
-          ),
           if (hasCaption) ...[
             const SizedBox(height: 9),
             ExpandableCaption(

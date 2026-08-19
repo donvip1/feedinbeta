@@ -30,6 +30,7 @@ class FeedActionRail extends StatelessWidget {
     required this.onShare,
     this.onAvatar,
     this.avatarHeroTag,
+    this.showAvatar = true,
   });
 
   final int likesCount;
@@ -51,6 +52,7 @@ class FeedActionRail extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback? onAvatar;
   final Object? avatarHeroTag;
+  final bool showAvatar;
 
   static const double _gap = 3;
 
@@ -67,13 +69,15 @@ class FeedActionRail extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _RailAvatar(
-              avatarText: avatarText,
-              avatarUrl: avatarUrl,
-              onTap: onAvatar,
-              heroTag: avatarHeroTag,
-            ),
-            const SizedBox(height: _gap),
+            if (showAvatar) ...[
+              _RailAvatar(
+                avatarText: avatarText,
+                avatarUrl: avatarUrl,
+                onTap: onAvatar,
+                heroTag: avatarHeroTag,
+              ),
+              const SizedBox(height: _gap),
+            ],
             _RailAction(
               key: const Key('feed-action-like'),
               icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border,
