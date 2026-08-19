@@ -98,31 +98,36 @@ class _QuotedOriginal extends StatelessWidget {
       label: 'Quoted post by ${post.authorName}',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+        child: Padding(
           key: const Key('quote-refeed-original'),
-          width: double.infinity,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: FeedImmersiveTheme.glassSurfaceStrong,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: FeedImmersiveTheme.glassBorder),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                handle.isEmpty
-                    ? post.authorName
-                    : '${post.authorName} · $handle',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FeedImmersiveTheme.ink,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.repeat_rounded,
+                    size: 15,
+                    color: FeedImmersiveTheme.inkMuted,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      handle.isEmpty
+                          ? post.authorName
+                          : '${post.authorName} · $handle',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FeedImmersiveTheme.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               if (post.body.trim().isNotEmpty) ...[
                 const SizedBox(height: 4),

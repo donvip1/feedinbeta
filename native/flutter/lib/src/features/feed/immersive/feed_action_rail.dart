@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -54,7 +52,7 @@ class FeedActionRail extends StatelessWidget {
   final VoidCallback? onAvatar;
   final Object? avatarHeroTag;
 
-  static const double _gap = FeedImmersiveTheme.railGap;
+  static const double _gap = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -331,12 +329,10 @@ class _RailActionState extends State<_RailAction> {
                   child: AnimatedScale(
                     scale: _pressed ? FeedImmersiveTheme.pressScale : 1,
                     duration: FeedImmersiveTheme.motionPress,
-                    child: _GlassActionSurface(
-                      background: widget.active && widget.activeColor != null
-                          ? widget.activeColor!
-                          : FeedImmersiveTheme.railChip,
-                      icon: widget.icon,
-                      iconColor: widget.iconColor,
+                    child: Icon(
+                      widget.icon,
+                      size: FeedImmersiveTheme.railIconSize * 1.2,
+                      color: widget.iconColor,
                     ),
                   ),
                 ),
@@ -350,59 +346,6 @@ class _RailActionState extends State<_RailAction> {
                 ),
               ],
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlassActionSurface extends StatelessWidget {
-  const _GlassActionSurface({
-    required this.background,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  final Color background;
-  final IconData icon;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(
-          sigmaX: FeedImmersiveTheme.blurControl,
-          sigmaY: FeedImmersiveTheme.blurControl,
-        ),
-        child: AnimatedContainer(
-          duration: FeedImmersiveTheme.motionFast,
-          width: FeedImmersiveTheme.railChipSize,
-          height: FeedImmersiveTheme.railChipSize,
-          decoration: BoxDecoration(
-            color: background == FeedImmersiveTheme.railChip
-                ? Colors.transparent
-                : background,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: background == FeedImmersiveTheme.railChip
-                  ? Colors.transparent
-                  : FeedImmersiveTheme.glassBorder,
-            ),
-            boxShadow: background == FeedImmersiveTheme.railChip
-                ? const []
-                : FeedImmersiveTheme.controlShadow,
-          ),
-          child: AnimatedSwitcher(
-            duration: FeedImmersiveTheme.motionPress,
-            child: Icon(
-              icon,
-              key: ValueKey<IconData>(icon),
-              size: FeedImmersiveTheme.railIconSize,
-              color: iconColor,
-              shadows: FeedImmersiveTheme.textShadow,
-            ),
           ),
         ),
       ),

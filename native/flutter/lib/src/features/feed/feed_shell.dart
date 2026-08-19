@@ -2064,15 +2064,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             onPlaybackChange: _handlePlaybackChangeForPost(post),
           ),
         };
-        final framedCard = _chromeState == FeedChromeVisibility.full
-            ? Center(
-                child: AspectRatio(aspectRatio: 9 / 16, child: card),
-              )
-            : card;
         return _PageTransition(
           controller: _pageController,
           index: index,
-          child: framedCard,
+          child: card,
         );
       },
     );
@@ -2201,7 +2196,8 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                                     0,
                                     filtered.length - 1,
                                   )];
-                              if (active is! FeedPostItem) {
+                              if (active is! FeedPostItem ||
+                                  active.post.userId != widget.currentUserId) {
                                 return const SizedBox.shrink();
                               }
                               return IconButton(
