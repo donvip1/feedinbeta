@@ -186,6 +186,24 @@ class StoryPublisher {
     return 'Music story published.';
   }
 
+  /// Publishes an EXISTING media URL (from a feed post) directly as a story,
+  /// mirroring the web share sheet's "Story" action
+  /// (`supabase.from('stories').insert({user_id, media_url, media_type})`).
+  /// No re-upload — the post media is already hosted. Throws
+  /// [StoryPublishException] on failure.
+  Future<String> publishSharedMedia({
+    required String mediaUrl,
+    required String mediaType,
+  }) async {
+    final userId = _requireUser();
+    await _insertStory(
+      userId: userId,
+      mediaUrl: mediaUrl,
+      mediaType: mediaType.contains('video') ? 'video' : 'image',
+    );
+    return 'Added to your story.';
+  }
+
   /// Validates a picked/recorded audio file against the mime + 4-min rules,
   /// probing duration through the injected seam when possible.
   Future<AudioValidation> validateAudio(AudioAttachment attachment) async {

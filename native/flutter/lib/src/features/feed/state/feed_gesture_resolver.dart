@@ -19,17 +19,17 @@ class FeedGestureDecision {
   /// Whether the immersive video player should toggle play/pause.
   final bool shouldTogglePlayback;
 
-  /// A tap that arrived while the video is hidden should reveal chrome,
-  /// not toggle playback.
+  /// A tap that arrived while the chrome is hidden should reveal it (and the
+  /// caller pauses the video).
   static const FeedGestureDecision reveal = FeedGestureDecision(
-    chromeIntent: FeedSurfaceTapIntent.chromeReveal,
-    shouldTogglePlayback: false,
+    chromeIntent: FeedSurfaceTapIntent.reveal,
+    shouldTogglePlayback: true,
   );
 
-  /// A tap that arrived while the chrome is already full should toggle
-  /// playback and not touch the chrome state.
-  static const FeedGestureDecision playback = FeedGestureDecision(
-    chromeIntent: FeedSurfaceTapIntent.videoPlayback,
+  /// A tap that arrived while the chrome is visible should hide it (and the
+  /// caller resumes the video).
+  static const FeedGestureDecision hide = FeedGestureDecision(
+    chromeIntent: FeedSurfaceTapIntent.hide,
     shouldTogglePlayback: true,
   );
 
@@ -40,26 +40,23 @@ class FeedGestureDecision {
   );
 }
 
-/// Static helpers that derive gesture decisions from the current chrome
-/// state. The host pager passes the current visibility and decides
-/// whether the active post is a video; the helper returns the correct
-/// intent.
+/// Static helpers that derive gesture decisions from the active video's
+/// playback state. The immersive surface asks "what does this tap mean?" and
+/// forwards the answer. The decision is keyed off PLAYBACK, not chrome
+/// visibility, so tapping a playing video always pauses it (and reveals the
+/// chrome) — even during the brief window where the chrome is still visible
+/// while playback has just begun.
 class FeedGestureResolver {
   const FeedGestureResolver._();
 
   static FeedGestureDecision decideSurfaceTap({
-    required FeedChromeVisibility chromeState,
     required bool isActiveVideoPage,
+    required bool isPlaying,
   }) {
-    // Only a real video page owns the reveal-vs-playback distinction.
+    // Only the active video page owns the pause/resume + reveal/hide gesture.
     if (!isActiveVideoPage) return FeedGestureDecision.absorb;
 
-    switch (chromeState) {
-      case FeedChromeVisibility.hidden:
-      case FeedChromeVisibility.socialOnly:
-        return FeedGestureDecision.reveal;
-      case FeedChromeVisibility.full:
-        return FeedGestureDecision.playback;
-    }
+    // Playing → pause and reveal the chrome; paused → resume and hide it.
+    return isPlaying ? FeedGestureDecision.reveal : FeedGestureDecision.hide;
   }
 }

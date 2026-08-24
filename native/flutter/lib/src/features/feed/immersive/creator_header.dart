@@ -32,6 +32,13 @@ class CreatorHeader extends StatelessWidget {
         ? '?'
         : authorName.trim().characters.first.toUpperCase();
     final imageUrl = avatarUrl?.trim();
+    // Username, timestamp, and location (if tagged) share a single line so
+    // the identity block never wraps to a third line. The display name,
+    // badges, and Follow control stay on the line above.
+    final secondary = [
+      if (handle.trim().isNotEmpty) handle.trim(),
+      if (metadata.trim().isNotEmpty) metadata.trim(),
+    ].join(' · ');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -109,22 +116,13 @@ class CreatorHeader extends StatelessWidget {
                   ],
                 ],
               ),
-              if (handle.trim().isNotEmpty)
+              if (secondary.isNotEmpty)
                 Text(
-                  handle.trim(),
+                  secondary,
+                  key: const Key('feed-author-secondary-line'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: FeedImmersiveTheme.handle,
-                ),
-              if (metadata.trim().isNotEmpty)
-                Text(
-                  metadata.trim(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FeedImmersiveTheme.inkMuted,
-                    fontSize: 11,
-                  ),
                 ),
             ],
           ),

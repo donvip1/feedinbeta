@@ -65,7 +65,7 @@ void main() {
     expect(find.byType(InkWell), findsWidgets);
   });
 
-  testWidgets('bookmark toggle rolls back when repository update fails', (
+  testWidgets('bookmark toggle (via share drawer) rolls back when save fails', (
     tester,
   ) async {
     final repository = _EngagementRepository(
@@ -92,17 +92,21 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    await tester.tap(find.byKey(const Key('feed-action-more')));
-    await tester.pump(const Duration(milliseconds: 350));
-    final bookmarkAction = find.byKey(const Key('feed-action-save'));
-    expect(bookmarkAction, findsOneWidget);
-    await tester.tap(bookmarkAction);
+    // Save now lives inside the consolidated share drawer.
+    await tester.tap(find.byKey(const Key('feed-action-share')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
+    final saveRow = find.byKey(const Key('share-row-save'));
+    expect(saveRow, findsOneWidget);
+    await tester.tap(saveRow);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The repository was called with the pre-toggle saved state, and the
+    // optimistic flip rolled back after it threw.
     expect(repository.saveCalls, [('saved-1', true)]);
     expect(repository.failSave, isTrue);
-    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
   });
 
   testWidgets('owner can permanently delete a post after confirmation', (
@@ -139,6 +143,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('post-more-actions')));
     await tester.pump(const Duration(milliseconds: 250));
+    tester
+        .widget<ListTile>(find.widgetWithText(ListTile, 'Delete post'))
+        .onTap!();
+    await tester.pump(const Duration(milliseconds: 250));
     expect(find.text('This permanently deletes the post.'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -148,7 +156,9 @@ void main() {
     expect(repository.deletedPostIds, ['owner-post']);
   });
 
-  testWidgets('post actions stay hidden for a non-owner', (tester) async {
+  testWidgets('non-owner post actions expose Promote without Delete', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: FeedPostPagerScreen(
@@ -168,7 +178,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byKey(const Key('post-more-actions')), findsNothing);
+    final actions = find.byKey(const Key('post-more-actions'));
+    expect(actions, findsOneWidget);
+    await tester.tap(actions);
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Promote post'), findsOneWidget);
+    expect(find.text('Delete post'), findsNothing);
   });
 }
 

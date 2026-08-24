@@ -16,14 +16,11 @@ void main() {
             viewsCount: 99,
             isLiked: false,
             isRefeeded: false,
-            isSaved: true,
             isMoreExpanded: expanded,
-            avatarText: 'Ada',
             onLike: () {},
             onComment: () {},
             onRefeed: () {},
             onMore: onMore ?? () {},
-            onSave: () {},
             onGift: () {},
             onShare: () {},
           ),
@@ -32,7 +29,7 @@ void main() {
     );
   }
 
-  testWidgets('Gift shows by default, Views hidden until More', (
+  testWidgets('Share is a default action; Save is gone from the rail', (
     tester,
   ) async {
     await tester.pumpWidget(host(expanded: false));
@@ -40,29 +37,38 @@ void main() {
     expect(find.byKey(const Key('feed-action-like')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-comment')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-refeed')), findsOneWidget);
-    // Gift is now a default action; Views is no longer shown by default.
     expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
+    // Share is now a consolidated, default-visible action (opens the drawer).
+    expect(find.byKey(const Key('feed-action-share')), findsOneWidget);
+    // Save is no longer a rail button — it lives inside the share drawer.
+    expect(find.byKey(const Key('feed-action-save')), findsNothing);
+    // Views still hides until More.
     expect(find.byIcon(Icons.visibility_outlined), findsNothing);
     expect(find.byKey(const Key('feed-action-more')), findsOneWidget);
-    expect(find.byKey(const Key('feed-action-save')), findsNothing);
-    expect(find.byKey(const Key('feed-action-share')), findsNothing);
-    expect(find.byType(Dialog), findsNothing);
-    expect(find.byType(BottomSheet), findsNothing);
   });
 
-  testWidgets('Expanded More reveals Save, Share, and Views inline', (
-    tester,
-  ) async {
+  testWidgets('Expanded More reveals only Views inline', (tester) async {
     await tester.pumpWidget(host(expanded: true));
     await tester.pump(const Duration(milliseconds: 350));
 
-    expect(find.byKey(const Key('feed-action-save')), findsOneWidget);
     expect(find.byKey(const Key('feed-action-share')), findsOneWidget);
-    // Gift stays visible (it's a default action now), Views appears under More.
-    expect(find.byKey(const Key('feed-action-gift')), findsOneWidget);
+    expect(find.byKey(const Key('feed-action-save')), findsNothing);
     expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
-    expect(find.byType(Dialog), findsNothing);
-    expect(find.byType(BottomSheet), findsNothing);
+  });
+
+  testWidgets('Action buttons sit on a transparent background (no fill)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(expanded: false));
+
+    // The old glass chip drew a filled circular DecoratedBox behind each icon.
+    // With the transparent restyle there should be no such shape decoration
+    // inside the like action.
+    final decorated = find.descendant(
+      of: find.byKey(const Key('feed-action-like')),
+      matching: find.byType(DecoratedBox),
+    );
+    expect(decorated, findsNothing);
   });
 
   testWidgets('Visible controls retain accessible tap targets', (tester) async {
@@ -74,7 +80,6 @@ void main() {
       Key('feed-action-comment'),
       Key('feed-action-refeed'),
       Key('feed-action-more'),
-      Key('feed-action-save'),
       Key('feed-action-gift'),
       Key('feed-action-share'),
     ]) {

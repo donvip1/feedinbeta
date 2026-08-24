@@ -293,40 +293,31 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     if (callback != null) callback(isPlaying);
   }
 
-  /// Decide what a single tap on the video means.
-  ///
-  /// The chrome state machine is owned by the host pager; this widget
-  /// just forwards a strongly-typed intent. When chrome is hidden or
-  /// socialOnly, taps are reveal gestures (do not toggle play/pause).
-  /// When chrome is full, taps toggle play/pause as before.
-  void _handleTap() {
+  /// Center-zone tap → play/pause only. Chrome is unaffected: the user can
+  /// scrub playback without disturbing whatever chrome state they're in.
+  void _handlePlayPauseTap() {
     final controller = _controller;
+    if (controller == null || !_isInitialized) return;
+    if (controller.value.isPlaying) {
+      controller.pause();
+      _flashTapIcon(Icons.pause);
+    } else {
+      controller.play();
+      _flashTapIcon(Icons.play_arrow);
+    }
+    HapticFeedback.selectionClick();
+  }
+
+  /// Outer-zone tap → toggle ALL feed chrome (top bar, header, caption, rail).
+  /// The bottom home bar is owned by the shell and stays put.
+  void _handleChromeToggleTap() {
     final host = widget.onSurfaceTap;
-    final canToggle = controller != null && _isInitialized;
-
+    if (host == null) return;
     final intent = widget.chromeState == FeedChromeVisibility.full
-        ? FeedSurfaceTapIntent.videoPlayback
-        : FeedSurfaceTapIntent.chromeReveal;
-
-    if (host != null) {
-      host(intent);
-    }
-
-    // Only toggle playback when the chrome is already full AND the
-    // controller is ready. Hidden / socialOnly taps are pure reveal
-    // gestures.
-    if (intent == FeedSurfaceTapIntent.videoPlayback && canToggle) {
-      final wasPlaying = controller.value.isPlaying;
-      if (wasPlaying) {
-        controller.pause();
-      } else {
-        controller.play();
-      }
-      HapticFeedback.selectionClick();
-      _flashTapIcon(wasPlaying ? Icons.pause : Icons.play_arrow);
-    } else if (intent == FeedSurfaceTapIntent.chromeReveal) {
-      HapticFeedback.selectionClick();
-    }
+        ? FeedSurfaceTapIntent.hide
+        : FeedSurfaceTapIntent.reveal;
+    host(intent);
+    HapticFeedback.selectionClick();
   }
 
   void _flashTapIcon(IconData icon) {
@@ -358,30 +349,45 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     final controller = _controller;
     final ready = controller != null && _isInitialized;
 
-    return GestureDetector(
-      onTap: _handleTap,
-      onDoubleTap: widget.onDoubleTapLike,
-      child: ColoredBox(
-        color: FeedImmersiveTheme.mediaBackdrop,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (ready)
-              _buildVideo(controller)
-            else
-              _buildPlaceholder(loading: _hasSource),
-            if (ready && _isBuffering(controller)) _buildBufferingSpinner(),
-            if (ready && widget.chromeState == FeedChromeVisibility.full) ...[
-              _buildTapFeedback(),
-              _buildProgressBar(controller),
-            ],
-            // The mute control is part of the full chrome stage only — it
-            // is hidden alongside caption/progress when chrome is hidden
-            // or socialOnly.
-            if (widget.chromeState == FeedChromeVisibility.full)
-              _buildMuteButton(enabled: ready),
-          ],
-        ),
+    return ColoredBox(
+      color: FeedImmersiveTheme.mediaBackdrop,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (ready)
+            _buildVideo(controller)
+          else
+            _buildPlaceholder(loading: _hasSource),
+          if (ready && _isBuffering(controller)) _buildBufferingSpinner(),
+          // Outer zone: a tap toggles all feed chrome; double-tap Likes.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _handleChromeToggleTap,
+              onDoubleTap: widget.onDoubleTapLike,
+            ),
+          ),
+          // Center zone (around the play/pause glyph): a tap plays/pauses the
+          // video and leaves the chrome alone; double-tap still Likes.
+          Center(
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              heightFactor: 0.32,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _handlePlayPauseTap,
+                onDoubleTap: widget.onDoubleTapLike,
+              ),
+            ),
+          ),
+          // Play/pause feedback is independent of chrome, so it always shows.
+          if (ready) IgnorePointer(child: _buildTapFeedback()),
+          // Progress bar + mute ARE chrome — they hide when chrome hides.
+          if (ready && widget.chromeState == FeedChromeVisibility.full)
+            _buildProgressBar(controller),
+          if (widget.chromeState == FeedChromeVisibility.full)
+            _buildMuteButton(enabled: ready),
+        ],
       ),
     );
   }

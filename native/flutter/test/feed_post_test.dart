@@ -2,6 +2,28 @@ import 'package:feedin/src/features/feed/feed_post.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('author identity fields survive JSON round-trip', () {
+    const post = FeedPost(
+      id: 'post-identity',
+      userId: 'author-1',
+      authorName: 'Ada',
+      body: '',
+      meta: '@ada',
+      createdAtMillis: 10,
+      avatarUrl: 'https://example.com/ada.jpg',
+      authorHandle: '@ada',
+      isAuthorVerified: true,
+      authorBadgeTier: FeedAuthorBadgeTier.premium,
+      visibility: FeedPostVisibility.public,
+    );
+
+    final restored = FeedPost.fromJson(post.toJson());
+
+    expect(restored.isAuthorVerified, isTrue);
+    expect(restored.authorBadgeTier, FeedAuthorBadgeTier.premium);
+    expect(restored.visibility, FeedPostVisibility.public);
+  });
+
   test('normalizes image-only multi-media posts', () {
     const post = FeedPost(
       id: 'photos',

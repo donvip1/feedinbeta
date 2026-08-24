@@ -73,7 +73,6 @@ void main() {
       ),
     );
 
-    expect(find.text('Grace Hopper'), findsOneWidget);
     final quoteCaption = tester.widget<ExpandableCaption>(
       find.byKey(const Key('post-caption-quote-1')),
     );

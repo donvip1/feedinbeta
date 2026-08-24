@@ -84,7 +84,8 @@ class _AudioChipState extends State<AudioChip>
                   widget.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: FeedImmersiveTheme.metaLabel.copyWith(fontSize: 12),
+                  // Match the top feed tabs (Videos / Photos / Live) size.
+                  style: FeedImmersiveTheme.metaLabel.copyWith(fontSize: 10),
                 ),
               ),
             ],

@@ -309,6 +309,11 @@ class FeedImmersiveTheme {
   static const double navBlur = 18;
   static const double navHeight = 64;
 
+  /// Height of the pinned feed top bar's content (excludes the top safe-area
+  /// inset). The immersive pager is framed below `safeAreaTop + this` while the
+  /// chrome is visible, and expands full-bleed when it hides.
+  static const double feedTopBarContentHeight = 62;
+
   /// Gradient create pill (center "+" action).
   static const LinearGradient createPillGradient = LinearGradient(
     colors: [brandPink, brandViolet],

@@ -38,6 +38,7 @@ class PostController extends FamilyNotifier<PostState, PostControllerArgs> {
   }
 
   bool get isRefeeded => state.isRefeeded;
+  bool get isSaved => state.isSaved;
 
   void toggleMore() {
     state = state.copyWith(

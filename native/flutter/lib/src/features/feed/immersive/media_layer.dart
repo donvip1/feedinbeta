@@ -6,7 +6,6 @@ import '../state/feed_chrome_state_machine.dart';
 import 'feed_immersive_theme.dart';
 import 'immersive_video_player.dart';
 import 'photo_carousel.dart';
-import 'post_photo_viewer.dart';
 
 /// Resolves and renders a post's background media: the immersive video
 /// player, a photo carousel, or a branded gradient text card when there
@@ -83,15 +82,17 @@ class MediaLayer extends StatelessWidget {
               .map((item) => _mediaFilter(item.filterId)?.filter)
               .toList(growable: false),
           onDoubleTapLike: onDoubleTapLike,
-          onPhotoTap: (index) => Navigator.of(context).push<void>(
-            PostPhotoViewer.route(
-              urls: images.map((item) => item.url).toList(growable: false),
-              localPaths: images
-                  .map((item) => item.localPath)
-                  .toList(growable: false),
-              initialIndex: index,
-            ),
-          ),
+          // A single tap on a photo toggles the feed chrome (same as a video's
+          // outer zone) rather than opening a separate viewer.
+          onPhotoTap: (_) {
+            final host = onSurfaceTap;
+            if (host == null) return;
+            host(
+              chromeState == FeedChromeVisibility.full
+                  ? FeedSurfaceTapIntent.hide
+                  : FeedSurfaceTapIntent.reveal,
+            );
+          },
         );
       } else {
         return _TextCardBackground(

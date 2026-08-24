@@ -74,8 +74,9 @@ import 'immersive/incoming_feed_message_banner.dart';
 import 'immersive/refeed_sheet.dart';
 import '../../core/realtime/incoming_message_resolver.dart';
 import 'presentation/post_controller_card.dart';
+import 'share/feed_share_actions.dart';
+import 'share/feed_share_sheet.dart';
 import 'state/feed_chrome_state_machine.dart';
-import 'state/feed_gesture_resolver.dart';
 import 'state/post_controller.dart';
 
 class FeedShell extends StatefulWidget {
@@ -939,20 +940,13 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     );
   }
 
-  /// Whether the shared bottom navigation should be on screen for the
-  /// current shell index + Feed chrome visibility.
+  /// Whether the shared bottom navigation should be on screen.
   ///
-  /// Chats (_index == 1) always owns the full viewport (existing
-  /// behaviour). Other indices follow the immersive chrome rules:
-  /// bottom navigation is only visible when the Feed chrome is in its
-  /// `full` stage. While the user is watching a video with auto-hidden
-  /// chrome, the bottom navigation is hidden too, so the experience is
-  /// fully immersive.
+  /// Chats (_index == 1) always owns the full viewport. Every other tab keeps
+  /// the home bar (Feed / Chats / + / Wallet / Profile) visible at all times —
+  /// even while the feed chrome is tapped away for immersive viewing.
   bool _shouldShowFeedBottomNavigation() {
-    if (_index == 1) return false;
-    return _index == 0
-        ? _feedChromeVisibility == FeedChromeVisibility.full
-        : true;
+    return _index != 1;
   }
 }
 
@@ -1798,28 +1792,27 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     }
   }
 
-  Future<void> _sharePost(FeedPost post) async {
-    final action = await showFeedShareSheet(context, post: post);
-    if (!mounted || action == null) return;
-    if (action == FeedShareAction.copyLink) {
-      await widget.shareService.copyPostLink(post);
-      if (!mounted) return;
-      setState(() => _message = 'Post link copied.');
-      return;
-    }
-
-    try {
-      await widget.shareService.openNativeShareSheet(post);
-      await widget.shareService.recordShare(
+  Future<void> _sharePost(FeedPost post, PostController controller) async {
+    final actions = FeedShareActionsImpl(
+      post: post,
+      shareService: widget.shareService,
+      isConfigured: widget.currentUserId.isNotEmpty,
+      initiallySaved: controller.isSaved,
+      onToggleSave: () async {
+        await controller.toggleSave();
+        return controller.isSaved;
+      },
+      onExternalShared: () => widget.shareService.recordShare(
         post: post,
         repository: widget.feedRepository,
         syncService: widget.syncService,
         connectivityService: widget.connectivityService,
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _message = 'Could not open the share sheet.');
-    }
+      ),
+    );
+
+    final message = await showFeedShareDrawer(context, actions: actions);
+    if (!mounted || message == null) return;
+    setState(() => _message = message);
   }
 
   Future<void> _openGiftMarketplace(FeedPost post) async {
@@ -1833,6 +1826,26 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
       if (!mounted) return;
       setState(() => _message = 'Could not open gifts right now.');
     }
+  }
+
+  /// Opens a quoted/original post in the full-screen post viewer — the native
+  /// equivalent of a "post detail" screen. Used by the embedded quote card.
+  void _openOriginalPost(FeedPost original) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedPostPagerScreen(
+          posts: [original],
+          initialIndex: 0,
+          feedRepository: widget.feedRepository,
+          syncService: widget.syncService,
+          connectivityService: widget.connectivityService,
+          currentUserId: widget.currentUserId,
+          onOpenUserProfile: widget.onOpenUserProfile,
+          socialGraphDataSource: widget.socialGraphDataSource,
+          shareService: widget.shareService,
+        ),
+      ),
+    );
   }
 
   Future<void> _openCreatorPreview(FeedPost post) async {
@@ -2017,6 +2030,13 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
 
         final topInset = MediaQuery.of(context).padding.top;
         final overlayHeight = topInset + 104;
+        // While the chrome is visible the immersive pager is framed BELOW the
+        // pinned bar + demarcation line; when it hides (video playing) the
+        // pager expands to true full screen. Photos, Live, loading and empty
+        // states always sit below the bar via their own topPadding.
+        final chromeVisible = _chromeState == FeedChromeVisibility.full;
+        final pagerTopInset =
+            topInset + FeedImmersiveTheme.feedTopBarContentHeight;
 
         Widget content;
         if (_tabIndex == 2) {
@@ -2039,7 +2059,19 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                         topPadding: overlayHeight,
                         onRefresh: _refresh,
                       ))
-              : _buildImmersivePager(filteredPosts);
+              : AnimatedPadding(
+                  duration: FeedImmersiveTheme.motionMedium,
+                  curve: FeedImmersiveTheme.premiumSettleCurve,
+                  padding: EdgeInsets.only(top: chromeVisible ? pagerTopInset : 0),
+                  // Remove the top safe-area padding inside the framed pager so
+                  // the card's own header offset isn't double-counted against
+                  // the inset we just applied.
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: _buildImmersivePager(filteredPosts),
+                  ),
+                );
         }
 
         return ColoredBox(
@@ -2131,7 +2163,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             isActive: _routeVisible && index == _activePage,
             onCommentRequested: (_) => _openComments(post),
             onRefeedRequested: (controller) => _refeedPost(post, controller),
-            onShare: () => _sharePost(post),
+            onShare: (controller) => _sharePost(post, controller),
             onGift: () => unawaited(_openGiftMarketplace(post)),
             onFollow:
                 post.displayedPost.userId == widget.currentUserId ||
@@ -2139,8 +2171,19 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
                 ? null
                 : () => unawaited(_followCreator(post.displayedPost)),
             onAvatar: () => _openCreatorPreview(post),
-            onCreatorName: () =>
-                widget.onOpenUserProfile(post.displayedPost.userId),
+            // The outer header author is the QUOTER for quotes, else the
+            // content author — tap it to open that author's profile.
+            onCreatorName: () => widget.onOpenUserProfile(
+              (post.isQuoteRefeed ? post : post.displayedPost).userId,
+            ),
+            // The embedded quote card opens the ORIGINAL POST (never a
+            // profile) in the full-screen post viewer.
+            onOpenOriginalPost: post.isQuoteRefeed
+                ? () => _openOriginalPost(post.displayedPost)
+                : null,
+            // Sit the identity header just below the pinned top bar (the feed
+            // is framed below it), closing the previous large gap.
+            headerTopGap: FeedImmersiveTheme.spacingXs + 2,
             chromeState: _chromeState,
             onSurfaceTap: _handleSurfaceTapForPost(post, index),
             onPlaybackChange: _handlePlaybackChangeForPost(post),
@@ -2165,22 +2208,17 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 
-  /// Single-tap from the immersive video surface. Decides via the
-  /// gesture resolver whether the tap reveals chrome or toggles
-  /// playback. Non-video posts return an `absorb` decision so the
-  /// pager's surface tap never fights the existing double-tap Like.
+  /// Single-tap from the immersive video surface. The video player decides
+  /// the intent from the current playback state (playing → reveal + pause,
+  /// paused → hide + resume) and forwards it here; the pager just applies it
+  /// to the chrome state machine.
   void Function(FeedSurfaceTapIntent intent) _handleSurfaceTapForPost(
     FeedPost post,
     int postIndex,
   ) {
     return (intent) {
       if (!_routeVisible) return;
-      final isVideo = post.displayedPost.hasVideoMedia;
-      final decision = FeedGestureResolver.decideSurfaceTap(
-        chromeState: _chromeState,
-        isActiveVideoPage: isVideo && postIndex == _activePage,
-      );
-      _chrome.handleSurfaceTap(decision.chromeIntent);
+      _chrome.handleSurfaceTap(intent);
     };
   }
 
@@ -2222,20 +2260,32 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
               : FeedImmersiveTheme.opacityHidden,
           duration: FeedImmersiveTheme.motionMedium,
           curve: FeedImmersiveTheme.premiumSettleCurve,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: FeedImmersiveTheme.topScrim,
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 48,
-                      child: FeedTopChromeLayout(
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(
+                sigmaX: FeedImmersiveTheme.navBlur,
+                sigmaY: FeedImmersiveTheme.navBlur,
+              ),
+              child: DecoratedBox(
+                // A pinned, opaque bar with a hairline demarcation line so the
+                // feed never scrolls under it (framed below); it slides away
+                // only when chrome hides for true full-screen media.
+                decoration: const BoxDecoration(
+                  color: FeedImmersiveTheme.navGlassSurface,
+                  border: Border(
+                    bottom: BorderSide(color: FeedImmersiveTheme.divider),
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 48,
+                          child: FeedTopChromeLayout(
                         leading: const Text.rich(
                           TextSpan(
                             children: [
@@ -2326,6 +2376,8 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
               ),
             ),
           ),
+        ),
+        ),
         ),
       ),
     );

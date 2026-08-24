@@ -56,37 +56,29 @@ void main() {
   });
 
   group('FeedGestureResolver', () {
-    test('video page + hidden chrome returns reveal', () {
+    test('playing video → reveal chrome and pause', () {
       final decision = FeedGestureResolver.decideSurfaceTap(
-        chromeState: FeedChromeVisibility.hidden,
         isActiveVideoPage: true,
+        isPlaying: true,
       );
-      expect(decision.chromeIntent, FeedSurfaceTapIntent.chromeReveal);
-      expect(decision.shouldTogglePlayback, isFalse);
-    });
-
-    test('video page + socialOnly chrome returns reveal', () {
-      final decision = FeedGestureResolver.decideSurfaceTap(
-        chromeState: FeedChromeVisibility.socialOnly,
-        isActiveVideoPage: true,
-      );
-      expect(decision.chromeIntent, FeedSurfaceTapIntent.chromeReveal);
-    });
-
-    test('video page + full chrome returns playback', () {
-      final decision = FeedGestureResolver.decideSurfaceTap(
-        chromeState: FeedChromeVisibility.full,
-        isActiveVideoPage: true,
-      );
-      expect(decision.chromeIntent, FeedSurfaceTapIntent.videoPlayback);
+      expect(decision.chromeIntent, FeedSurfaceTapIntent.reveal);
       expect(decision.shouldTogglePlayback, isTrue);
     });
 
-    test('photo / text page absorbs taps regardless of chrome state', () {
-      for (final state in FeedChromeVisibility.values) {
+    test('paused video → hide chrome and resume', () {
+      final decision = FeedGestureResolver.decideSurfaceTap(
+        isActiveVideoPage: true,
+        isPlaying: false,
+      );
+      expect(decision.chromeIntent, FeedSurfaceTapIntent.hide);
+      expect(decision.shouldTogglePlayback, isTrue);
+    });
+
+    test('inactive / non-video page absorbs taps', () {
+      for (final playing in const [true, false]) {
         final decision = FeedGestureResolver.decideSurfaceTap(
-          chromeState: state,
           isActiveVideoPage: false,
+          isPlaying: playing,
         );
         expect(decision.chromeIntent, FeedSurfaceTapIntent.none);
         expect(decision.shouldTogglePlayback, isFalse);

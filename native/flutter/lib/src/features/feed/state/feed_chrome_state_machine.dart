@@ -2,36 +2,39 @@ import 'dart:async' show Timer, Zone;
 
 import 'package:flutter/foundation.dart';
 
-/// Three-stage visibility for the primary Feed/Home chrome.
+/// Visibility for the primary Feed/Home chrome.
 ///
 /// The pager-driven Feed auto-hides its chrome while a video is actively
-/// playing so the viewer gets an immersive experience, and uses a small
-/// state machine to reveal UI in two distinct stages:
+/// playing so the viewer gets an immersive experience. A single tap toggles
+/// between two resting states:
 ///
-/// 1. [hidden]   — video only. No chrome is interactive.
-/// 2. [socialOnly] — first tap from [hidden] reveals the right-side social
-///    action rail only (avatar / like / comment / refeed / views / more).
-/// 3. [full]     — second tap adds caption, playback controls, FeedIn
-///    branding, Videos/Photos/Live tabs, Search, notification bell, the
-///    owner More action, the Create FAB, and the bottom navigation bar.
+/// * [hidden] — video only, playing full screen. No chrome is interactive.
+/// * [full]   — all chrome visible (caption, action rail, playback controls,
+///   FeedIn branding, tabs, search, bell, bottom nav) and the video paused.
 ///
-/// After the user reaches [full] while a video keeps playing, the
-/// inactivity countdown restarts; after `autoHideDelay` without further
-/// interaction the chrome drops back to [hidden]. The intermediate
-/// [socialOnly] stage remains visible until the second reveal tap.
+/// The rule is "playing = chrome hidden; paused = chrome visible": a tap on a
+/// hidden surface pauses the video and reveals full chrome; a tap on a visible
+/// surface hides it and resumes playback. While a video keeps playing, the
+/// inactivity countdown hides the chrome after `autoHideDelay`.
+///
+/// [socialOnly] is retained for backward compatibility with callers that still
+/// switch over the enum, but the tap flow no longer produces it (reveal goes
+/// straight to [full] in one tap).
 ///
 /// The state machine itself only owns transitions and timer bookkeeping;
 /// it never reads or writes the video controller. Callers wire video
 /// readiness/playback into the helper via the [isVideoPlaying] gate, and
-/// route user gestures through [handleSurfaceTap]/[handlePlaybackTap] to
-/// drive the chrome while keeping video playback semantics intact.
+/// route user gestures through [handleSurfaceTap] to drive the chrome while
+/// keeping video playback semantics intact.
 enum FeedChromeVisibility { hidden, socialOnly, full }
 
-/// Surface-tap input classification. The host (Feed pager) tells the helper
-/// what kind of surface tap arrived; the helper decides whether the tap
-/// advances the chrome state machine, pauses/plays the video, or is
-/// ignored.
-enum FeedSurfaceTapIntent { chromeReveal, videoPlayback, none }
+/// Surface-tap input classification. A single tap on an immersive video
+/// toggles the chrome AND playback together:
+///
+/// * [reveal] — tap while chrome is hidden: show chrome and pause the video.
+/// * [hide]   — tap while chrome is visible: hide chrome and resume the video.
+/// * [none]   — absorbed (e.g. a non-video surface or a child widget).
+enum FeedSurfaceTapIntent { reveal, hide, none }
 
 /// Pure, side-effect-free state machine that drives the Feed chrome. Tests
 /// inject a deterministic [FeedChromeClock] so they don't depend on real
@@ -40,7 +43,7 @@ enum FeedSurfaceTapIntent { chromeReveal, videoPlayback, none }
 class FeedChromeStateMachine {
   FeedChromeStateMachine({
     FeedChromeClock clock = const _SystemClock(),
-    Duration autoHideDelay = const Duration(seconds: 4),
+    Duration autoHideDelay = const Duration(seconds: 3),
   }) : _clock = clock,
        _autoHideDelay = autoHideDelay;
 
@@ -82,24 +85,19 @@ class FeedChromeStateMachine {
     _listener?.call(next);
   }
 
-  /// Report whether the video is actively playing. When the gate flips
-  /// from false → true and the immersive surface is eligible, start the
-  /// auto-hide timer.
+  /// Report whether the video is actively playing. Playing arms the
+  /// inactivity countdown (chrome hides after [autoHideDelay]). Playback is
+  /// otherwise decoupled from chrome: pausing does NOT force the chrome back —
+  /// the center play/pause tap must not disturb the current chrome state.
   void reportVideoPlayback({required bool isPlaying}) {
     final wasPlaying = _isVideoPlaying;
     _isVideoPlaying = isPlaying;
     if (wasPlaying == isPlaying) return;
 
     if (isPlaying && _isImmersiveSurfaceActive) {
-      if (_state != FeedChromeVisibility.full) {
-        setState(FeedChromeVisibility.full);
-      }
       _scheduleAutoHide();
     } else {
       _cancelAutoHide();
-      if (!isPlaying && _isImmersiveSurfaceActive) {
-        setState(FeedChromeVisibility.full);
-      }
     }
   }
 
@@ -129,52 +127,30 @@ class FeedChromeStateMachine {
     setState(FeedChromeVisibility.full);
   }
 
-  /// Decide what to do with a tap on the immersive surface.
+  /// Apply a single surface tap.
   ///
-  /// - [FeedSurfaceTapIntent.chromeReveal] is the staged reveal gesture:
-  ///   the caller invokes this *instead* of pausing/playing the video.
-  ///   It moves hidden → socialOnly → full.
-  /// - [FeedSurfaceTapIntent.videoPlayback] is the explicit play/pause
-  ///   tap. The caller invokes this only when the chrome is already
-  ///   [full] (so we don't fight the reveal sequence).
-  /// - [FeedSurfaceTapIntent.none] is a no-op (e.g. tap absorbed by a
-  ///   child interactive widget like the action rail).
+  /// - [FeedSurfaceTapIntent.reveal] shows full chrome (the caller pauses the
+  ///   video); the inactivity countdown is cancelled because a paused video
+  ///   keeps its chrome visible.
+  /// - [FeedSurfaceTapIntent.hide] hides the chrome (the caller resumes the
+  ///   video); playback resuming re-arms the countdown via
+  ///   [reportVideoPlayback].
+  /// - [FeedSurfaceTapIntent.none] is a no-op.
   ///
   /// Returns the new visibility state for convenience.
   FeedChromeVisibility handleSurfaceTap(FeedSurfaceTapIntent intent) {
     switch (intent) {
       case FeedSurfaceTapIntent.none:
         return _state;
-      case FeedSurfaceTapIntent.chromeReveal:
-        return _advanceChrome();
-      case FeedSurfaceTapIntent.videoPlayback:
-        // Explicit playback taps clear any pending timer because the
-        // user is engaging with the video and we want the chrome to
-        // stay visible long enough to react. Reveal taps restart the
-        // timer inside [_advanceChrome] instead.
-        _cancelAutoHide();
-        return _state;
-    }
-  }
-
-  FeedChromeVisibility _advanceChrome() {
-    switch (_state) {
-      case FeedChromeVisibility.hidden:
-        setState(FeedChromeVisibility.socialOnly);
-        // First reveal stage stays visible until the second tap; the
-        // inactivity countdown begins only after full chrome is shown.
-        _cancelAutoHide();
-        return _state;
-      case FeedChromeVisibility.socialOnly:
+      case FeedSurfaceTapIntent.reveal:
         setState(FeedChromeVisibility.full);
-        // The user explicitly revealed full chrome. If the video is still
-        // playing, restart the four-second inactivity countdown so the Feed
-        // returns to immersive mode without requiring a playback change.
+        // While a video keeps playing, re-arm the inactivity countdown so the
+        // revealed chrome fades back out for immersive viewing.
         _scheduleAutoHide();
         return _state;
-      case FeedChromeVisibility.full:
-        // Already full: a chrome tap in this state should not restart
-        // anything; it's just absorbed.
+      case FeedSurfaceTapIntent.hide:
+        _cancelAutoHide();
+        setState(FeedChromeVisibility.hidden);
         return _state;
     }
   }

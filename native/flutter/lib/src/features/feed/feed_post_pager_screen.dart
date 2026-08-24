@@ -10,13 +10,20 @@ import '../../core/sync/sync_service.dart';
 import '../../data/local/local_feed_repository_contract.dart';
 import '../../data/remote/social_graph_remote_data_source.dart';
 import '../profile/parity/profile_tokens.dart';
+import '../gifts/data/gift_remote_data_source.dart';
+import '../gifts/presentation/gift_marketplace_sheet.dart';
+import '../promotions/data/promotion_remote_data_source.dart';
+import '../promotions/presentation/promote_post_flow.dart';
 import 'feed_post.dart';
 import 'feed_share_service.dart';
 import 'immersive/comment_sheet.dart';
 import 'immersive/creator_preview_sheet.dart';
 import 'immersive/feed_immersive_theme.dart';
+import 'immersive/feed_post_actions_sheet.dart';
 import 'immersive/refeed_sheet.dart';
 import 'presentation/post_controller_card.dart';
+import 'share/feed_share_actions.dart';
+import 'share/feed_share_sheet.dart';
 import 'state/post_controller.dart';
 
 typedef OpenFeedUserProfile = void Function(String userId);
@@ -61,6 +68,10 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
   ModalRoute<void>? _subscribedRoute;
   bool _routeVisible = true;
   String? _message;
+  final GiftRemoteDataSource _giftRepository =
+      GiftRemoteDataSource.autoDetect();
+  final PromotionRemoteDataSource _promotionRepository =
+      PromotionRemoteDataSource.autoDetect();
 
   @override
   void initState() {
@@ -176,28 +187,59 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
     );
   }
 
-  Future<void> _sharePost(FeedPost post) async {
-    final action = await showFeedShareSheet(context, post: post);
-    if (!mounted || action == null) return;
-    if (action == FeedShareAction.copyLink) {
-      await widget.shareService.copyPostLink(post);
-      if (!mounted) return;
-      setState(() => _message = 'Post link copied.');
-      return;
-    }
-
-    try {
-      await widget.shareService.openNativeShareSheet(post);
-      await widget.shareService.recordShare(
+  Future<void> _sharePost(FeedPost post, PostController controller) async {
+    final actions = FeedShareActionsImpl(
+      post: post,
+      shareService: widget.shareService,
+      isConfigured: widget.currentUserId.isNotEmpty,
+      initiallySaved: controller.isSaved,
+      onToggleSave: () async {
+        await controller.toggleSave();
+        return controller.isSaved;
+      },
+      onExternalShared: () => widget.shareService.recordShare(
         post: post,
         repository: widget.feedRepository,
         syncService: widget.syncService,
         connectivityService: widget.connectivityService,
+      ),
+    );
+
+    final message = await showFeedShareDrawer(context, actions: actions);
+    if (!mounted || message == null) return;
+    setState(() => _message = message);
+  }
+
+  Future<void> _openGiftMarketplace(FeedPost post) async {
+    try {
+      await showGiftMarketplaceSheet(
+        context,
+        postId: post.displayedPost.id,
+        repository: _giftRepository,
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => _message = 'Could not open the share sheet.');
+      setState(() => _message = 'Could not open gifts right now.');
     }
+  }
+
+  /// Pushes the quoted/original post as its own full-screen viewer page.
+  void _openOriginalPost(FeedPost original) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedPostPagerScreen(
+          posts: [original],
+          initialIndex: 0,
+          feedRepository: widget.feedRepository,
+          syncService: widget.syncService,
+          connectivityService: widget.connectivityService,
+          currentUserId: widget.currentUserId,
+          onOpenUserProfile: widget.onOpenUserProfile,
+          socialGraphDataSource: widget.socialGraphDataSource,
+          shareService: widget.shareService,
+        ),
+      ),
+    );
   }
 
   Future<void> _openCreatorPreview(FeedPost post) async {
@@ -225,6 +267,23 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
           ? null
           : () => widget.socialGraphDataSource.toggleFollow(content.userId),
     );
+  }
+
+  Future<void> _followCreator(FeedPost creatorPost) async {
+    try {
+      final following = await widget.socialGraphDataSource.toggleFollow(
+        creatorPost.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _message = following
+            ? 'You are now following ${creatorPost.authorName}.'
+            : 'Follow status updated.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _message = 'Could not follow this creator.');
+    }
   }
 
   Future<void> _deletePost(FeedPost post) async {
@@ -272,6 +331,34 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
     }
   }
 
+  Future<void> _openPostActions(FeedPost post) async {
+    final content = post.displayedPost;
+    final action = await showFeedPostActionsSheet(
+      context,
+      canDelete: post.userId == widget.currentUserId,
+      canPromote:
+          content.visibility == FeedPostVisibility.public &&
+          !content.isPromoted,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case FeedPostMenuAction.promote:
+        final campaign = await Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => PromotePostFlow(
+              post: content,
+              repository: _promotionRepository,
+            ),
+          ),
+        );
+        if (!mounted || campaign == null) return;
+        setState(() => _message = 'Promotion created successfully.');
+      case FeedPostMenuAction.delete:
+        await _deletePost(post);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -296,12 +383,21 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
                       _openComments(post, controller),
                   onRefeedRequested: (controller) =>
                       _refeedPost(post, controller),
-                  onShare: () => unawaited(_sharePost(post)),
-                  onGift: () =>
-                      setState(() => _message = 'Open Wallet to send a gift.'),
+                  onShare: (controller) =>
+                      unawaited(_sharePost(post, controller)),
+                  onGift: () => unawaited(_openGiftMarketplace(post)),
+                  onFollow:
+                      post.displayedPost.userId == widget.currentUserId ||
+                          post.displayedPost.viewerIsFollowing
+                      ? null
+                      : () => unawaited(_followCreator(post.displayedPost)),
                   onAvatar: () => unawaited(_openCreatorPreview(post)),
-                  onCreatorName: () =>
-                      widget.onOpenUserProfile(post.displayedPost.userId),
+                  onCreatorName: () => widget.onOpenUserProfile(
+                    (post.isQuoteRefeed ? post : post.displayedPost).userId,
+                  ),
+                  onOpenOriginalPost: post.isQuoteRefeed
+                      ? () => _openOriginalPost(post.displayedPost)
+                      : null,
                 );
               },
             ),
@@ -324,13 +420,12 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                     ),
                     const Spacer(),
-                    if (_posts.isNotEmpty &&
-                        _posts[_activePage].userId == widget.currentUserId)
+                    if (_posts.isNotEmpty)
                       IconButton(
                         key: const Key('post-more-actions'),
                         tooltip: 'Post actions',
                         onPressed: () =>
-                            unawaited(_deletePost(_posts[_activePage])),
+                            unawaited(_openPostActions(_posts[_activePage])),
                         icon: const Icon(
                           Icons.more_vert_rounded,
                           color: Colors.white,

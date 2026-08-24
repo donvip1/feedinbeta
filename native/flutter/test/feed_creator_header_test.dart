@@ -21,7 +21,7 @@ void main() {
             avatarUrl: null,
             isVerified: true,
             badgeTier: FeedAuthorBadgeTier.premium,
-            metadata: '2h · Public · Lagos',
+            metadata: '2h · Lagos',
             onProfileTap: () => profileTaps++,
             onFollow: () => followTaps++,
           ),
@@ -31,9 +31,13 @@ void main() {
 
     expect(find.byKey(const Key('feed-author-avatar')), findsOneWidget);
     expect(find.text('Ada Lovelace'), findsOneWidget);
-    expect(find.text('@ada'), findsOneWidget);
     expect(find.text('Premium'), findsOneWidget);
-    expect(find.text('2h · Public · Lagos'), findsOneWidget);
+    // Username, timestamp, and location render together on one line.
+    expect(find.text('@ada · 2h · Lagos'), findsOneWidget);
+    expect(
+      find.byKey(const Key('feed-author-secondary-line')),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('feed-author-profile')));
@@ -127,11 +131,9 @@ void main() {
             isActive: true,
             isLiked: false,
             isRefeeded: false,
-            isSaved: false,
             onLike: () {},
             onComment: () {},
             onRefeed: () {},
-            onSave: () {},
             onShare: () {},
             onMore: () {},
             onGift: () {},

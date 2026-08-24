@@ -1,3 +1,7 @@
+enum FeedAuthorBadgeTier { none, pro, premium }
+
+enum FeedPostVisibility { public, followers, private }
+
 class FeedPostMedia {
   const FeedPostMedia({
     required this.url,
@@ -38,11 +42,15 @@ class FeedPost {
     this.postType,
     this.avatarUrl,
     this.authorHandle,
+    this.isAuthorVerified = false,
+    this.authorBadgeTier = FeedAuthorBadgeTier.none,
+    this.visibility = FeedPostVisibility.public,
     this.originalPostId,
     this.originalPost,
     this.viewerHasLiked = false,
     this.viewerHasSaved = false,
     this.viewerHasRefeeded = false,
+    this.viewerIsFollowing = false,
     this.isPromoted = false,
     this.isTrending = false,
     this.isNewPost = false,
@@ -74,11 +82,15 @@ class FeedPost {
 
   /// Author handle (e.g. `@username`) from the `profiles` join, if available.
   final String? authorHandle;
+  final bool isAuthorVerified;
+  final FeedAuthorBadgeTier authorBadgeTier;
+  final FeedPostVisibility visibility;
   final String? originalPostId;
   final FeedPost? originalPost;
   final bool viewerHasLiked;
   final bool viewerHasSaved;
   final bool viewerHasRefeeded;
+  final bool viewerIsFollowing;
 
   /// Ranking flags supplied by the server feed engine (`feed-engine`). Default
   /// false for locally-cached / reverse-chron posts. Used only for badging
@@ -145,6 +157,7 @@ class FeedPost {
     bool? viewerHasLiked,
     bool? viewerHasSaved,
     bool? viewerHasRefeeded,
+    bool? viewerIsFollowing,
     FeedPost? originalPost,
   }) {
     return FeedPost(
@@ -169,14 +182,95 @@ class FeedPost {
       postType: postType,
       avatarUrl: avatarUrl,
       authorHandle: authorHandle,
+      isAuthorVerified: isAuthorVerified,
+      authorBadgeTier: authorBadgeTier,
+      visibility: visibility,
       originalPostId: originalPostId,
       originalPost: originalPost ?? this.originalPost,
       viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
       viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
       viewerHasRefeeded: viewerHasRefeeded ?? this.viewerHasRefeeded,
+      viewerIsFollowing: viewerIsFollowing ?? this.viewerIsFollowing,
       isPromoted: isPromoted,
       isTrending: isTrending,
       isNewPost: isNewPost,
+    );
+  }
+
+  factory FeedPost.fromRemoteRow(
+    Map<String, dynamic> row, {
+    bool viewerHasLiked = false,
+    bool viewerHasSaved = false,
+    bool viewerHasRefeeded = false,
+    FeedPost? originalPost,
+  }) {
+    final profile = row['profiles'];
+    final profileMap = profile is Map
+        ? Map<String, dynamic>.from(profile)
+        : const <String, dynamic>{};
+    final username = _remoteText(
+      row['author_username'] ?? profileMap['username'],
+    );
+    final displayName = _remoteText(
+      row['author_display_name'] ?? profileMap['display_name'],
+    );
+    final avatarUrl = _remoteText(
+      row['author_avatar_url'] ?? profileMap['avatar_url'],
+    );
+    final badgeName = _remoteText(
+      row['author_badge_tier'] ?? profileMap['plan_tier'],
+    )?.toLowerCase();
+    final visibilityName = _remoteText(
+      row['visibility'] ?? row['privacy'],
+    )?.toLowerCase();
+    return FeedPost(
+      id: row['id']?.toString() ?? '',
+      userId: row['user_id']?.toString() ?? '',
+      authorName: displayName ?? username ?? 'feedIn User',
+      body: row['content']?.toString() ?? '',
+      meta: username == null ? 'Synced from server' : '@$username',
+      createdAtMillis:
+          DateTime.tryParse(
+            row['created_at']?.toString() ?? '',
+          )?.millisecondsSinceEpoch ??
+          DateTime.now().millisecondsSinceEpoch,
+      mediaUrl: _remoteText(row['media_url']),
+      mediaType: _remoteText(row['media_type']),
+      mediaUrls: _remoteStringList(row['media_urls']),
+      mediaTypes: _remoteStringList(row['media_types']),
+      mediaFilterId: _remoteText(row['media_filter_id']),
+      mediaFilterIds: _remoteStringList(row['media_filter_ids']),
+      likesCount: _remoteInt(row['likes_count']),
+      commentsCount: _remoteInt(row['comments_count']),
+      viewsCount: _remoteInt(row['views_count']),
+      refeedsCount: _remoteInt(row['refeeds_count']),
+      location: _remoteText(row['location']),
+      postType: _remoteText(row['post_type']),
+      avatarUrl: avatarUrl,
+      authorHandle: username == null ? null : '@$username',
+      isAuthorVerified:
+          row['author_verified'] == true || profileMap['is_verified'] == true,
+      authorBadgeTier: switch (badgeName) {
+        'pro' => FeedAuthorBadgeTier.pro,
+        'premium' => FeedAuthorBadgeTier.premium,
+        _ => FeedAuthorBadgeTier.none,
+      },
+      visibility: switch (visibilityName) {
+        'followers' => FeedPostVisibility.followers,
+        'friends' => FeedPostVisibility.followers,
+        'private' => FeedPostVisibility.private,
+        'only_me' => FeedPostVisibility.private,
+        _ => FeedPostVisibility.public,
+      },
+      originalPostId: _remoteText(row['original_post_id']),
+      originalPost: originalPost,
+      viewerHasLiked: viewerHasLiked,
+      viewerHasSaved: viewerHasSaved,
+      viewerHasRefeeded: viewerHasRefeeded,
+      viewerIsFollowing: row['viewer_is_following'] == true,
+      isPromoted: row['is_promoted'] == true,
+      isTrending: row['is_trending'] == true,
+      isNewPost: row['is_new_post'] == true,
     );
   }
 
@@ -209,6 +303,15 @@ class FeedPost {
       postType: json['postType'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       authorHandle: json['authorHandle'] as String?,
+      isAuthorVerified: json['isAuthorVerified'] as bool? ?? false,
+      authorBadgeTier: FeedAuthorBadgeTier.values.firstWhere(
+        (value) => value.name == json['authorBadgeTier'],
+        orElse: () => FeedAuthorBadgeTier.none,
+      ),
+      visibility: FeedPostVisibility.values.firstWhere(
+        (value) => value.name == json['visibility'],
+        orElse: () => FeedPostVisibility.public,
+      ),
       originalPostId: json['originalPostId'] as String?,
       originalPost: json['originalPost'] is Map
           ? FeedPost.fromJson(
@@ -218,6 +321,7 @@ class FeedPost {
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       viewerHasSaved: json['viewerHasSaved'] as bool? ?? false,
       viewerHasRefeeded: json['viewerHasRefeeded'] as bool? ?? false,
+      viewerIsFollowing: json['viewerIsFollowing'] as bool? ?? false,
       isPromoted: json['isPromoted'] as bool? ?? false,
       isTrending: json['isTrending'] as bool? ?? false,
       isNewPost: json['isNewPost'] as bool? ?? false,
@@ -247,16 +351,39 @@ class FeedPost {
       'postType': postType,
       'avatarUrl': avatarUrl,
       'authorHandle': authorHandle,
+      'isAuthorVerified': isAuthorVerified,
+      'authorBadgeTier': authorBadgeTier.name,
+      'visibility': visibility.name,
       'originalPostId': originalPostId,
       'originalPost': originalPost?.toJson(),
       'viewerHasLiked': viewerHasLiked,
       'viewerHasSaved': viewerHasSaved,
       'viewerHasRefeeded': viewerHasRefeeded,
+      'viewerIsFollowing': viewerIsFollowing,
       'isPromoted': isPromoted,
       'isTrending': isTrending,
       'isNewPost': isNewPost,
     };
   }
+}
+
+String? _remoteText(Object? value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
+List<String> _remoteStringList(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
+int _remoteInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 class FeedComment {

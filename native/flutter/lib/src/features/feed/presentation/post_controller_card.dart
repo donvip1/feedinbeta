@@ -26,8 +26,11 @@ class PostControllerCard extends ConsumerStatefulWidget {
     required this.onRefeedRequested,
     required this.onShare,
     required this.onGift,
+    this.onFollow,
     this.onAvatar,
     this.onCreatorName,
+    this.onOpenOriginalPost,
+    this.headerTopGap = 68,
     this.chromeState = FeedChromeVisibility.full,
     this.onSurfaceTap,
     this.onPlaybackChange,
@@ -38,10 +41,21 @@ class PostControllerCard extends ConsumerStatefulWidget {
   final bool isActive;
   final Future<void> Function(PostController controller) onCommentRequested;
   final Future<void> Function(PostController controller) onRefeedRequested;
-  final VoidCallback onShare;
+
+  /// Opens the share drawer. Receives the post's controller so the caller can
+  /// toggle Save on the SAME provider instance the card renders (correct even
+  /// under the pager's local [ProviderScope]).
+  final void Function(PostController controller) onShare;
   final VoidCallback onGift;
+  final VoidCallback? onFollow;
   final VoidCallback? onAvatar;
   final VoidCallback? onCreatorName;
+
+  /// Opens the embedded quoted post's detail (for quote-refeeds).
+  final VoidCallback? onOpenOriginalPost;
+
+  /// Passed to the card's author header offset (see ImmersivePostCard).
+  final double headerTopGap;
 
   /// Visibility stage for the Feed chrome around this card.
   final FeedChromeVisibility chromeState;
@@ -100,7 +114,6 @@ class _PostControllerCardState extends ConsumerState<PostControllerCard> {
       isActive: widget.isActive,
       isLiked: postState.isLiked,
       isRefeeded: postState.isRefeeded,
-      isSaved: postState.isSaved,
       isMoreExpanded: postState.isMoreExpanded,
       onLike: () => unawaited(controller.toggleLike()),
       onComment: () {
@@ -108,18 +121,20 @@ class _PostControllerCardState extends ConsumerState<PostControllerCard> {
         unawaited(widget.onCommentRequested(controller));
       },
       onRefeed: () => unawaited(widget.onRefeedRequested(controller)),
-      onSave: () => unawaited(controller.toggleSave()),
       onShare: () {
         controller.collapseMore();
-        widget.onShare();
+        widget.onShare(controller);
       },
       onMore: controller.toggleMore,
       onGift: () {
         controller.collapseMore();
         widget.onGift();
       },
+      onFollow: widget.onFollow,
       onAvatar: widget.onAvatar,
       onCreatorName: widget.onCreatorName,
+      onOpenOriginalPost: widget.onOpenOriginalPost,
+      headerTopGap: widget.headerTopGap,
       chromeState: widget.chromeState,
     );
   }
