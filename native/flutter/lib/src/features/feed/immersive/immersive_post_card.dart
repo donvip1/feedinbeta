@@ -8,16 +8,14 @@ import 'creator_header.dart';
 import 'feed_action_rail.dart';
 import 'feed_immersive_theme.dart';
 import 'gesture_layer.dart';
-import 'gradient_overlay.dart';
 import 'media_layer.dart';
 
 /// A single full-screen TikTok-style social post.
 ///
 /// This is the thin orchestrator that composes the immersive layers as a
-/// full-bleed [Stack]: [MediaLayer] background, [ReadabilityScrims]
-/// legibility treatment, the bottom-left [CaptionLayer], the right-hand
-/// [FeedActionRail], and the double-tap [HeartBurst]. All state and
-/// behavior live in the layers; this widget only wires callbacks and the
+/// full-bleed [Stack]: [MediaLayer] background, the bottom-left [CaptionLayer],
+/// the right-hand [FeedActionRail], and the double-tap [HeartBurst]. All state
+/// and behavior live in the layers; this widget only wires callbacks and the
 /// active-page transitions.
 ///
 /// The two visibility groups [socialChromeVisible] and [fullChromeVisible]
@@ -43,6 +41,8 @@ class ImmersivePostCard extends StatefulWidget {
     this.onAvatar,
     this.onCreatorName,
     this.onOpenOriginalPost,
+    this.onSurfaceTap,
+    this.onPlaybackChange,
     this.headerTopGap = 68,
     this.chromeState = FeedChromeVisibility.full,
   });
@@ -71,6 +71,14 @@ class ImmersivePostCard extends StatefulWidget {
   /// Opens the embedded quoted post's detail (for quote-refeeds). The quote
   /// card routes here — to the ORIGINAL POST, never a profile.
   final VoidCallback? onOpenOriginalPost;
+
+  /// Forwarded to the media surface: an outer-zone tap (video) or any tap
+  /// (photo) reports a chrome reveal/hide intent to the host pager.
+  final void Function(FeedSurfaceTapIntent intent)? onSurfaceTap;
+
+  /// Forwarded to the video player so the host can arm the auto-hide timer
+  /// when playback actually starts/stops.
+  final void Function(bool isPlaying)? onPlaybackChange;
 
   /// Distance from the top safe-area inset to the author header. The framed
   /// immersive feed passes a small value (the header sits just below the
@@ -141,6 +149,9 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
                 post: _contentPost,
                 isActive: widget.isActive,
                 onDoubleTapLike: _handleDoubleTapLike,
+                onSurfaceTap: widget.onSurfaceTap,
+                onPlaybackChange: widget.onPlaybackChange,
+                chromeState: widget.chromeState,
               ),
             ),
           ),
@@ -149,8 +160,8 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
           //    (above the pager), so the card omits its own to avoid the
           //    over-darkened "double scrim" at the top of the media.
 
-          // 3. Layered edge treatment protecting the caption/rail.
-          const Positioned.fill(child: ReadabilityScrims()),
+          // 3. No readability scrim over the media (removed by request) — the
+          //    caption/author text relies on its own drop shadows instead.
 
           // 4. Author identity belongs at the top-left of the media, matching
           //    the web feed and keeping it separate from the post caption.

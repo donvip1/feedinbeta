@@ -135,6 +135,8 @@ class _PostControllerCardState extends ConsumerState<PostControllerCard> {
       onCreatorName: widget.onCreatorName,
       onOpenOriginalPost: widget.onOpenOriginalPost,
       headerTopGap: widget.headerTopGap,
+      onSurfaceTap: widget.onSurfaceTap,
+      onPlaybackChange: widget.onPlaybackChange,
       chromeState: widget.chromeState,
     );
   }
