@@ -347,6 +347,50 @@ class LiveRemoteDataSource {
     }
   }
 
+  /// Create a new audio space owned by the current user and immediately join it
+  /// as host. Mirrors [startLiveStream] but targets the `live_spaces` contract.
+  Future<LiveSpaceSummary> startLiveSpace({
+    required String title,
+    String? description,
+    String? topicCategory,
+  }) async {
+    final client = _client;
+    if (client == null) _throwUnavailable();
+    final userId = currentUserId;
+    if (userId == null) _throwSignIn('start an audio space');
+    final normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) {
+      throw const LiveDataException('An audio-space title is required.');
+    }
+    try {
+      final row = await client
+          .from(_spacesTable)
+          .insert({
+            'user_id': userId,
+            'title': normalizedTitle,
+            'description': description?.trim().isEmpty ?? true
+                ? null
+                : description!.trim(),
+            'topic_category': topicCategory?.trim().isEmpty ?? true
+                ? null
+                : topicCategory!.trim(),
+            'status': 'live',
+            'started_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .select(
+            'id, user_id, title, description, status, viewer_count, '
+            'topic_category, started_at, $_spaceHostEmbed',
+          )
+          .single();
+      final space = LiveSpaceSummary.fromJson(Map<String, Object?>.from(row));
+      await joinSpace(space.id, role: 'host');
+      return space;
+    } catch (error) {
+      if (error is LiveDataException) rethrow;
+      throw LiveDataException('Could not start the audio space.', cause: error);
+    }
+  }
+
   // --- Join / leave a stream -------------------------------------------------
 
   /// Mark the current user as an active viewer of [streamId]. Idempotent: the

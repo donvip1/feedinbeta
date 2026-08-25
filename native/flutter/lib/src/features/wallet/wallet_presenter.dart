@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'data/currency_models.dart';
+import 'data/wallet_gift_models.dart';
 import 'data/wallet_models.dart';
 import 'data/wallet_remote_data_source.dart';
 
@@ -60,6 +62,20 @@ class WalletPresenter extends ChangeNotifier {
   WalletLoadState get packagesState => _packagesState;
   List<CreditPackage> _packages = const [];
   List<CreditPackage> get packages => _packages;
+  CurrencyQuote _currencyQuote = CurrencyQuote.usd;
+  CurrencyQuote get currencyQuote => _currencyQuote;
+
+  CurrencyDisplayPrice get balanceApproximation =>
+      CurrencyDisplayPrice.fromUsdMinor(
+        (_balance.approxUsd * 100).round(),
+        _currencyQuote,
+      );
+
+  CurrencyDisplayPrice packagePrice(CreditPackage package) =>
+      CurrencyDisplayPrice.fromUsdMinor(package.priceCents, _currencyQuote);
+
+  CurrencyDisplayPrice subscriptionPrice(SubscriptionTier tier) =>
+      CurrencyDisplayPrice.fromUsdMinor(tier.priceCents, _currencyQuote);
 
   // --- Transactions ---
   WalletLoadState _transactionsState = WalletLoadState.idle;
@@ -71,6 +87,14 @@ class WalletPresenter extends ChangeNotifier {
   TransactionFilter get transactionFilter => _transactionFilter;
   List<CreditTransaction> get filteredTransactions =>
       _transactions.where(_transactionFilter.matches).toList();
+
+  // --- Gifts ---
+  WalletLoadState _giftsState = WalletLoadState.idle;
+  WalletLoadState get giftsState => _giftsState;
+  List<WalletGiftReceipt> _receivedGifts = const [];
+  List<WalletGiftReceipt> get receivedGifts => _receivedGifts;
+  List<WalletGiftReceipt> _sentGifts = const [];
+  List<WalletGiftReceipt> get sentGifts => _sentGifts;
 
   // --- Finance buyback ---
   WalletLoadState _buybackState = WalletLoadState.idle;
@@ -225,7 +249,12 @@ class WalletPresenter extends ChangeNotifier {
     _packagesState = WalletLoadState.loading;
     _safeNotify();
     try {
-      _packages = await _data.fetchPackages();
+      final results = await Future.wait([
+        _data.fetchPackages(),
+        _data.fetchCurrencyQuote(),
+      ]);
+      _packages = results[0] as List<CreditPackage>;
+      _currencyQuote = results[1] as CurrencyQuote;
       _packagesState = WalletLoadState.ready;
     } catch (_) {
       _packagesState = WalletLoadState.error;
@@ -242,6 +271,24 @@ class WalletPresenter extends ChangeNotifier {
       _transactionsState = WalletLoadState.ready;
     } catch (_) {
       _transactionsState = WalletLoadState.error;
+    }
+    _safeNotify();
+  }
+
+  Future<void> loadGifts() async {
+    if (_giftsState == WalletLoadState.loading) return;
+    _giftsState = WalletLoadState.loading;
+    _safeNotify();
+    try {
+      final results = await Future.wait([
+        _data.fetchReceivedGifts(),
+        _data.fetchSentGifts(),
+      ]);
+      _receivedGifts = results[0];
+      _sentGifts = results[1];
+      _giftsState = WalletLoadState.ready;
+    } catch (_) {
+      _giftsState = WalletLoadState.error;
     }
     _safeNotify();
   }
@@ -300,19 +347,25 @@ class WalletPresenter extends ChangeNotifier {
 
   /// Refresh the balance + ledger after a money move.
   Future<void> refreshAfterMutation() async {
-    await Future.wait([loadOverview(), loadTransactions()]);
+    await Future.wait([loadOverview(), loadTransactions(), loadGifts()]);
   }
 
   // --- Money moves (delegate to the data source; caller handles UX) -------
 
   Future<WalletCheckoutSession> startCreditCheckout(String packageId) async {
-    final session = await _data.startCreditCheckout(packageId);
+    final session = await _data.startCreditCheckout(
+      packageId,
+      currency: _currencyQuote.currencyCode,
+    );
     _rememberCheckout(session);
     return session;
   }
 
   Future<WalletCheckoutSession> startSubscriptionCheckout(String tierId) async {
-    final session = await _data.startSubscriptionCheckout(tierId);
+    final session = await _data.startSubscriptionCheckout(
+      tierId,
+      currency: _currencyQuote.currencyCode,
+    );
     _rememberCheckout(session);
     return session;
   }

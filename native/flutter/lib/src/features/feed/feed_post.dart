@@ -1,3 +1,7 @@
+enum FeedAuthorBadgeTier { none, pro, premium }
+
+enum FeedPostVisibility { public, followers, private }
+
 class FeedPostMedia {
   const FeedPostMedia({
     required this.url,
@@ -38,11 +42,15 @@ class FeedPost {
     this.postType,
     this.avatarUrl,
     this.authorHandle,
+    this.isAuthorVerified = false,
+    this.authorBadgeTier = FeedAuthorBadgeTier.none,
+    this.visibility = FeedPostVisibility.public,
     this.originalPostId,
     this.originalPost,
     this.viewerHasLiked = false,
     this.viewerHasSaved = false,
     this.viewerHasRefeeded = false,
+    this.viewerIsFollowing = false,
     this.isPromoted = false,
     this.isTrending = false,
     this.isNewPost = false,
@@ -74,11 +82,22 @@ class FeedPost {
 
   /// Author handle (e.g. `@username`) from the `profiles` join, if available.
   final String? authorHandle;
+
+  /// Author identity badges from the `profiles` join. Verified is a checkmark;
+  /// [authorBadgeTier] renders the Pro/Premium chip in the creator header.
+  final bool isAuthorVerified;
+  final FeedAuthorBadgeTier authorBadgeTier;
+
+  /// Audience the post was published to. Only `public` posts can be promoted.
+  final FeedPostVisibility visibility;
   final String? originalPostId;
   final FeedPost? originalPost;
   final bool viewerHasLiked;
   final bool viewerHasSaved;
   final bool viewerHasRefeeded;
+
+  /// Whether the viewer already follows the author. Hides the header Follow CTA.
+  final bool viewerIsFollowing;
 
   /// Ranking flags supplied by the server feed engine (`feed-engine`). Default
   /// false for locally-cached / reverse-chron posts. Used only for badging
@@ -145,6 +164,7 @@ class FeedPost {
     bool? viewerHasLiked,
     bool? viewerHasSaved,
     bool? viewerHasRefeeded,
+    bool? viewerIsFollowing,
     FeedPost? originalPost,
   }) {
     return FeedPost(
@@ -169,11 +189,15 @@ class FeedPost {
       postType: postType,
       avatarUrl: avatarUrl,
       authorHandle: authorHandle,
+      isAuthorVerified: isAuthorVerified,
+      authorBadgeTier: authorBadgeTier,
+      visibility: visibility,
       originalPostId: originalPostId,
       originalPost: originalPost ?? this.originalPost,
       viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
       viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
       viewerHasRefeeded: viewerHasRefeeded ?? this.viewerHasRefeeded,
+      viewerIsFollowing: viewerIsFollowing ?? this.viewerIsFollowing,
       isPromoted: isPromoted,
       isTrending: isTrending,
       isNewPost: isNewPost,
@@ -209,6 +233,15 @@ class FeedPost {
       postType: json['postType'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       authorHandle: json['authorHandle'] as String?,
+      isAuthorVerified: json['isAuthorVerified'] as bool? ?? false,
+      authorBadgeTier: FeedAuthorBadgeTier.values.firstWhere(
+        (value) => value.name == json['authorBadgeTier'],
+        orElse: () => FeedAuthorBadgeTier.none,
+      ),
+      visibility: FeedPostVisibility.values.firstWhere(
+        (value) => value.name == json['visibility'],
+        orElse: () => FeedPostVisibility.public,
+      ),
       originalPostId: json['originalPostId'] as String?,
       originalPost: json['originalPost'] is Map
           ? FeedPost.fromJson(
@@ -218,6 +251,7 @@ class FeedPost {
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       viewerHasSaved: json['viewerHasSaved'] as bool? ?? false,
       viewerHasRefeeded: json['viewerHasRefeeded'] as bool? ?? false,
+      viewerIsFollowing: json['viewerIsFollowing'] as bool? ?? false,
       isPromoted: json['isPromoted'] as bool? ?? false,
       isTrending: json['isTrending'] as bool? ?? false,
       isNewPost: json['isNewPost'] as bool? ?? false,
@@ -247,11 +281,15 @@ class FeedPost {
       'postType': postType,
       'avatarUrl': avatarUrl,
       'authorHandle': authorHandle,
+      'isAuthorVerified': isAuthorVerified,
+      'authorBadgeTier': authorBadgeTier.name,
+      'visibility': visibility.name,
       'originalPostId': originalPostId,
       'originalPost': originalPost?.toJson(),
       'viewerHasLiked': viewerHasLiked,
       'viewerHasSaved': viewerHasSaved,
       'viewerHasRefeeded': viewerHasRefeeded,
+      'viewerIsFollowing': viewerIsFollowing,
       'isPromoted': isPromoted,
       'isTrending': isTrending,
       'isNewPost': isNewPost,

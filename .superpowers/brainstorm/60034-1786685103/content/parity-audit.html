@@ -1,0 +1,48 @@
+<h2>Feedin Android parity audit</h2>
+<p class="subtitle">Current Flutter release compared with the old web behavior and the requested native target</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Current Flutter reel</div>
+    <div class="mockup-body" style="background:linear-gradient(160deg,#253044,#05070c);min-height:540px;position:relative;border-radius:18px;overflow:hidden;color:white">
+      <div style="position:absolute;top:24px;left:24px;font-size:26px;font-weight:900">feed<span style="color:#ff2d91">In</span></div>
+      <div style="position:absolute;right:18px;bottom:90px;display:grid;gap:16px;text-align:center">
+        <div style="width:48px;height:48px;border-radius:50%;background:#ff2d91;display:grid;place-items:center">AV</div>
+        <div>♡<br><small>12</small></div><div>▢<br><small>4</small></div><div>↻<br><small>1</small></div><div>🎁</div><div>•••</div>
+      </div>
+      <div style="position:absolute;left:22px;right:86px;bottom:48px">
+        <div style="font-weight:900;font-size:18px">Display Name <span style="opacity:.7;font-weight:600">@username</span></div>
+        <p style="margin-top:10px">Caption overlays the media near the bottom.</p>
+      </div>
+      <div style="position:absolute;left:18px;top:90px;background:#ef4444;color:white;border-radius:9px;padding:7px 10px;font-size:12px">GIFT CURRENTLY OPENS WALLET</div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Requested parity target</div>
+    <div class="mockup-body" style="background:linear-gradient(160deg,#38263c,#08070d);min-height:540px;position:relative;border-radius:18px;overflow:hidden;color:white">
+      <div style="position:absolute;top:24px;left:18px;right:18px;display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.28);padding:10px 12px;border-radius:18px;backdrop-filter:blur(10px)">
+        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ff2d91,#8456ff);display:grid;place-items:center;font-weight:900">AV</div>
+        <div style="min-width:0"><div style="font-weight:900;font-size:17px">Display Name <span style="color:#38bdf8">✓</span></div><div style="opacity:.75">@username</div></div>
+        <button style="margin-left:auto;background:linear-gradient(135deg,#ff2d91,#8456ff);border:0;color:white;border-radius:12px;padding:9px 12px;font-weight:800">Follow</button>
+      </div>
+      <div style="position:absolute;right:18px;bottom:88px;display:grid;gap:14px;text-align:center">
+        <div>♡<br><small>12</small></div><div>▢<br><small>4</small></div><div>↻<br><small>1</small></div><div style="color:#ffd166">🎁<br><small>Gift</small></div><div>•••</div>
+      </div>
+      <div style="position:absolute;left:22px;right:86px;bottom:44px"><p>Caption remains readable without duplicating author identity.</p></div>
+      <div style="position:absolute;left:18px;top:118px;display:flex;gap:8px"><span style="background:#ff2d91;border-radius:999px;padding:6px 10px;font-size:12px">Promoted</span><span style="background:#8456ff;border-radius:999px;padding:6px 10px;font-size:12px">Promote this post</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Four parity tracks found in the code</h3>
+  <div class="options" data-multiselect>
+    <div class="option selected" data-choice="identity"><div class="letter">1</div><div class="content"><h3>Creator identity</h3><p>Avatar at top left, verified badge from real profile data, display name, and username below.</p></div></div>
+    <div class="option selected" data-choice="gift"><div class="letter">2</div><div class="content"><h3>Post gifting</h3><p>Open a gift picker on the reel, show credit balance, call the post-specific gift RPC, animate success, and update the gift count.</p></div></div>
+    <div class="option selected" data-choice="promotion"><div class="letter">3</div><div class="content"><h3>Promotions and ads</h3><p>Promotion package selection, credit charging, active promotion state, promoted labels, tracking, and sponsored-feed rendering.</p></div></div>
+    <div class="option selected" data-choice="create"><div class="letter">4</div><div class="content"><h3>Expanded Create sheet</h3><p>Video, Photo+, Story, and Go Live with the old web descriptions, each routed to a real native flow.</p></div></div>
+  </div>
+</div>
+
+<p class="subtitle">This is an audit preview, not the final design. The next decisions define the exact behavior before implementation.</p>

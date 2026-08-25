@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/currency_models.dart';
 import '../data/wallet_models.dart';
 import '../wallet_theme.dart';
 import 'wallet_common.dart';
@@ -10,12 +11,14 @@ class WalletSubscriptionCard extends StatelessWidget {
     super.key,
     required this.tier,
     required this.onSubscribe,
+    required this.displayPrice,
     this.isCurrent = false,
     this.busy = false,
   });
 
   final SubscriptionTier tier;
   final VoidCallback onSubscribe;
+  final CurrencyDisplayPrice displayPrice;
   final bool isCurrent;
   final bool busy;
 
@@ -98,7 +101,7 @@ class WalletSubscriptionCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                formatMoney(tier.priceMajor, tier.currency),
+                displayPrice.primaryLabel,
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
@@ -109,6 +112,13 @@ class WalletSubscriptionCard extends StatelessWidget {
               const Text('/mo', style: WalletTextStyles.rowMuted),
             ],
           ),
+          if (displayPrice.canonicalLabel != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              displayPrice.canonicalLabel!,
+              style: WalletTextStyles.rowMuted.copyWith(fontSize: 11),
+            ),
+          ],
           if (tier.description != null && tier.description!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(tier.description!, style: WalletTextStyles.rowMuted),

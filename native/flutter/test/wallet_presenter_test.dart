@@ -1,10 +1,115 @@
 import 'package:feedin/src/features/wallet/data/wallet_models.dart';
+import 'package:feedin/src/features/wallet/data/wallet_gift_models.dart';
+import 'package:feedin/src/features/wallet/data/currency_models.dart';
 import 'package:feedin/src/features/wallet/wallet_presenter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'wallet_test_fakes.dart';
 
 void main() {
+  test('formats active local currency with canonical USD equivalent', () async {
+    final data = FakeWalletDataSource()
+      ..currencyQuote = const CurrencyQuote(
+        currencyCode: 'NGN',
+        currencySymbol: '₦',
+        ratePerUsd: 1515,
+        updatedAtMillis: 1,
+      )
+      ..packages = const [
+        CreditPackage(
+          id: 'package-id',
+          name: 'Starter',
+          credits: 1000,
+          bonusCredits: 0,
+          priceCents: 1000,
+          currency: 'USD',
+        ),
+      ];
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadPackages();
+
+    final price = presenter.packagePrice(data.packages.single);
+    expect(price.primaryLabel, '₦15,150');
+    expect(price.canonicalLabel, r'$10.00 USD equivalent');
+    expect(presenter.currencyQuote.rateTimestampLabel, 'Rate updated 1970-01-01');
+    expect(
+      CurrencyDisplayPrice.fromUsdMinor(1000, presenter.currencyQuote)
+          .primaryLabel,
+      '₦15,150',
+    );
+  });
+
+  test('falls back to canonical USD when local currency is unavailable', () async {
+    final data = FakeWalletDataSource()
+      ..packages = const [
+        CreditPackage(
+          id: 'package-id',
+          name: 'Starter',
+          credits: 1000,
+          bonusCredits: 0,
+          priceCents: 1000,
+          currency: 'USD',
+        ),
+      ];
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadPackages();
+
+    final price = presenter.packagePrice(data.packages.single);
+    expect(price.primaryLabel, r'$10.00');
+    expect(price.canonicalLabel, isNull);
+  });
+
+  test('starts checkout in the active supported local currency', () async {
+    final data = FakeWalletDataSource()
+      ..currencyQuote = const CurrencyQuote(
+        currencyCode: 'NGN',
+        currencySymbol: '₦',
+        ratePerUsd: 1515,
+        updatedAtMillis: 1,
+      )
+      ..creditCheckout = fakeCheckoutSession(
+        kind: WalletCheckoutKind.credits,
+        itemId: 'package-id',
+      );
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadPackages();
+    await presenter.startCreditCheckout('package-id');
+
+    expect(data.requestedCheckoutCurrency, 'NGN');
+  });
+
+  test('loads received gift details for the gifts tab', () async {
+    final data = FakeWalletDataSource()
+      ..receivedGifts = const [
+        WalletGiftReceipt(
+          id: 'gift-id',
+          giftName: 'Golden Star',
+          giftKey: 'golden-star',
+          senderId: 'sender-id',
+          senderDisplayName: 'Ada Okafor',
+          senderUsername: 'adaokafor',
+          grossCredits: 30,
+          recipientCredits: 24,
+          state: WalletGiftState.sent,
+          createdAtMillis: 1234,
+        ),
+      ];
+    final presenter = WalletPresenter(dataSource: data);
+
+    await presenter.loadGifts();
+
+    expect(presenter.giftsState, WalletLoadState.ready);
+    expect(presenter.receivedGifts.single.giftName, 'Golden Star');
+    expect(presenter.receivedGifts.single.senderLabel, 'Ada Okafor');
+    expect(presenter.receivedGifts.single.grossCredits, 30);
+    expect(presenter.receivedGifts.single.recipientCredits, 24);
+    expect(presenter.receivedGifts.single.createdAtMillis, 1234);
+    expect(presenter.receivedGifts.single.isConverted, isTrue);
+  });
+
   test('verifies credit checkout and refreshes balance and ledger', () async {
     final data = FakeWalletDataSource()
       ..balance = const CreditBalance(

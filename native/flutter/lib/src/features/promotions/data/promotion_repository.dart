@@ -3,6 +3,18 @@ import 'promotion_models.dart';
 
 class PromotionRepository {
   const PromotionRepository({required this.isConfigured});
+
+  /// Detects whether Supabase is initialised so promotion calls hit the live
+  /// backend; falls back to the bundled demo plans when it is not configured.
+  factory PromotionRepository.autoDetect() {
+    try {
+      Supabase.instance.client;
+      return const PromotionRepository(isConfigured: true);
+    } catch (_) {
+      return const PromotionRepository(isConfigured: false);
+    }
+  }
+
   final bool isConfigured;
 
   Future<int> fetchCreditBalance() async {

@@ -62,6 +62,7 @@ class CreatePostScreen extends StatefulWidget {
     this.initialMediaPath,
     this.initialMediaKind,
     this.initialMediaFilterId,
+    this.initialStoryMode = false,
   });
 
   final PostDraftRepository draftRepository;
@@ -79,6 +80,9 @@ class CreatePostScreen extends StatefulWidget {
   /// Optional Camera Studio filter preset persisted with the post. The Feed
   /// reapplies this deterministic GPU color matrix when rendering the media.
   final String? initialMediaFilterId;
+
+  /// Opens the composer directly in Story mode (from the Create action sheet).
+  final bool initialStoryMode;
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -102,7 +106,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     audioSource: DeviceStoryAudioSource(contextProvider: () => context),
   );
 
-  _CreateMode _mode = _CreateMode.post;
+  late _CreateMode _mode;
 
   // Composer state (the screen is the single source of truth; the panel renders
   // an immutable [PostComposerView] rebuilt from these fields).
@@ -125,6 +129,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   void initState() {
     super.initState();
+    _mode = widget.initialStoryMode ? _CreateMode.story : _CreateMode.post;
     _refreshDrafts();
     _seedInitialMedia();
   }

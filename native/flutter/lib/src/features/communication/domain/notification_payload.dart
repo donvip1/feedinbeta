@@ -3,7 +3,11 @@
 enum NotificationCategory {
   message,
   call,
+  gift,
+  comment,
   mention,
+  tag,
+  follow,
   reply,
   reaction,
   groupEvent,
@@ -107,10 +111,7 @@ class NotificationPayload {
     }
 
     return NotificationPayload(
-      category: NotificationCategory.values.firstWhere(
-        (c) => c.name == data['category'],
-        orElse: () => NotificationCategory.message,
-      ),
+      category: _categoryFromData(data),
       title: data['title']?.toString() ?? '',
       body: data['body']?.toString() ?? '',
       conversationId: data['conversation_id']?.toString(),
@@ -119,7 +120,7 @@ class NotificationPayload {
       senderId: data['sender_id']?.toString(),
       senderName: data['sender_name']?.toString(),
       avatarUrl: data['avatar_url']?.toString(),
-      route: data['route']?.toString(),
+      route: notificationRouteFromData(data),
       extra: {
         for (final entry in data.entries)
           if (!_knownKeys.contains(entry.key) && entry.value != null)
@@ -142,6 +143,46 @@ class NotificationPayload {
     'route',
     'type',
   };
+}
+
+NotificationCategory _categoryFromData(Map<String, Object?> data) {
+  final wire = data['category']?.toString() ?? data['type']?.toString();
+  return NotificationCategory.values.firstWhere(
+    (category) => category.name == wire,
+    orElse: () => NotificationCategory.message,
+  );
+}
+
+String? notificationRouteFromData(Map<String, Object?> data) {
+  final explicit = data['route']?.toString().trim();
+  if (explicit != null && explicit.isNotEmpty) return explicit;
+
+  final type = data['type']?.toString() ?? data['category']?.toString();
+  String? idFor(List<String> keys) {
+    for (final key in keys) {
+      final value = data[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  return switch (type) {
+    'gift' || 'comment' || 'mention' || 'tag' =>
+      idFor(['post_id', 'related_id'])?.let((id) => 'post:$id'),
+    'follow' => idFor([
+      'profile_id',
+      'actor_id',
+      'from_user_id',
+    ])?.let((id) => 'profile:$id'),
+    'message' =>
+      idFor(['conversation_id'])?.let((id) => 'conversation:$id'),
+    'call' => idFor(['call_id'])?.let((id) => 'call:$id'),
+    _ => null,
+  };
+}
+
+extension _NotificationLet<T> on T {
+  R let<R>(R Function(T value) transform) => transform(this);
 }
 
 /// What the router decided to do with a payload — returned so hosts (and

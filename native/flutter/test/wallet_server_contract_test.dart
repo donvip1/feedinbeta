@@ -4,6 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('WalletServerContract checkout', () {
+    test('builds a local-currency checkout payload', () {
+      expect(
+        WalletServerContract.buildCheckoutBody(
+          kind: WalletCheckoutKind.credits,
+          itemId: 'package-id',
+          currency: 'ngn',
+        ),
+        {'type': 'credits', 'itemId': 'package-id', 'currency': 'NGN'},
+      );
+    });
+
     test('parses the typed hosted checkout response', () {
       final session = WalletServerContract.parseCheckoutSession(
         {

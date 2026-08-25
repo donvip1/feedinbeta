@@ -1,10 +1,60 @@
 import 'package:feedin/src/core/realtime/feedin_realtime_service.dart';
 import 'package:feedin/src/core/realtime/incoming_message_resolver.dart';
+import 'package:feedin/src/features/feed/feed_shell.dart';
 import 'package:feedin/src/features/feed/state/feed_chrome_state_machine.dart';
 import 'package:feedin/src/features/feed/state/feed_gesture_resolver.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('feed top chrome keeps tabs centered between action zones', (
+    tester,
+  ) async {
+    // Production padding leaves 304px of a 320px viewport for this layout.
+    await tester.binding.setSurfaceSize(const Size(304, 120));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 48,
+            child: FeedTopChromeLayout(
+              leading: SizedBox(
+                key: Key('feed-top-leading'),
+                width: 58,
+                height: 36,
+              ),
+              center: SizedBox(
+                key: Key('feed-top-tabs'),
+                width: 104,
+                height: 24,
+              ),
+              trailing: SizedBox(
+                key: Key('feed-top-trailing'),
+                width: 108,
+                height: 36,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tabsRect = tester.getRect(find.byKey(const Key('feed-top-tabs')));
+    final leadingRect = tester.getRect(
+      find.byKey(const Key('feed-top-leading')),
+    );
+    final trailingRect = tester.getRect(
+      find.byKey(const Key('feed-top-trailing')),
+    );
+
+    expect(tabsRect.center.dx, closeTo(152, 0.01));
+    expect(leadingRect.right, lessThanOrEqualTo(tabsRect.left));
+    expect(tabsRect.right, lessThanOrEqualTo(trailingRect.left));
+    expect(tester.takeException(), isNull);
+  });
+
   group('FeedGestureResolver', () {
     test('video page + hidden chrome returns reveal', () {
       final decision = FeedGestureResolver.decideSurfaceTap(
@@ -84,7 +134,10 @@ void main() {
         },
       );
       expect(
-        IncomingMessageResolver(currentUserId: 'me', event: event).buildBanner(),
+        IncomingMessageResolver(
+          currentUserId: 'me',
+          event: event,
+        ).buildBanner(),
         isNull,
       );
     });
@@ -100,7 +153,10 @@ void main() {
         },
       );
       expect(
-        IncomingMessageResolver(currentUserId: 'me', event: event).buildBanner(),
+        IncomingMessageResolver(
+          currentUserId: 'me',
+          event: event,
+        ).buildBanner(),
         isNull,
       );
     });
@@ -117,7 +173,10 @@ void main() {
         },
       );
       expect(
-        IncomingMessageResolver(currentUserId: 'me', event: event).buildBanner(),
+        IncomingMessageResolver(
+          currentUserId: 'me',
+          event: event,
+        ).buildBanner(),
         isNull,
       );
     });
@@ -133,7 +192,10 @@ void main() {
         },
       );
       expect(
-        IncomingMessageResolver(currentUserId: 'me', event: event).buildBanner(),
+        IncomingMessageResolver(
+          currentUserId: 'me',
+          event: event,
+        ).buildBanner(),
         isNull,
       );
     });

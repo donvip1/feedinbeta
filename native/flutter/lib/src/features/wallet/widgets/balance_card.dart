@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/currency_models.dart';
 import '../data/wallet_models.dart';
 import '../wallet_theme.dart';
 import 'wallet_common.dart';
@@ -14,12 +15,16 @@ class WalletBalanceCard extends StatelessWidget {
     super.key,
     required this.balance,
     required this.onBuy,
+    this.localApproximation,
+    this.rateTimestamp,
     this.onSend,
     this.onWithdraw,
     this.tierName,
   });
 
   final CreditBalance balance;
+  final CurrencyDisplayPrice? localApproximation;
+  final String? rateTimestamp;
   final VoidCallback? onSend;
   final VoidCallback onBuy;
   final VoidCallback? onWithdraw;
@@ -101,6 +106,19 @@ class WalletBalanceCard extends StatelessWidget {
             '≈ ${formatMoney(balance.approxUsd, 'USD')}',
             style: WalletTextStyles.balanceSub,
           ),
+          if (localApproximation != null &&
+              localApproximation!.primaryLabel !=
+                  formatMoney(balance.approxUsd, 'USD')) ...[
+            const SizedBox(height: 2),
+            Text(
+              '≈ ${localApproximation!.primaryLabel}',
+              style: WalletTextStyles.balanceSub,
+            ),
+          ],
+          if (rateTimestamp != null) ...[
+            const SizedBox(height: 2),
+            Text(rateTimestamp!, style: WalletTextStyles.balanceSub),
+          ],
           const SizedBox(height: WalletSpacing.lg),
           Row(
             children: [

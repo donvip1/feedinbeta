@@ -91,9 +91,15 @@ class FeedChromeStateMachine {
     if (wasPlaying == isPlaying) return;
 
     if (isPlaying && _isImmersiveSurfaceActive) {
+      if (_state != FeedChromeVisibility.full) {
+        setState(FeedChromeVisibility.full);
+      }
       _scheduleAutoHide();
     } else {
       _cancelAutoHide();
+      if (!isPlaying && _isImmersiveSurfaceActive) {
+        setState(FeedChromeVisibility.full);
+      }
     }
   }
 
@@ -154,16 +160,15 @@ class FeedChromeStateMachine {
   FeedChromeVisibility _advanceChrome() {
     switch (_state) {
       case FeedChromeVisibility.hidden:
-        // A corner tap restores the complete normal preview in one gesture.
-        // The old social-only intermediate state made the feed feel stuck
-        // between two layouts and required a second tap.
-        setState(FeedChromeVisibility.full);
-        _scheduleAutoHide();
+        setState(FeedChromeVisibility.socialOnly);
+        // First reveal stage stays visible until the second tap; the
+        // inactivity countdown begins only after full chrome is shown.
+        _cancelAutoHide();
         return _state;
       case FeedChromeVisibility.socialOnly:
         setState(FeedChromeVisibility.full);
         // The user explicitly revealed full chrome. If the video is still
-        // playing, restart the 2-second inactivity countdown so the Feed
+        // playing, restart the four-second inactivity countdown so the Feed
         // returns to immersive mode without requiring a playback change.
         _scheduleAutoHide();
         return _state;

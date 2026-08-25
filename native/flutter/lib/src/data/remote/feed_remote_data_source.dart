@@ -9,7 +9,7 @@ class FeedRemoteDataSource {
   final bool isConfigured;
 
   static const _postFields =
-      'id, user_id, content, media_url, media_type, media_urls, media_types, media_filter_id, media_filter_ids, created_at, likes_count, comments_count, views_count, refeeds_count, location, post_type, status, original_post_id, profiles:user_id(username, display_name, avatar_url)';
+      'id, user_id, content, media_url, media_type, media_urls, media_types, media_filter_id, media_filter_ids, created_at, likes_count, comments_count, views_count, refeeds_count, location, post_type, status, privacy, original_post_id, profiles:user_id(username, display_name, avatar_url)';
 
   Future<List<FeedPost>> fetchFeed({
     int limit = 30,
@@ -86,14 +86,21 @@ class FeedRemoteDataSource {
         engagement[2].map((row) => row['original_post_id'].toString()),
       );
     }
+    final identity = await _fetchAuthorIdentity(
+      allRows.map((row) => row['user_id']?.toString()).whereType<String>(),
+    );
     final mappedOriginals = <String, FeedPost>{};
     for (final row in originalRows) {
       final id = row['id'].toString();
+      final authorId = row['user_id']?.toString();
       mappedOriginals[id] = _mapPost(
         row,
         viewerHasLiked: likedIds.contains(id),
         viewerHasSaved: savedIds.contains(id),
         viewerHasRefeeded: refeededIds.contains(id),
+        viewerIsFollowing: identity.following.contains(authorId),
+        isAuthorVerified: identity.verified.contains(authorId),
+        authorBadgeTier: identity.tiers[authorId],
       );
     }
     return rows
@@ -103,6 +110,13 @@ class FeedRemoteDataSource {
             viewerHasLiked: likedIds.contains(row['id'].toString()),
             viewerHasSaved: savedIds.contains(row['id'].toString()),
             viewerHasRefeeded: refeededIds.contains(row['id'].toString()),
+            viewerIsFollowing: identity.following.contains(
+              row['user_id']?.toString(),
+            ),
+            isAuthorVerified: identity.verified.contains(
+              row['user_id']?.toString(),
+            ),
+            authorBadgeTier: identity.tiers[row['user_id']?.toString()],
             originalPost: mappedOriginals[row['original_post_id']?.toString()],
           ),
         )
@@ -490,6 +504,9 @@ class FeedRemoteDataSource {
       );
     }
 
+    final identity = await _fetchAuthorIdentity(
+      rows.map((row) => row['user_id']?.toString()).whereType<String>(),
+    );
     return rows
         .map(
           (row) => _mapPost(
@@ -497,6 +514,13 @@ class FeedRemoteDataSource {
             viewerHasLiked: likedIds.contains(row['id'].toString()),
             viewerHasSaved: savedIds.contains(row['id'].toString()),
             viewerHasRefeeded: refeededIds.contains(row['id'].toString()),
+            viewerIsFollowing: identity.following.contains(
+              row['user_id']?.toString(),
+            ),
+            isAuthorVerified: identity.verified.contains(
+              row['user_id']?.toString(),
+            ),
+            authorBadgeTier: identity.tiers[row['user_id']?.toString()],
           ),
         )
         .toList(growable: false);
@@ -566,6 +590,9 @@ class FeedRemoteDataSource {
     bool viewerHasLiked = false,
     bool viewerHasSaved = false,
     bool viewerHasRefeeded = false,
+    bool viewerIsFollowing = false,
+    bool isAuthorVerified = false,
+    String? authorBadgeTier,
     FeedPost? originalPost,
   }) {
     final profile = row['profiles'];
@@ -596,6 +623,9 @@ class FeedRemoteDataSource {
       meta: authorHandle ?? 'Synced from server',
       avatarUrl: (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : null,
       authorHandle: authorHandle,
+      isAuthorVerified: isAuthorVerified,
+      authorBadgeTier: _badgeTierFromName(authorBadgeTier),
+      visibility: _visibilityFromName(row['privacy']?.toString()),
       mediaUrl: row['media_url']?.toString(),
       mediaType: row['media_type']?.toString(),
       mediaUrls: _stringList(row['media_urls']),
@@ -613,6 +643,7 @@ class FeedRemoteDataSource {
       viewerHasLiked: viewerHasLiked,
       viewerHasSaved: viewerHasSaved,
       viewerHasRefeeded: viewerHasRefeeded,
+      viewerIsFollowing: viewerIsFollowing,
       createdAtMillis:
           DateTime.tryParse(
             row['created_at']?.toString() ?? '',
@@ -632,5 +663,80 @@ class FeedRemoteDataSource {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  /// Fetches per-author identity (verified flag + badge tier) plus the viewer's
+  /// follow relationship for [authorIds] in a batch. Best-effort: any failure
+  /// (e.g. the identity migration not yet deployed) degrades to safe defaults
+  /// rather than breaking the feed.
+  Future<
+    ({Set<String> following, Set<String> verified, Map<String, String> tiers})
+  >
+  _fetchAuthorIdentity(Iterable<String> authorIds) async {
+    final ids = authorIds.toSet().toList();
+    final following = <String>{};
+    final verified = <String>{};
+    final tiers = <String, String>{};
+    if (ids.isEmpty) {
+      return (following: following, verified: verified, tiers: tiers);
+    }
+    final client = Supabase.instance.client;
+    try {
+      final rows = await client.rpc(
+        'native_author_identity',
+        params: {'p_user_ids': ids},
+      );
+      if (rows is List) {
+        for (final row in rows.whereType<Map>()) {
+          final id = row['user_id']?.toString();
+          if (id == null) continue;
+          if (row['is_verified'] == true) verified.add(id);
+          final tier = row['badge_tier']?.toString();
+          if (tier != null && tier != 'none') tiers[id] = tier;
+        }
+      }
+    } catch (_) {
+      // Identity is best-effort; fall back to unverified / no badge.
+    }
+    final viewerId = client.auth.currentUser?.id;
+    if (viewerId != null) {
+      try {
+        final rows = await client
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', viewerId)
+            .inFilter('following_id', ids);
+        for (final row in rows) {
+          following.add(row['following_id'].toString());
+        }
+      } catch (_) {
+        // Follow state is best-effort; fall back to not-following.
+      }
+    }
+    return (following: following, verified: verified, tiers: tiers);
+  }
+
+  FeedAuthorBadgeTier _badgeTierFromName(String? name) {
+    switch (name?.toLowerCase()) {
+      case 'pro':
+        return FeedAuthorBadgeTier.pro;
+      case 'premium':
+        return FeedAuthorBadgeTier.premium;
+      default:
+        return FeedAuthorBadgeTier.none;
+    }
+  }
+
+  FeedPostVisibility _visibilityFromName(String? name) {
+    switch (name?.toLowerCase()) {
+      case 'followers':
+      case 'friends':
+        return FeedPostVisibility.followers;
+      case 'private':
+      case 'only_me':
+        return FeedPostVisibility.private;
+      default:
+        return FeedPostVisibility.public;
+    }
   }
 }

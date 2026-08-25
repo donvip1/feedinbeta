@@ -81,6 +81,125 @@ Future<void> showGoLiveSheet(
   );
 }
 
+/// Opens the "Start an Audio Space" composer. Used by the Create action sheet's
+/// Go Live → Audio Space path. Creates a `live_spaces` row and routes the host
+/// straight into the space room.
+Future<void> showStartLiveSpaceSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: LiveTheme.surface,
+    shape: const RoundedRectangleBorder(borderRadius: LiveTheme.sheetRadius),
+    builder: (_) =>
+        _StartLiveSpaceSheet(dataSource: LiveRemoteDataSource.autoDetect()),
+  );
+}
+
+class _StartLiveSpaceSheet extends StatefulWidget {
+  const _StartLiveSpaceSheet({required this.dataSource});
+
+  final LiveRemoteDataSource dataSource;
+
+  @override
+  State<_StartLiveSpaceSheet> createState() => _StartLiveSpaceSheetState();
+}
+
+class _StartLiveSpaceSheetState extends State<_StartLiveSpaceSheet> {
+  final _title = TextEditingController(text: 'Live audio space');
+  final _topic = TextEditingController();
+  bool _starting = false;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _topic.dispose();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    if (_title.text.trim().isEmpty || _starting) return;
+    setState(() => _starting = true);
+    try {
+      final space = await widget.dataSource.startLiveSpace(
+        title: _title.text,
+        topicCategory: _topic.text,
+      );
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      await navigator.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              LiveSpaceRoomScreen(space: space, dataSource: widget.dataSource),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Start an Audio Space', style: LiveTheme.screenTitle),
+            const SizedBox(height: 6),
+            const Text(
+              'Host a live voice conversation with your community.',
+              style: TextStyle(color: LiveTheme.onSurfaceMuted),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _title,
+              maxLength: 120,
+              style: const TextStyle(color: LiveTheme.onSurface),
+              decoration: const InputDecoration(
+                labelText: 'Space title',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _topic,
+              maxLength: 60,
+              style: const TextStyle(color: LiveTheme.onSurface),
+              decoration: const InputDecoration(
+                labelText: 'Topic (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _starting ? null : _start,
+                icon: const Icon(Icons.graphic_eq_rounded),
+                label: Text(_starting ? 'Starting...' : 'Start Audio Space'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LiveScreenState extends State<LiveScreen> {
   late final LiveRemoteDataSource _data =
       widget.dataSource ?? LiveRemoteDataSource.autoDetect();

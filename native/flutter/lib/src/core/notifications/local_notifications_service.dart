@@ -55,6 +55,10 @@ class LocalNotificationsService {
   static const String messagesChannelName = 'Messages';
   static const String messagesChannelDescription =
       'New direct messages and replies';
+  static const String socialChannelId = 'social_updates';
+  static const String socialChannelName = 'Social updates';
+  static const String socialChannelDescription =
+      'Gifts, comments, mentions, tags and follows';
 
   /// Prefix for the per-conversation Android group key.
   static const String _groupKeyPrefix = 'feedin.conversation.';
@@ -98,6 +102,18 @@ class LocalNotificationsService {
               importance: Importance.high,
             ),
           );
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(
+            const AndroidNotificationChannel(
+              socialChannelId,
+              socialChannelName,
+              description: socialChannelDescription,
+              importance: Importance.high,
+            ),
+          );
     } catch (_) {
       // Never let notification setup crash the app.
     }
@@ -110,11 +126,43 @@ class LocalNotificationsService {
     try {
       final details = await _plugin.getNotificationAppLaunchDetails();
       if (details?.didNotificationLaunchApp != true) return null;
-      return conversationIdFromPayload(
-        details?.notificationResponse?.payload,
-      )?.let((id) => '$_routePrefix$id');
+      final payload = details?.notificationResponse?.payload?.trim();
+      return payload == null || payload.isEmpty ? null : payload;
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<void> showSocialNotification({
+    required String title,
+    required String body,
+    required String route,
+    required String eventType,
+    String? notificationId,
+  }) async {
+    if (!isConfigured || !_initialized) return;
+    try {
+      final details = AndroidNotificationDetails(
+        socialChannelId,
+        socialChannelName,
+        channelDescription: socialChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.social,
+        styleInformation: BigTextStyleInformation(body, contentTitle: title),
+      );
+      final seed = notificationId?.isNotEmpty == true
+          ? notificationId!
+          : '$eventType:$route:$body';
+      await _plugin.show(
+        seed.hashCode & 0x7fffffff,
+        title,
+        body,
+        NotificationDetails(android: details),
+        payload: route,
+      );
+    } catch (_) {
+      // Best effort.
     }
   }
 
@@ -246,8 +294,4 @@ class LocalNotificationsService {
     _taps.close();
     _replies.close();
   }
-}
-
-extension _Let<T> on T {
-  R let<R>(R Function(T) transform) => transform(this);
 }

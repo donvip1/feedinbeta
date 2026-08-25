@@ -19,18 +19,19 @@ class CaptionLayer extends StatelessWidget {
     required this.post,
     this.onCreatorTap,
     this.onOriginalPostTap,
-    this.showCreatorHeader = true,
+    this.onFollow,
   });
 
   final FeedPost post;
   final VoidCallback? onCreatorTap;
   final VoidCallback? onOriginalPostTap;
-  final bool showCreatorHeader;
+  final VoidCallback? onFollow;
 
   @override
   Widget build(BuildContext context) {
     final original = post.displayedPost;
     final visibleAuthor = post.isQuoteRefeed ? post : original;
+    final handle = visibleAuthor.meta.trim();
     final hasLocation = original.location?.trim().isNotEmpty ?? false;
     final visibleCaption = post.isQuoteRefeed ? post.body : original.body;
     final hasCaption = visibleCaption.trim().isNotEmpty;
@@ -42,15 +43,6 @@ class CaptionLayer extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (showCreatorHeader)
-            CreatorHeader(
-              authorName: visibleAuthor.authorName,
-              handle: visibleAuthor.meta.trim(),
-              isVerified:
-                  visibleAuthor.postType?.toLowerCase().contains('verified') ??
-                  false,
-              onTap: onCreatorTap,
-            ),
           if (post.isRefeed && !post.isQuoteRefeed) ...[
             OverlayBadge(
               icon: Icons.repeat_rounded,
@@ -58,6 +50,16 @@ class CaptionLayer extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
+          CreatorHeader(
+            authorName: visibleAuthor.authorName,
+            handle: handle,
+            avatarUrl: visibleAuthor.avatarUrl,
+            isVerified: visibleAuthor.isAuthorVerified,
+            badgeTier: visibleAuthor.authorBadgeTier,
+            metadata: '${_relativeTime(visibleAuthor.createdAtMillis)} · Public${hasLocation ? ' · ${original.location!.trim()}' : ''}',
+            onProfileTap: onCreatorTap ?? () {},
+            onFollow: onFollow,
+          ),
           if (hasCaption) ...[
             const SizedBox(height: 9),
             ExpandableCaption(
@@ -98,10 +100,11 @@ class _QuotedOriginal extends StatelessWidget {
     return Semantics(
       label: 'Quoted post by ${post.authorName}',
       child: InkWell(
+        key: const Key('quote-refeed-original'),
         onTap: onTap,
-        child: Padding(
-          key: const Key('quote-refeed-original'),
-          padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -149,4 +152,12 @@ class _QuotedOriginal extends StatelessWidget {
       ),
     );
   }
+}
+
+String _relativeTime(int millis) {
+  final age = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(millis));
+  if (age.inDays > 0) return '${age.inDays}d';
+  if (age.inHours > 0) return '${age.inHours}h';
+  if (age.inMinutes > 0) return '${age.inMinutes}m';
+  return 'now';
 }

@@ -29,6 +29,7 @@ class PostControllerCard extends ConsumerStatefulWidget {
     this.onAvatar,
     this.onCreatorName,
     this.onOriginalPost,
+    this.onFollow,
     this.chromeState = FeedChromeVisibility.full,
     this.onSurfaceTap,
     this.onPlaybackChange,
@@ -44,6 +45,7 @@ class PostControllerCard extends ConsumerStatefulWidget {
   final VoidCallback? onAvatar;
   final VoidCallback? onCreatorName;
   final VoidCallback? onOriginalPost;
+  final VoidCallback? onFollow;
 
   /// Visibility stage for the Feed chrome around this card.
   final FeedChromeVisibility chromeState;
@@ -123,6 +125,7 @@ class _PostControllerCardState extends ConsumerState<PostControllerCard> {
       onAvatar: widget.onAvatar,
       onCreatorName: widget.onCreatorName,
       onOriginalPost: widget.onOriginalPost,
+      onFollow: widget.onFollow,
       chromeState: widget.chromeState,
     );
   }

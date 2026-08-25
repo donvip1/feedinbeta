@@ -9,9 +9,12 @@ import 'wallet_presenter.dart';
 import 'wallet_theme.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/buyback_section.dart';
+import 'widgets/gifts_tab.dart';
 import 'widgets/package_card.dart';
-import 'widgets/transaction_list.dart';
+import 'widgets/subscription_card.dart';
 import 'widgets/wallet_common.dart';
+import 'widgets/wallet_history_tab.dart';
+import 'widgets/wallet_tab_bar.dart';
 
 typedef WalletCheckoutLauncher = Future<bool> Function(Uri uri);
 
@@ -31,8 +34,9 @@ class _WalletScreenState extends State<WalletScreen>
     with WidgetsBindingObserver {
   late final WalletPresenter _presenter;
   late final bool _ownsPresenter;
-  final GlobalKey _packagesKey = GlobalKey();
+  WalletTab _selectedTab = WalletTab.packages;
   String? _busyPackageId;
+  String? _busyTierId;
   bool _checkoutWasBackgrounded = false;
   bool _checkingCheckout = false;
 
@@ -73,8 +77,10 @@ class _WalletScreenState extends State<WalletScreen>
     await _presenter.loadOverview();
     await Future.wait([
       _presenter.loadPackages(),
+      _presenter.loadTiers(),
       _presenter.loadTransactions(),
       _presenter.loadFinanceBuybacks(),
+      _presenter.loadGifts(),
     ]);
   }
 
@@ -85,15 +91,7 @@ class _WalletScreenState extends State<WalletScreen>
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _scrollToPackages() {
-    final context = _packagesKey.currentContext;
-    if (context == null) return;
-    Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 350),
-      alignment: 0.05,
-    );
-  }
+  void _showPackages() => setState(() => _selectedTab = WalletTab.packages);
 
   Future<void> _openP2P() async {
     await Navigator.of(context).push(
@@ -154,6 +152,20 @@ class _WalletScreenState extends State<WalletScreen>
       _snack('Could not start checkout. Please try again.');
     } finally {
       if (mounted) setState(() => _busyPackageId = null);
+    }
+  }
+
+  Future<void> _subscribe(SubscriptionTier tier) async {
+    setState(() => _busyTierId = tier.id);
+    try {
+      final checkout = await _presenter.startSubscriptionCheckout(tier.id);
+      await _openCheckout(checkout);
+    } on WalletBackendUnavailable catch (error) {
+      _snack(error.message);
+    } catch (_) {
+      _snack('Could not start subscription checkout. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busyTierId = null);
     }
   }
 
@@ -248,7 +260,9 @@ class _WalletScreenState extends State<WalletScreen>
               children: [
                 WalletBalanceCard(
                   balance: presenter.balance,
-                  onBuy: _scrollToPackages,
+                  localApproximation: presenter.balanceApproximation,
+                  rateTimestamp: presenter.currencyQuote.rateTimestampLabel,
+                  onBuy: _showPackages,
                 ),
                 if (presenter.checkoutState != WalletCheckoutState.idle) ...[
                   const SizedBox(height: 12),
@@ -264,76 +278,12 @@ class _WalletScreenState extends State<WalletScreen>
                   ),
                 ],
                 const SizedBox(height: 16),
-                WalletNavTile(
-                  icon: Icons.storefront_rounded,
-                  title: 'Sell credits P2P',
-                  subtitle: 'List and trade credits with other users',
-                  onTap: _openP2P,
+                WalletTabBar(
+                  selected: _selectedTab,
+                  onSelected: (tab) => setState(() => _selectedTab = tab),
                 ),
                 const SizedBox(height: 20),
-                Container(key: _packagesKey),
-                const WalletSectionHeader(title: 'Feedin credit packages'),
-                const SizedBox(height: 8),
-                if (presenter.packagesState == WalletLoadState.loading)
-                  const WalletLoading()
-                else if (presenter.packagesState == WalletLoadState.error)
-                  WalletEmptyState(
-                    icon: Icons.error_outline_rounded,
-                    title: 'Couldn\'t load packages',
-                    subtitle: 'Check your connection and try again.',
-                    action: WalletSecondaryButton(
-                      label: 'Retry',
-                      icon: Icons.refresh_rounded,
-                      onPressed: presenter.loadPackages,
-                    ),
-                  )
-                else if (presenter.packages.isEmpty)
-                  _emptyLine('No credit packages available yet.')
-                else
-                  ...presenter.packages.map(
-                    (package) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: WalletPackageCard(
-                        package: package,
-                        onPurchase: () => _buy(package),
-                        busy: _busyPackageId == package.id,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                WalletBuybackSection(
-                  balance: presenter.balance,
-                  requests: presenter.buybackRequests,
-                  state: presenter.buybackState,
-                  mutationState: presenter.buybackMutationState,
-                  blockedReason: presenter.financeBuybackBlockedReason,
-                  cancelingRequestId: presenter.cancelingBuybackRequestId,
-                  onRequest: _requestFinanceBuyback,
-                  onCancel: _cancelFinanceBuyback,
-                  onRetry: presenter.loadFinanceBuybacks,
-                ),
-                const SizedBox(height: 20),
-                const WalletSectionHeader(title: 'Transaction history'),
-                const SizedBox(height: 8),
-                if (presenter.transactionsState == WalletLoadState.loading)
-                  const WalletLoading()
-                else if (presenter.transactionsState == WalletLoadState.error)
-                  WalletEmptyState(
-                    icon: Icons.error_outline_rounded,
-                    title: 'Couldn\'t load transactions',
-                    subtitle: 'Check your connection and try again.',
-                    action: WalletSecondaryButton(
-                      label: 'Retry',
-                      icon: Icons.refresh_rounded,
-                      onPressed: presenter.loadTransactions,
-                    ),
-                  )
-                else
-                  WalletTransactionList(
-                    transactions: presenter.filteredTransactions,
-                    filter: presenter.transactionFilter,
-                    onFilterChanged: presenter.setTransactionFilter,
-                  ),
+                _selectedBody(presenter),
               ],
             ),
           );
@@ -351,6 +301,108 @@ class _WalletScreenState extends State<WalletScreen>
       ),
     ),
   );
+
+  Widget _selectedBody(WalletPresenter presenter) => switch (_selectedTab) {
+    WalletTab.packages => _packagesTab(presenter),
+    WalletTab.gifts => KeyedSubtree(
+      key: const Key('wallet-gifts-tab'),
+      child: WalletGiftsTab(
+        state: presenter.giftsState,
+        received: presenter.receivedGifts,
+        sent: presenter.sentGifts,
+        onRefresh: presenter.loadGifts,
+      ),
+    ),
+    WalletTab.history => KeyedSubtree(
+      key: const Key('wallet-history-tab'),
+      child: WalletHistoryTab(
+        state: presenter.transactionsState,
+        transactions: presenter.filteredTransactions,
+        filter: presenter.transactionFilter,
+        onFilterChanged: presenter.setTransactionFilter,
+        onRetry: presenter.loadTransactions,
+      ),
+    ),
+    WalletTab.sellCredits => KeyedSubtree(
+      key: const Key('wallet-sell-credits-tab'),
+      child: WalletBuybackSection(
+        balance: presenter.balance,
+        requests: presenter.buybackRequests,
+        state: presenter.buybackState,
+        mutationState: presenter.buybackMutationState,
+        blockedReason: presenter.financeBuybackBlockedReason,
+        cancelingRequestId: presenter.cancelingBuybackRequestId,
+        onRequest: _requestFinanceBuyback,
+        onCancel: _cancelFinanceBuyback,
+        onRetry: presenter.loadFinanceBuybacks,
+      ),
+    ),
+    WalletTab.p2p => KeyedSubtree(
+      key: const Key('wallet-p2p-tab'),
+      child: WalletNavTile(
+        icon: Icons.storefront_rounded,
+        title: 'P2P marketplace',
+        subtitle: 'List, buy and trade credits with other users',
+        onTap: _openP2P,
+      ),
+    ),
+  };
+
+  Widget _packagesTab(WalletPresenter presenter) {
+    return Column(
+      key: const Key('wallet-packages-tab'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WalletSectionHeader(title: 'Feedin credit packages'),
+        const SizedBox(height: WalletSpacing.sm),
+        if (presenter.packagesState == WalletLoadState.loading)
+          const WalletLoading()
+        else if (presenter.packagesState == WalletLoadState.error)
+          WalletEmptyState(
+            icon: Icons.error_outline_rounded,
+            title: 'Couldn\'t load packages',
+            subtitle: 'Check your connection and try again.',
+            action: WalletSecondaryButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              onPressed: presenter.loadPackages,
+            ),
+          )
+        else if (presenter.packages.isEmpty)
+          _emptyLine('No credit packages available yet.')
+        else
+          for (final package in presenter.packages)
+            Padding(
+              padding: const EdgeInsets.only(bottom: WalletSpacing.md),
+              child: WalletPackageCard(
+                package: package,
+                displayPrice: presenter.packagePrice(package),
+                onPurchase: () => _buy(package),
+                busy: _busyPackageId == package.id,
+              ),
+            ),
+        const SizedBox(height: WalletSpacing.lg),
+        const WalletSectionHeader(title: 'Subscriptions'),
+        const SizedBox(height: WalletSpacing.sm),
+        if (presenter.tiersState == WalletLoadState.loading)
+          const WalletLoading()
+        else if (presenter.tiers.isEmpty)
+          _emptyLine('No subscriptions available yet.')
+        else
+          for (final tier in presenter.tiers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: WalletSpacing.md),
+              child: WalletSubscriptionCard(
+                tier: tier,
+                displayPrice: presenter.subscriptionPrice(tier),
+                isCurrent: presenter.activeTierId == tier.id,
+                busy: _busyTierId == tier.id,
+                onSubscribe: () => _subscribe(tier),
+              ),
+            ),
+      ],
+    );
+  }
 
   Widget _checkoutBanner(WalletPresenter presenter) {
     final message =

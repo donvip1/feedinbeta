@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/feed/feed_item.dart';
@@ -80,6 +81,12 @@ class FeedEngineRemoteDataSource {
     return FeedEngineResult(items: items, hasMore: hasMore);
   }
 
+  /// Test-only access to the engine JSON → [FeedPost] mapping (including the
+  /// author-identity fields) without standing up a Supabase Edge Function.
+  @visibleForTesting
+  static FeedPost postFromEngineJsonForTest(Map<String, Object?> json) =>
+      _postFromEngineJson(json);
+
   /// Maps the engine's post JSON (snake_case, `user_id`, ISO `created_at`,
   /// nested `profiles`, `is_promoted`/`is_trending`/`is_new_post`) into the
   /// app's [FeedPost]. Mirrors the enrichment in `FeedRemoteDataSource` but for
@@ -125,6 +132,11 @@ class FeedEngineRemoteDataSource {
       postType: _text(json['post_type']),
       avatarUrl: _text(profileMap['avatar_url']),
       authorHandle: handle.isEmpty ? null : handle,
+      isAuthorVerified:
+          json['author_verified'] == true || profileMap['is_verified'] == true,
+      authorBadgeTier: _badgeTier(json['author_badge_tier']),
+      visibility: _visibility(json['visibility']),
+      viewerIsFollowing: json['viewer_is_following'] == true,
       originalPostId: _text(json['original_post_id']),
       originalPost: originalPost,
       isPromoted: json['is_promoted'] == true,
@@ -136,6 +148,30 @@ class FeedEngineRemoteDataSource {
   static String? _text(Object? value) {
     final s = value?.toString();
     return (s != null && s.isNotEmpty) ? s : null;
+  }
+
+  static FeedAuthorBadgeTier _badgeTier(Object? value) {
+    switch (value?.toString().toLowerCase()) {
+      case 'pro':
+        return FeedAuthorBadgeTier.pro;
+      case 'premium':
+        return FeedAuthorBadgeTier.premium;
+      default:
+        return FeedAuthorBadgeTier.none;
+    }
+  }
+
+  static FeedPostVisibility _visibility(Object? value) {
+    switch (value?.toString().toLowerCase()) {
+      case 'followers':
+      case 'friends':
+        return FeedPostVisibility.followers;
+      case 'private':
+      case 'only_me':
+        return FeedPostVisibility.private;
+      default:
+        return FeedPostVisibility.public;
+    }
   }
 
   static int _int(Object? value) {

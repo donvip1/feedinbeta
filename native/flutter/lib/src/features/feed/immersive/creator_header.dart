@@ -1,92 +1,164 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../feed_post.dart';
 import 'feed_immersive_theme.dart';
 
-/// Creator identity row for the post overlay: the author name in the strongest
-/// typographic weight, an optional verified badge, and a quieter handle that
-/// never competes with the caption.
-///
-/// When [onTap] is provided the name/handle become a single tappable target
-/// (used to open the creator preview), with a subtle press scale and haptic.
-class CreatorHeader extends StatefulWidget {
+class CreatorHeader extends StatelessWidget {
   const CreatorHeader({
     super.key,
     required this.authorName,
-    this.handle = '',
-    this.isVerified = false,
-    this.onTap,
+    required this.handle,
+    required this.avatarUrl,
+    required this.isVerified,
+    required this.badgeTier,
+    required this.metadata,
+    required this.onProfileTap,
+    this.onFollow,
   });
 
   final String authorName;
   final String handle;
+  final String? avatarUrl;
   final bool isVerified;
-  final VoidCallback? onTap;
-
-  @override
-  State<CreatorHeader> createState() => _CreatorHeaderState();
-}
-
-class _CreatorHeaderState extends State<CreatorHeader> {
-  bool _pressed = false;
+  final FeedAuthorBadgeTier badgeTier;
+  final String metadata;
+  final VoidCallback onProfileTap;
+  final VoidCallback? onFollow;
 
   @override
   Widget build(BuildContext context) {
-    final handle = widget.handle.trim();
-    final row = Row(
-      mainAxisSize: MainAxisSize.min,
+    final initial = authorName.trim().isEmpty
+        ? '?'
+        : authorName.trim().characters.first.toUpperCase();
+    final imageUrl = avatarUrl?.trim();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Flexible(
+        CircleAvatar(
+          key: const Key('feed-author-avatar'),
+          radius: 21,
+          backgroundColor: FeedImmersiveTheme.glassSurfaceStrong,
+          foregroundImage: imageUrl != null && imageUrl.isNotEmpty
+              ? NetworkImage(imageUrl)
+              : null,
           child: Text(
-            widget.authorName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: FeedImmersiveTheme.authorName,
-          ),
-        ),
-        if (widget.isVerified) ...[
-          const SizedBox(width: 5),
-          const Icon(
-            Icons.verified_rounded,
-            color: FeedImmersiveTheme.brandPink,
-            size: 16,
-            shadows: FeedImmersiveTheme.textShadow,
-          ),
-        ],
-        if (handle.isNotEmpty) ...[
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              handle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: FeedImmersiveTheme.handle,
+            initial,
+            style: const TextStyle(
+              color: FeedImmersiveTheme.onMedia,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ],
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Semantics(
+                      button: true,
+                      label: 'Open $authorName profile',
+                      child: InkWell(
+                        key: const Key('feed-author-profile'),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onProfileTap();
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: FeedImmersiveTheme.authorName,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isVerified) ...[
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.verified_rounded,
+                      size: 16,
+                      color: Color(0xFF35C6C3),
+                    ),
+                  ],
+                  if (badgeTier != FeedAuthorBadgeTier.none) ...[
+                    const SizedBox(width: 6),
+                    _TierBadge(tier: badgeTier),
+                  ],
+                  if (onFollow != null) ...[
+                    const SizedBox(width: 4),
+                    TextButton(
+                      key: const Key('feed-author-follow'),
+                      onPressed: onFollow,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF35C6C3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Follow'),
+                    ),
+                  ],
+                ],
+              ),
+              if (handle.trim().isNotEmpty)
+                Text(
+                  handle.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: FeedImmersiveTheme.handle,
+                ),
+              if (metadata.trim().isNotEmpty)
+                Text(
+                  metadata.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FeedImmersiveTheme.inkMuted,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
+  }
+}
 
-    if (widget.onTap == null) return row;
+class _TierBadge extends StatelessWidget {
+  const _TierBadge({required this.tier});
 
-    return Semantics(
-      button: true,
-      label: 'Open ${widget.authorName} profile',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.selectionClick();
-          widget.onTap!();
-        },
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        child: AnimatedScale(
-          scale: _pressed ? 0.97 : 1,
-          duration: FeedImmersiveTheme.motionPress,
-          curve: FeedImmersiveTheme.premiumSettleCurve,
-          alignment: Alignment.centerLeft,
-          child: row,
+  final FeedAuthorBadgeTier tier;
+
+  @override
+  Widget build(BuildContext context) {
+    final premium = tier == FeedAuthorBadgeTier.premium;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: premium ? const Color(0x2EEDA94A) : const Color(0x2635C6C3),
+        border: Border.all(
+          color: premium ? const Color(0xFFEDA94A) : const Color(0xFF35C6C3),
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        child: Text(
+          premium ? 'Premium' : 'Pro',
+          style: TextStyle(
+            color: premium ? const Color(0xFFFFD277) : const Color(0xFF7DE5E2),
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

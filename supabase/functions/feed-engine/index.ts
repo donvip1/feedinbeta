@@ -92,11 +92,16 @@ interface FeedPost {
   is_new_post: boolean;
   is_promoted: boolean;
   is_trending?: boolean;
+  author_verified?: boolean;
+  author_badge_tier?: string;
+  viewer_is_following?: boolean;
+  visibility?: string;
   profiles?: {
     id: string;
     username: string | null;
     display_name: string | null;
     avatar_url: string | null;
+    is_verified?: boolean;
   } | null;
 }
 
@@ -230,13 +235,36 @@ Deno.serve(async (req) => {
     const userIds = [...new Set(rawPosts.map(p => p.post_user_id).filter(Boolean))];
     
     let profileMap = new Map<string, any>();
+    const badgeTierMap = new Map<string, string>();
+    const followingSet = new Set<string>();
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url')
+        .select('id, username, display_name, avatar_url, is_verified')
         .in('id', userIds);
-      
+
       profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+      // Author badge tiers (pro/premium) derived server-side from active
+      // subscriptions, plus the viewer's follow set. Best-effort: identity
+      // enrichment never fails a ranking response.
+      const { data: identity } = await supabase.rpc('native_author_identity', {
+        p_user_ids: userIds,
+      });
+      for (const row of identity || []) {
+        if (row?.badge_tier && row.badge_tier !== 'none') {
+          badgeTierMap.set(row.user_id, row.badge_tier);
+        }
+      }
+
+      const { data: follows } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id)
+        .in('following_id', userIds);
+      for (const row of follows || []) {
+        followingSet.add(row.following_id);
+      }
     }
 
     // Enrich posts with profile data
@@ -261,6 +289,11 @@ Deno.serve(async (req) => {
       is_promoted: post.is_promoted || false,
       is_trending: post.is_trending || false,
       profiles: profileMap.get(post.post_user_id) || null,
+      author_verified: profileMap.get(post.post_user_id)?.is_verified === true,
+      author_badge_tier: badgeTierMap.get(post.post_user_id) || 'none',
+      viewer_is_following: followingSet.has(post.post_user_id),
+      // The ranked feed only surfaces public posts to other viewers.
+      visibility: 'public',
     }));
 
     // ========================================
