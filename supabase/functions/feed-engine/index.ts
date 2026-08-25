@@ -27,6 +27,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { mergePromotedPosts, rankPromotedPosts } from './promotion-ranking.ts';
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -68,6 +69,8 @@ interface RawFeedPost {
   relevance_score: number;
   is_new_post: boolean;
   is_promoted: boolean;
+  promotion_campaign_id?: string;
+  promotion_disclosure?: string;
   is_trending?: boolean;
 }
 
@@ -92,16 +95,13 @@ interface FeedPost {
   is_new_post: boolean;
   is_promoted: boolean;
   is_trending?: boolean;
-  author_verified?: boolean;
-  author_badge_tier?: string;
-  viewer_is_following?: boolean;
-  visibility?: string;
   profiles?: {
     id: string;
     username: string | null;
     display_name: string | null;
     avatar_url: string | null;
     is_verified?: boolean;
+    plan_tier?: string | null;
   } | null;
 }
 
@@ -235,36 +235,13 @@ Deno.serve(async (req) => {
     const userIds = [...new Set(rawPosts.map(p => p.post_user_id).filter(Boolean))];
     
     let profileMap = new Map<string, any>();
-    const badgeTierMap = new Map<string, string>();
-    const followingSet = new Set<string>();
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, is_verified')
+        .select('id, username, display_name, avatar_url, is_verified, plan_tier')
         .in('id', userIds);
-
+      
       profileMap = new Map((profiles || []).map(p => [p.id, p]));
-
-      // Author badge tiers (pro/premium) derived server-side from active
-      // subscriptions, plus the viewer's follow set. Best-effort: identity
-      // enrichment never fails a ranking response.
-      const { data: identity } = await supabase.rpc('native_author_identity', {
-        p_user_ids: userIds,
-      });
-      for (const row of identity || []) {
-        if (row?.badge_tier && row.badge_tier !== 'none') {
-          badgeTierMap.set(row.user_id, row.badge_tier);
-        }
-      }
-
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id)
-        .in('following_id', userIds);
-      for (const row of follows || []) {
-        followingSet.add(row.following_id);
-      }
     }
 
     // Enrich posts with profile data
@@ -289,21 +266,96 @@ Deno.serve(async (req) => {
       is_promoted: post.is_promoted || false,
       is_trending: post.is_trending || false,
       profiles: profileMap.get(post.post_user_id) || null,
-      author_verified: profileMap.get(post.post_user_id)?.is_verified === true,
-      author_badge_tier: badgeTierMap.get(post.post_user_id) || 'none',
-      viewer_is_following: followingSet.has(post.post_user_id),
-      // The ranked feed only surfaces public posts to other viewers.
-      visibility: 'public',
     }));
 
     // ========================================
-    // 6. FETCH AND INSERT TARGETED ADS
+    // 6. MERGE ACTIVE PROMOTION CAMPAIGNS
+    // ========================================
+    const postIds = enrichedPosts.map((post) => post.id);
+    let rankedPosts = enrichedPosts;
+    if (postIds.length > 0) {
+      const now = new Date().toISOString();
+      const { data: campaigns, error: campaignError } = await supabase
+        .from('post_promotion_campaigns')
+        .select('id, post_id, plan_key, remaining_budget, estimate_max, state, starts_at, ends_at')
+        .eq('state', 'active')
+        .gt('remaining_budget', 0)
+        .lte('starts_at', now)
+        .gt('ends_at', now)
+        .in('post_id', postIds);
+
+      if (!campaignError && campaigns?.length) {
+        const campaignIds = campaigns.map((campaign) => campaign.id);
+        const { data: sessionDeliveries } = await supabase
+          .from('post_promotion_delivery_events')
+          .select('campaign_id')
+          .eq('viewer_id', user.id)
+          .eq('session_id', config.sessionId)
+          .in('campaign_id', campaignIds);
+        const sessionCampaignIds = new Set(
+          (sessionDeliveries || []).map((delivery) => delivery.campaign_id),
+        );
+        const planWeights: Record<string, number> = {
+          starter: 1,
+          basic: 1.4,
+          pro: 2,
+          premium: 3,
+          elite: 4,
+        };
+        const candidates = campaigns.map((campaign) => {
+          const post = enrichedPosts.find((item) => item.id === campaign.post_id);
+          const engagement = post
+            ? Math.max(0.6, Math.min(1.4, 0.8 + (post.likes_count + post.comments_count * 2) / Math.max(50, post.views_count || 50)))
+            : 0.8;
+          return {
+            campaignId: campaign.id,
+            postId: campaign.post_id,
+            planKey: campaign.plan_key,
+            planWeight: planWeights[campaign.plan_key] || 1,
+            active: campaign.state === 'active',
+            targetMatches: true,
+            frequencyCapped: sessionCampaignIds.has(campaign.id),
+            pacingFactor: Math.max(0.2, Math.min(1, campaign.remaining_budget / Math.max(1, campaign.estimate_max))),
+            qualityFactor: engagement,
+          };
+        });
+        const promoted = rankPromotedPosts(candidates, Math.max(1, Math.ceil(enrichedPosts.length / 5)));
+        rankedPosts = mergePromotedPosts(enrichedPosts, promoted) as FeedPost[];
+
+        const deliveredCampaignIds = rankedPosts
+          .filter((post) => post.is_promoted && post.promotion_campaign_id)
+          .map((post) => post.promotion_campaign_id!);
+        if (deliveredCampaignIds.length > 0) {
+          const deliverySessionId = config.sessionId;
+          const deliveryResults = await Promise.all(
+            deliveredCampaignIds.map((campaignId) =>
+              supabase.rpc('record_post_promotion_delivery', {
+                p_campaign_id: campaignId,
+                p_viewer_id: user.id,
+                p_session_id: deliverySessionId,
+              })
+            ),
+          );
+          deliveryResults.forEach(({ error }, index) => {
+            if (error) {
+              console.error(
+                `[FeedEngine] Promotion delivery failed for ${deliveredCampaignIds[index].slice(0, 8)}:`,
+                error,
+              );
+            }
+          });
+        }
+      }
+    }
+
+    // ========================================
+    // 7. FETCH AND INSERT TARGETED ADS
     // Ads are inserted every adFrequency posts
     // Excludes ads already shown today
     // ========================================
-    let finalFeed: (FeedPost | FeedAd)[] = [...enrichedPosts];
+    let finalFeed: (FeedPost | FeedAd)[] = [...rankedPosts];
 
-    if (config.includeAds && enrichedPosts.length >= config.adFrequency) {
+    if (config.includeAds && rankedPosts.length >= config.adFrequency) {
       // Get user interests for ad targeting
       const { data: userInterests } = await supabase
         .from('user_interests')
@@ -316,7 +368,7 @@ Deno.serve(async (req) => {
       const interestTags = (userInterests || []).map(i => i.interest_value).filter(Boolean);
 
       // Fetch targeted ads
-      const adCount = Math.ceil(enrichedPosts.length / config.adFrequency);
+      const adCount = Math.ceil(rankedPosts.length / config.adFrequency);
       const { data: ads } = await supabase.rpc('insert_ads', {
         p_user_id: user.id,
         p_ad_count: adCount,
@@ -328,8 +380,8 @@ Deno.serve(async (req) => {
         const result: (FeedPost | FeedAd)[] = [];
         let adIndex = 0;
 
-        for (let i = 0; i < enrichedPosts.length; i++) {
-          result.push(enrichedPosts[i]);
+        for (let i = 0; i < rankedPosts.length; i++) {
+          result.push(rankedPosts[i]);
 
           // Insert ad every adFrequency posts
           if ((i + 1) % config.adFrequency === 0 && adIndex < ads.length) {
