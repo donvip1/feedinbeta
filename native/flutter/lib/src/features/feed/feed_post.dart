@@ -149,6 +149,10 @@ class FeedPost {
     return media.isNotEmpty && media.every((item) => item.isImage);
   }
 
+  /// A text-only post: no video and no images. Rendered as a branded gradient
+  /// text card and surfaced in the Photos tab alongside photo posts.
+  bool get isTextOnly => normalizedMedia.isEmpty;
+
   FeedPost copyWith({
     String? localMediaPath,
     int? likesCount,

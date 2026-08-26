@@ -328,12 +328,6 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
     });
   }
 
-  /// Flips the shared, session-wide mute flag (web parity: `toggleMute`). The
-  /// notifier listener re-applies volume to this and every other live reel.
-  void _toggleMute() {
-    immersiveFeedMuted.value = !immersiveFeedMuted.value;
-  }
-
   /// True once the controller reports it is actively buffering (network stalls).
   bool _isBuffering(VideoPlayerController controller) {
     final value = controller.value;
@@ -382,11 +376,10 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
           ),
           // Play/pause feedback is independent of chrome, so it always shows.
           if (ready) IgnorePointer(child: _buildTapFeedback()),
-          // Progress bar + mute ARE chrome — they hide when chrome hides.
+          // Progress bar is chrome — it hides when chrome hides. Mute moved to
+          // the top-right header line (see ImmersivePostCard._FeedMuteButton).
           if (ready && widget.chromeState == FeedChromeVisibility.full)
             _buildProgressBar(controller),
-          if (widget.chromeState == FeedChromeVisibility.full)
-            _buildMuteButton(enabled: ready),
         ],
       ),
     );
@@ -494,34 +487,6 @@ class _ImmersiveVideoPlayerState extends State<ImmersiveVideoPlayer> {
             playedColor: FeedImmersiveTheme.brandPink,
             bufferedColor: FeedImmersiveTheme.progressBuffered,
             backgroundColor: FeedImmersiveTheme.progressTrack,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMuteButton({required bool enabled}) {
-    final muted = immersiveFeedMuted.value;
-    return Align(
-      alignment: Alignment.bottomRight,
-      child: Padding(
-        // Sit just above the progress bar.
-        padding: const EdgeInsets.only(
-          right: FeedImmersiveTheme.muteControlRightInset,
-          bottom: FeedImmersiveTheme.muteControlBottomInset,
-        ),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: FeedImmersiveTheme.overlayControlSoft,
-            shape: BoxShape.circle,
-            boxShadow: FeedImmersiveTheme.mediaControlShadow,
-          ),
-          child: IconButton(
-            tooltip: muted ? 'Unmute' : 'Mute',
-            onPressed: enabled ? _toggleMute : null,
-            color: FeedImmersiveTheme.onMedia,
-            iconSize: FeedImmersiveTheme.iconMd,
-            icon: Icon(muted ? Icons.volume_off : Icons.volume_up),
           ),
         ),
       ),

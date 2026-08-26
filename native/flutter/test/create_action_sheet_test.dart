@@ -26,9 +26,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Video'), findsOneWidget);
-    expect(find.text('Take a video or choose from gallery'), findsOneWidget);
+    expect(find.text('Take video or choose from gallery'), findsOneWidget);
     expect(find.text('Photo+'), findsOneWidget);
-    expect(find.text('Share your thoughts with images'), findsOneWidget);
+    expect(find.text('Share your thoughts'), findsOneWidget);
     expect(find.text('Story'), findsOneWidget);
     expect(find.text('Share for 24 hours'), findsOneWidget);
     expect(find.text('Go Live'), findsOneWidget);

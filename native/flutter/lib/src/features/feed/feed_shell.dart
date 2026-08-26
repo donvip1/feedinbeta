@@ -451,9 +451,9 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
       case CreateAction.video:
         await _openSelectedCreateMethod(CaptureMethod.recordVideo);
       case CreateAction.photo:
-        await _openSelectedCreateMethod(CaptureMethod.takePhoto);
+        await _openComposerRoute(storyMode: false);
       case CreateAction.story:
-        await _openStoryComposerRoute();
+        await _openComposerRoute(storyMode: true);
       case CreateAction.goLive:
         final liveAction = await showLiveCreateActionSheet(context);
         if (!mounted || liveAction == null) return;
@@ -514,7 +514,10 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openStoryComposerRoute() async {
+  /// Opens the fullscreen composer. In post mode (`storyMode: false`) media is
+  /// optional, so users can publish text-only posts or attach photos ("Share
+  /// your thoughts"); in story mode it seeds the 24h story flow.
+  Future<void> _openComposerRoute({required bool storyMode}) async {
     final outcome = await Navigator.of(context).push<CreateOutcome>(
       MaterialPageRoute<CreateOutcome>(
         fullscreenDialog: true,
@@ -524,7 +527,7 @@ class _FeedShellState extends State<FeedShell> with WidgetsBindingObserver {
           uploadQueueService: widget.uploadQueueService,
           connectivityService: widget.connectivityService,
           onPostUploaded: _handlePostUploaded,
-          initialStoryMode: true,
+          initialStoryMode: storyMode,
         ),
       ),
     );
@@ -1267,7 +1270,9 @@ PublishedPostPlacement locatePublishedPost(
       .whereType<FeedPostItem>()
       .where((item) {
         final displayed = item.post.displayedPost;
-        return tabIndex == 0 ? displayed.hasVideoMedia : displayed.isPhotoOnly;
+        return tabIndex == 0
+            ? displayed.hasVideoMedia
+            : !displayed.hasVideoMedia;
       })
       .toList(growable: false);
   final pageIndex = filtered.indexWhere(
@@ -2130,6 +2135,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
+      // Pre-build the adjacent page so swiping to it is instant (media widget
+      // is already mounted before the drag completes).
+      allowImplicitScrolling: true,
       itemCount: items.length,
       onPageChanged: (index) {
         setState(() => _activePage = index);
@@ -2389,11 +2397,15 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   List<FeedItem> _filterPosts(List<FeedItem> posts) {
     bool isVideo(FeedItem item) =>
         item is FeedPostItem && item.post.displayedPost.hasVideoMedia;
-    bool isPhoto(FeedItem item) =>
-        item is FeedPostItem && item.post.displayedPost.isPhotoOnly;
+    // The Photos tab holds photo posts AND text-only posts (branded gradient
+    // cards) — everything that isn't a video — matching the old web feed.
+    bool isPhotoOrText(FeedItem item) =>
+        item is FeedPostItem && !item.post.displayedPost.hasVideoMedia;
     return switch (_tabIndex) {
       0 => posts.where((item) => item is FeedAdItem || isVideo(item)).toList(),
-      1 => posts.where((item) => item is FeedAdItem || isPhoto(item)).toList(),
+      1 => posts
+          .where((item) => item is FeedAdItem || isPhotoOrText(item))
+          .toList(),
       2 => const <FeedItem>[],
       _ => posts,
     };
@@ -2418,24 +2430,25 @@ class _PageTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      child: child,
-      builder: (context, child) {
-        // Distance (in pages) of this page from the current scroll position.
-        double delta = 0;
-        if (controller.hasClients && controller.position.hasContentDimensions) {
-          final page = controller.page ?? controller.initialPage.toDouble();
-          delta = (page - index).abs().clamp(0.0, 1.0);
-        }
-        // Active page -> scale 1.0 / full opacity; neighbour -> 0.92 / 0.55.
-        final scale = 1.0 - (0.08 * delta);
-        final opacity = 1.0 - (0.45 * delta);
-        return Opacity(
-          opacity: opacity,
-          child: Transform.scale(scale: scale, child: child),
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: controller,
+        child: child,
+        builder: (context, child) {
+          // Distance (in pages) of this page from the current scroll position.
+          double delta = 0;
+          if (controller.hasClients &&
+              controller.position.hasContentDimensions) {
+            final page = controller.page ?? controller.initialPage.toDouble();
+            delta = (page - index).abs().clamp(0.0, 1.0);
+          }
+          // A subtle scale-back for neighbours. No Opacity: that forces a
+          // per-frame saveLayer on the full-screen page and is the main scroll
+          // jank source — a paint-time Transform is effectively free.
+          final scale = 1.0 - (0.04 * delta);
+          return Transform.scale(scale: scale, child: child);
+        },
+      ),
     );
   }
 }

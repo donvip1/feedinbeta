@@ -370,6 +370,7 @@ class _FeedPostPagerScreenState extends State<FeedPostPagerScreen>
             child: PageView.builder(
               controller: _controller,
               scrollDirection: Axis.vertical,
+              allowImplicitScrolling: true,
               itemCount: _posts.length,
               onPageChanged: (index) => setState(() => _activePage = index),
               itemBuilder: (context, index) {

@@ -30,35 +30,36 @@ class _CreateActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SheetFrame(
       title: 'Create',
-      subtitle: 'Choose what you want to share',
+      showClose: true,
+      showCancel: true,
       children: const [
         _ActionRow(
           value: CreateAction.video,
           icon: Icons.videocam_rounded,
           title: 'Video',
-          description: 'Take a video or choose from gallery',
-          accent: Color(0xFF35C6C3),
+          description: 'Take video or choose from gallery',
+          gradient: [Color(0xFF4F8CFF), Color(0xFF35C6C3)],
         ),
         _ActionRow(
           value: CreateAction.photo,
           icon: Icons.add_photo_alternate_rounded,
           title: 'Photo+',
-          description: 'Share your thoughts with images',
-          accent: Color(0xFFFFC857),
+          description: 'Share your thoughts',
+          gradient: [Color(0xFF9B5CF6), Color(0xFFE455C7)],
         ),
         _ActionRow(
           value: CreateAction.story,
-          icon: Icons.amp_stories_rounded,
+          icon: Icons.sensors_rounded,
           title: 'Story',
           description: 'Share for 24 hours',
-          accent: Color(0xFF9B8AFB),
+          gradient: [Color(0xFFFF6FA5), Color(0xFFFF4D6D)],
         ),
         _ActionRow(
           value: CreateAction.goLive,
-          icon: Icons.sensors_rounded,
+          icon: Icons.mic_rounded,
           title: 'Go Live',
           description: 'Start a live stream or audio space',
-          accent: Color(0xFFFF5D73),
+          gradient: [Color(0xFFFF6B5B), Color(0xFFFF3D6E)],
         ),
       ],
     );
@@ -79,14 +80,14 @@ class _LiveCreateActionSheet extends StatelessWidget {
           icon: Icons.videocam_rounded,
           title: 'Video Live',
           description: 'Broadcast with camera and live chat',
-          accent: Color(0xFFFF5D73),
+          gradient: [Color(0xFFFF6B5B), Color(0xFFFF3D6E)],
         ),
         _ActionRow(
           value: LiveCreateAction.audioSpace,
           icon: Icons.graphic_eq_rounded,
           title: 'Audio Space',
           description: 'Host a live voice conversation',
-          accent: Color(0xFF35C6C3),
+          gradient: [Color(0xFF4F8CFF), Color(0xFF35C6C3)],
         ),
       ],
     );
@@ -96,12 +97,16 @@ class _LiveCreateActionSheet extends StatelessWidget {
 class _SheetFrame extends StatelessWidget {
   const _SheetFrame({
     required this.title,
-    required this.subtitle,
     required this.children,
+    this.subtitle,
+    this.showClose = false,
+    this.showCancel = false,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final bool showClose;
+  final bool showCancel;
   final List<Widget> children;
 
   @override
@@ -112,7 +117,7 @@ class _SheetFrame extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
         decoration: const BoxDecoration(
           color: Color(0xFF111318),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           border: Border(top: BorderSide(color: Color(0xFF2A2E36))),
         ),
         child: Column(
@@ -130,21 +135,55 @@ class _SheetFrame extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (showClose)
+                  IconButton(
+                    key: const Key('create-sheet-close'),
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    color: const Color(0xFFA8AFBA),
+                    tooltip: 'Close',
+                  ),
+              ],
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: const TextStyle(color: Color(0xFFA8AFBA), fontSize: 13),
               ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Color(0xFFA8AFBA), fontSize: 13),
-            ),
+            ],
             const SizedBox(height: 14),
             ...children,
+            if (showCancel) ...[
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  key: const Key('create-sheet-cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFD3D7DE),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -158,42 +197,46 @@ class _ActionRow<T> extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.description,
-    required this.accent,
+    required this.gradient,
   });
 
   final T value;
   final IconData icon;
   final String title;
   final String description;
-  final Color accent;
+  final List<Color> gradient;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: const Color(0xFF1A1D23),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
           key: ValueKey('create-action-$value'),
           onTap: () => Navigator.of(context).pop<T>(value),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(12),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 68),
+            constraints: const BoxConstraints(minHeight: 72),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(6),
+                      gradient: LinearGradient(
+                        colors: gradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(icon, color: accent, size: 23),
+                    child: Icon(icon, color: Colors.white, size: 24),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -203,7 +246,7 @@ class _ActionRow<T> extends StatelessWidget {
                           title,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -212,7 +255,7 @@ class _ActionRow<T> extends StatelessWidget {
                           description,
                           style: const TextStyle(
                             color: Color(0xFFA8AFBA),
-                            fontSize: 12,
+                            fontSize: 13,
                             height: 1.25,
                           ),
                         ),

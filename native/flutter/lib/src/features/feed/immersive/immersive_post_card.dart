@@ -8,6 +8,7 @@ import 'creator_header.dart';
 import 'feed_action_rail.dart';
 import 'feed_immersive_theme.dart';
 import 'gesture_layer.dart';
+import 'immersive_audio.dart';
 import 'media_layer.dart';
 
 /// A single full-screen TikTok-style social post.
@@ -192,6 +193,22 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
             ),
           ),
 
+          // 4b. Mute toggle for video posts: top-right, on the display-name
+          //     line, aligned to the action rail's right column (so it no
+          //     longer overlaps the "More" button at the bottom). Photos/text
+          //     have no audio, so it's video-only.
+          if (_contentPost.hasVideoMedia)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + widget.headerTopGap,
+              right: FeedImmersiveTheme.railRightInset,
+              child: _ChromeStageOverlay(
+                visible: _chromeVisible,
+                active: widget.isActive,
+                offset: const Offset(0.04, 0),
+                child: const _FeedMuteButton(),
+              ),
+            ),
+
           // 5. Bottom-left text overlay. Only visible in the full chrome
           //    stage; hidden chrome never reveals it.
           Positioned(
@@ -266,6 +283,44 @@ class _ImmersivePostCardState extends State<ImmersivePostCard> {
     if (elapsed.inHours >= 1) return '${elapsed.inHours}h';
     if (elapsed.inMinutes >= 1) return '${elapsed.inMinutes}m';
     return 'Now';
+  }
+}
+
+/// Session-wide mute toggle for immersive video, shown top-right on the
+/// creator-header line. Flips the shared [immersiveFeedMuted] notifier; each
+/// live [ImmersiveVideoPlayer] re-applies its volume in response.
+class _FeedMuteButton extends StatelessWidget {
+  const _FeedMuteButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: immersiveFeedMuted,
+      builder: (context, muted, _) {
+        return Semantics(
+          button: true,
+          label: muted ? 'Unmute video' : 'Mute video',
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: FeedImmersiveTheme.overlayControlSoft,
+              shape: BoxShape.circle,
+              boxShadow: FeedImmersiveTheme.mediaControlShadow,
+            ),
+            child: IconButton(
+              key: const Key('feed-mute-toggle'),
+              tooltip: muted ? 'Unmute' : 'Mute',
+              onPressed: () =>
+                  immersiveFeedMuted.value = !immersiveFeedMuted.value,
+              color: FeedImmersiveTheme.onMedia,
+              iconSize: FeedImmersiveTheme.iconMd,
+              icon: Icon(
+                muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
