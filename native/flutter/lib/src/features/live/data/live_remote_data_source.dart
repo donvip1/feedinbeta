@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import 'live_models.dart';
 
@@ -73,11 +74,9 @@ class LiveRemoteDataSource {
   static const _streamViewersTable = 'live_stream_viewers';
   static const _streamCommentsTable = 'live_stream_comments';
   static const _streamReactionsTable = 'live_stream_reactions';
-  static const _streamGiftsTable = 'live_stream_gifts';
   static const _spaceSpeakersTable = 'live_space_speakers';
   static const _spaceMessagesTable = 'live_space_messages';
   static const _spaceReactionsTable = 'live_space_reactions';
-  static const _spaceGiftsTable = 'live_space_gifts';
 
   /// Embedded profile projections. Use concrete FK names from the native
   /// migrations so PostgREST does not fail on ambiguous `profiles` relations.
@@ -511,13 +510,14 @@ class LiveRemoteDataSource {
 
   // --- Stream gifts ----------------------------------------------------------
 
-  /// Send a gift in a stream. Native has no `send_live_gift` credit RPC, so this
-  /// inserts the gift row directly (no atomic credit deduction — see report).
-  /// [receiverId] defaults to the stream host.
+  /// Send a gift in a stream via the server-authoritative `send_live_stream_gift`
+  /// RPC: the cost is derived from the `live_gift_types` catalog (never the
+  /// client), the sender is debited and the host credited atomically, and the
+  /// insert happens inside the SECURITY DEFINER function. [receiverId] must be
+  /// the stream host; a fresh idempotency key guards against double-charge.
   Future<void> sendStreamGift({
     required String streamId,
     required String giftType,
-    required int creditValue,
     required String receiverId,
   }) async {
     final client = _client;
@@ -529,13 +529,37 @@ class LiveRemoteDataSource {
         'Cannot send a gift because the stream is missing.',
       );
     }
-    await client.from(_streamGiftsTable).insert({
-      'stream_id': streamId,
-      'sender_id': userId,
-      'receiver_id': receiverId.isEmpty ? null : receiverId,
-      'gift_type': giftType,
-      'credit_value': creditValue,
-    });
+    try {
+      await client.rpc(
+        'send_live_stream_gift',
+        params: {
+          'p_gift_type': giftType,
+          'p_stream_id': streamId,
+          'p_receiver_id': receiverId.isEmpty ? null : receiverId,
+          'p_idempotency_key': const Uuid().v4(),
+        },
+      );
+    } catch (error) {
+      throw LiveDataException(_giftFailureMessage(error));
+    }
+  }
+
+  /// Maps a gift settlement RPC error to a friendly, user-facing message.
+  String _giftFailureMessage(Object error) {
+    final raw = error is PostgrestException ? error.message : error.toString();
+    if (raw.contains('INSUFFICIENT_CREDITS')) {
+      return 'You don\'t have enough credits to send this gift.';
+    }
+    if (raw.contains('SELF_GIFT_NOT_ALLOWED')) {
+      return 'You can\'t send a gift to your own room.';
+    }
+    if (raw.contains('GIFT_NOT_AVAILABLE')) {
+      return 'That gift isn\'t available right now.';
+    }
+    if (raw.contains('NOT_AUTHENTICATED')) {
+      return 'Sign in to send gifts.';
+    }
+    return 'Could not send the gift. Please try again.';
   }
 
   // --- Host PULSE cards (stream_features.host_cards) --------------------------
@@ -796,7 +820,6 @@ class LiveRemoteDataSource {
   Future<void> sendSpaceGift({
     required String spaceId,
     required String giftType,
-    required int creditValue,
     required String receiverId,
   }) async {
     final client = _client;
@@ -817,17 +840,17 @@ class LiveRemoteDataSource {
       );
     }
     try {
-      await client.from(_spaceGiftsTable).insert({
-        'space_id': spaceId,
-        'sender_id': userId,
-        'receiver_id': receiverId.isEmpty ? null : receiverId,
-        'gift_type': giftType,
-        'credit_value': creditValue,
-      });
-    } catch (_) {
-      throw const LiveSpaceUnavailableException(
-        'Audio-space gifts are unavailable. The backend may be missing gift table access or credit handling.',
+      await client.rpc(
+        'send_live_space_gift',
+        params: {
+          'p_gift_type': giftType,
+          'p_space_id': spaceId,
+          'p_receiver_id': receiverId.isEmpty ? null : receiverId,
+          'p_idempotency_key': const Uuid().v4(),
+        },
       );
+    } catch (error) {
+      throw LiveSpaceUnavailableException(_giftFailureMessage(error));
     }
   }
 }

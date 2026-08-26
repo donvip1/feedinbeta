@@ -388,7 +388,6 @@ class _LiveStreamViewerScreenState extends State<LiveStreamViewerScreen> {
       await _data.sendStreamGift(
         streamId: widget.stream.id,
         giftType: gift.type,
-        creditValue: gift.creditValue,
         receiverId: widget.stream.hostId,
       );
       if (!mounted) return;

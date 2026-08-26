@@ -228,7 +228,6 @@ class _LiveSpaceRoomScreenState extends State<LiveSpaceRoomScreen> {
       await _data.sendSpaceGift(
         spaceId: widget.space.id,
         giftType: gift.type,
-        creditValue: gift.creditValue,
         receiverId: widget.space.hostId,
       );
       if (!mounted) return;
